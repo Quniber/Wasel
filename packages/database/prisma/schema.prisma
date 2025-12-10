@@ -1,0 +1,1102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum DriverStatus {
+  online
+  offline
+  in_ride
+  waiting_documents
+  pending_approval
+  soft_reject
+  hard_reject
+  blocked
+}
+
+enum CustomerStatus {
+  enabled
+  disabled
+}
+
+enum OrderStatus {
+  Requested
+  NotFound
+  NoCloseFound
+  Found
+  DriverAccepted
+  Arrived
+  WaitingForPrePay
+  DriverCanceled
+  RiderCanceled
+  Started
+  WaitingForPostPay
+  WaitingForReview
+  Finished
+  Booked
+  Expired
+}
+
+enum PaymentMode {
+  cash
+  wallet
+  saved_payment_method
+  payment_gateway
+}
+
+enum OperatorRole {
+  admin
+  operator
+  viewer
+}
+
+enum TransactionType {
+  credit
+  debit
+}
+
+enum TransactionAction {
+  ride_payment
+  ride_earning
+  topup
+  withdrawal
+  refund
+  commission
+  tip
+  cancellation_fee
+  adjustment
+}
+
+enum DocumentStatus {
+  pending
+  approved
+  rejected
+}
+
+enum SupportRequestStatus {
+  submitted
+  in_progress
+  resolved
+}
+
+enum SOSStatus {
+  submitted
+  in_progress
+  resolved
+}
+
+enum PaymentGatewayType {
+  stripe
+  paypal
+  razorpay
+  paystack
+  flutterwave
+  cash
+}
+
+enum AddressType {
+  home
+  work
+  other
+}
+
+enum AnnouncementUserType {
+  all
+  riders
+  drivers
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+// ==================== CUSTOMER MODELS ====================
+
+model Customer {
+  id                Int              @id @default(autoincrement())
+  firstName         String?
+  lastName          String?
+  email             String?          @unique
+  mobileNumber      String           @unique
+  countryIso        String?          @db.VarChar(5)
+  gender            Gender?
+  password          String?
+  status            CustomerStatus   @default(enabled)
+  isResident        Boolean?
+  idNumber          String?
+  notificationToken String?
+
+  // Avatar
+  mediaId           Int?
+  media             Media?           @relation(fields: [mediaId], references: [id])
+  presetAvatarNumber Int?
+
+  // Wallet
+  walletBalance     Decimal          @default(0) @db.Decimal(10, 2)
+
+  // Default payment
+  defaultPaymentMethodId Int?
+  defaultPaymentMethod   SavedPaymentMethod? @relation("DefaultPaymentMethod", fields: [defaultPaymentMethodId], references: [id])
+
+  // Timestamps
+  lastActivityAt    DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  orders            Order[]
+  addresses         CustomerAddress[]
+  walletTransactions CustomerTransaction[]
+  coupons           CustomerCoupon[]
+  favoriteDrivers   FavoriteDriver[]
+  blockedDrivers    BlockedDriver[]
+  savedPaymentMethods SavedPaymentMethod[] @relation("CustomerPaymentMethods")
+  sessions          CustomerSession[]
+  notes             CustomerNote[]
+  supportRequests   SupportRequest[]
+
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id          Int         @id @default(autoincrement())
+  customerId  Int
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type        AddressType @default(other)
+  title       String?
+  address     String
+  latitude    Decimal     @db.Decimal(10, 7)
+  longitude   Decimal     @db.Decimal(10, 7)
+  isDefault   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("customer_addresses")
+}
+
+model CustomerTransaction {
+  id            Int               @id @default(autoincrement())
+  customerId    Int
+  customer      Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId       Int?
+  order         Order?            @relation(fields: [orderId], references: [id])
+  type          TransactionType
+  action        TransactionAction
+  amount        Decimal           @db.Decimal(10, 2)
+  currency      String            @default("USD") @db.Char(3)
+  description   String?
+  reference     String?
+  createdAt     DateTime          @default(now())
+
+  @@index([customerId])
+  @@map("customer_transactions")
+}
+
+model CustomerSession {
+  id            Int            @id @default(autoincrement())
+  customerId    Int
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deviceToken   String?
+  devicePlatform DevicePlatform?
+  deviceModel   String?
+  appVersion    String?
+  lastActiveAt  DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+
+  @@map("customer_sessions")
+}
+
+model CustomerNote {
+  id          Int       @id @default(autoincrement())
+  customerId  Int
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  operatorId  Int
+  operator    Operator  @relation(fields: [operatorId], references: [id])
+  note        String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("customer_notes")
+}
+
+model CustomerCoupon {
+  id          Int       @id @default(autoincrement())
+  customerId  Int
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  couponId    Int
+  coupon      Coupon    @relation(fields: [couponId], references: [id])
+  usedCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@unique([customerId, couponId])
+  @@map("customer_coupons")
+}
+
+model FavoriteDriver {
+  id          Int       @id @default(autoincrement())
+  customerId  Int
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([customerId, driverId])
+  @@map("favorite_drivers")
+}
+
+model BlockedDriver {
+  id          Int       @id @default(autoincrement())
+  customerId  Int
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  reason      String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([customerId, driverId])
+  @@map("blocked_drivers")
+}
+
+// ==================== DRIVER MODELS ====================
+
+model Driver {
+  id                  Int              @id @default(autoincrement())
+  firstName           String?
+  lastName            String?
+  email               String?          @unique
+  mobileNumber        String           @unique
+  countryIso          String?          @db.VarChar(5)
+  gender              Gender?
+  password            String?
+  status              DriverStatus     @default(waiting_documents)
+  certificateNumber   String?
+  address             String?
+
+  // Avatar
+  mediaId             Int?
+  media               Media?           @relation(fields: [mediaId], references: [id])
+  presetAvatarNumber  Int?
+
+  // Car details
+  carModelId          Int?
+  carModel            CarModel?        @relation(fields: [carModelId], references: [id])
+  carColorId          Int?
+  carColor            CarColor?        @relation(fields: [carColorId], references: [id])
+  carPlate            String?
+  carProductionYear   Int?
+
+  // Fleet
+  fleetId             Int?
+  fleet               Fleet?           @relation(fields: [fleetId], references: [id])
+
+  // Location
+  latitude            Decimal?         @db.Decimal(10, 7)
+  longitude           Decimal?         @db.Decimal(10, 7)
+  searchDistance      Int?             @default(10000)
+
+  // Stats
+  rating              Decimal          @default(5.0) @db.Decimal(3, 2)
+  reviewCount         Int              @default(0)
+  acceptedOrdersCount Int              @default(0)
+  rejectedOrdersCount Int              @default(0)
+  completedOrdersCount Int             @default(0)
+
+  // Wallet
+  walletBalance       Decimal          @default(0) @db.Decimal(10, 2)
+
+  // Bank details
+  bankName            String?
+  accountNumber       String?
+  bankRoutingNumber   String?
+  bankSwift           String?
+
+  // Notifications
+  notificationToken   String?
+  softRejectionNote   String?
+
+  // Timestamps
+  lastSeenAt          DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
+
+  // Relations
+  orders              Order[]
+  documents           DriverDocument[]
+  walletTransactions  DriverTransaction[]
+  feedbacks           Feedback[]
+  enabledServices     DriverService[]
+  sessions            DriverSession[]
+  notes               DriverNote[]
+  favoriteOf          FavoriteDriver[]
+  blockedBy           BlockedDriver[]
+  reviewsGiven        RiderReview[]
+  savedPaymentMethods SavedPaymentMethod[]
+
+  @@map("drivers")
+}
+
+model CarModel {
+  id          Int       @id @default(autoincrement())
+  brand       String
+  model       String
+  year        Int?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  drivers     Driver[]
+
+  @@map("car_models")
+}
+
+model CarColor {
+  id          Int       @id @default(autoincrement())
+  name        String
+  hexCode     String?   @db.VarChar(7)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  drivers     Driver[]
+
+  @@map("car_colors")
+}
+
+model DriverDocument {
+  id               Int            @id @default(autoincrement())
+  driverId         Int
+  driver           Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  documentTypeId   Int
+  documentType     DocumentType   @relation(fields: [documentTypeId], references: [id])
+  mediaId          Int
+  media            Media          @relation(fields: [mediaId], references: [id])
+  status           DocumentStatus @default(pending)
+  expiryDate       DateTime?
+  rejectionNote    String?
+  verifiedAt       DateTime?
+  verifiedById     Int?
+  verifiedBy       Operator?      @relation(fields: [verifiedById], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("driver_documents")
+}
+
+model DocumentType {
+  id              Int              @id @default(autoincrement())
+  name            String
+  description     String?
+  isRequired      Boolean          @default(true)
+  hasExpiry       Boolean          @default(false)
+  sortOrder       Int              @default(0)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  documents       DriverDocument[]
+
+  @@map("document_types")
+}
+
+model DriverTransaction {
+  id            Int               @id @default(autoincrement())
+  driverId      Int
+  driver        Driver            @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  orderId       Int?
+  order         Order?            @relation(fields: [orderId], references: [id])
+  type          TransactionType
+  action        TransactionAction
+  amount        Decimal           @db.Decimal(10, 2)
+  currency      String            @default("USD") @db.Char(3)
+  description   String?
+  reference     String?
+  createdAt     DateTime          @default(now())
+
+  @@index([driverId])
+  @@map("driver_transactions")
+}
+
+model DriverSession {
+  id            Int            @id @default(autoincrement())
+  driverId      Int
+  driver        Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  deviceToken   String?
+  devicePlatform DevicePlatform?
+  deviceModel   String?
+  appVersion    String?
+  lastActiveAt  DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+
+  @@map("driver_sessions")
+}
+
+model DriverNote {
+  id          Int       @id @default(autoincrement())
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  operatorId  Int
+  operator    Operator  @relation(fields: [operatorId], references: [id])
+  note        String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("driver_notes")
+}
+
+model DriverService {
+  id          Int       @id @default(autoincrement())
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  serviceId   Int
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  isEnabled   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@unique([driverId, serviceId])
+  @@map("driver_services")
+}
+
+// ==================== SERVICE MODELS ====================
+
+model ServiceCategory {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  iconUrl     String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  services    Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id                Int              @id @default(autoincrement())
+  categoryId        Int?
+  category          ServiceCategory? @relation(fields: [categoryId], references: [id])
+  name              String
+  description       String?          @db.Text
+
+  // Media
+  mediaId           Int?
+  media             Media?           @relation(fields: [mediaId], references: [id])
+
+  // Capacity
+  personCapacity    Int              @default(4)
+
+  // Pricing
+  baseFare          Decimal          @default(0) @db.Decimal(10, 2)
+  perKilometer      Decimal          @default(0) @db.Decimal(10, 2)
+  perHundredMeters  Decimal          @default(0) @db.Decimal(10, 2)
+  perMinuteDrive    Decimal          @default(0) @db.Decimal(10, 2)
+  perMinuteWait     Decimal          @default(0) @db.Decimal(10, 2)
+  minimumFare       Decimal          @default(0) @db.Decimal(10, 2)
+  cancellationFee   Decimal          @default(0) @db.Decimal(10, 2)
+  cancellationDriverShare Decimal    @default(0) @db.Decimal(10, 2)
+  currency          String           @default("QAR") @db.Char(3)
+
+  // Commission
+  providerSharePercent Int           @default(0)
+  providerShareFlat    Decimal       @default(0) @db.Decimal(10, 2)
+
+  // Settings
+  searchRadius      Int              @default(10000)
+  prepayPercent     Int              @default(0)
+  twoWayAvailable   Boolean          @default(false)
+
+  // Availability
+  availableTimeFrom String           @default("00:00") @db.VarChar(5)
+  availableTimeTo   String           @default("23:59") @db.VarChar(5)
+
+  // Display
+  displayPriority   Int              @default(0)
+  isActive          Boolean          @default(true)
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  orders            Order[]
+  drivers           DriverService[]
+  options           ServiceOption[]
+  zonePrices        ZonePrice[]
+  regions           ServiceRegion[]
+  coupons           CouponService[]
+
+  @@map("services")
+}
+
+model ServiceOption {
+  id          Int       @id @default(autoincrement())
+  serviceId   Int
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  icon        String?
+  price       Decimal   @default(0) @db.Decimal(10, 2)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  orderOptions OrderServiceOption[]
+
+  @@map("service_options")
+}
+
+model ZonePrice {
+  id              Int       @id @default(autoincrement())
+  serviceId       Int
+  service         Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  name            String
+  fromPolygon     String    @db.Text
+  toPolygon       String    @db.Text
+  price           Decimal   @db.Decimal(10, 2)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  @@map("zone_prices")
+}
+
+// ==================== REGION MODELS ====================
+
+model Region {
+  id          Int             @id @default(autoincrement())
+  name        String
+  currency    String          @default("USD") @db.Char(3)
+  polygon     String          @db.Text
+  isEnabled   Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  services    ServiceRegion[]
+  orders      Order[]
+
+  @@map("regions")
+}
+
+model ServiceRegion {
+  id          Int       @id @default(autoincrement())
+  serviceId   Int
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  regionId    Int
+  region      Region    @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, regionId])
+  @@map("service_regions")
+}
+
+// ==================== FLEET MODELS ====================
+
+model Fleet {
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  phoneNumber           String
+  mobileNumber          String
+  address               String?
+  accountNumber         String?
+
+  // Commission
+  commissionSharePercent Int      @default(0)
+  commissionShareFlat   Decimal   @default(0) @db.Decimal(10, 2)
+  feeMultiplier         Decimal?  @db.Decimal(10, 2)
+
+  // Auth
+  userName              String?   @unique
+  password              String?
+
+  // Status
+  isBlocked             Boolean   @default(false)
+
+  // Avatar
+  profilePictureId      Int?
+  profilePicture        Media?    @relation(fields: [profilePictureId], references: [id])
+
+  // Wallet
+  walletBalance         Decimal   @default(0) @db.Decimal(10, 2)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  // Relations
+  drivers               Driver[]
+  transactions          FleetTransaction[]
+  orders                Order[]
+
+  @@map("fleets")
+}
+
+model FleetTransaction {
+  id            Int               @id @default(autoincrement())
+  fleetId       Int
+  fleet         Fleet             @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  orderId       Int?
+  order         Order?            @relation(fields: [orderId], references: [id])
+  type          TransactionType
+  action        TransactionAction
+  amount        Decimal           @db.Decimal(10, 2)
+  currency      String            @default("USD") @db.Char(3)
+  description   String?
+  reference     String?
+  createdAt     DateTime          @default(now())
+
+  @@index([fleetId])
+  @@map("fleet_transactions")
+}
+
+// ==================== ORDER MODELS ====================
+
+model Order {
+  id                  Int            @id @default(autoincrement())
+  status              OrderStatus    @default(Requested)
+
+  // Relations
+  customerId          Int
+  customer            Customer       @relation(fields: [customerId], references: [id])
+  driverId            Int?
+  driver              Driver?        @relation(fields: [driverId], references: [id])
+  serviceId           Int
+  service             Service        @relation(fields: [serviceId], references: [id])
+  regionId            Int?
+  region              Region?        @relation(fields: [regionId], references: [id])
+  fleetId             Int?
+  fleet               Fleet?         @relation(fields: [fleetId], references: [id])
+  couponId            Int?
+  coupon              Coupon?        @relation(fields: [couponId], references: [id])
+
+  // Addresses (stored as JSON for multiple waypoints)
+  addresses           String         @db.Text
+  points              String         @db.Text
+
+  // Legacy single pickup/dropoff
+  pickupAddress       String?
+  pickupLatitude      Decimal?       @db.Decimal(10, 7)
+  pickupLongitude     Decimal?       @db.Decimal(10, 7)
+  dropoffAddress      String?
+  dropoffLatitude     Decimal?       @db.Decimal(10, 7)
+  dropoffLongitude    Decimal?       @db.Decimal(10, 7)
+
+  // Trip details
+  distanceMeters      Int            @default(0)
+  durationSeconds     Int            @default(0)
+  waitMinutes         Int            @default(0)
+
+  // Expected/ETA
+  expectedTimestamp   DateTime       @default(now())
+  pickupEta           DateTime?
+  dropOffEta          DateTime?
+
+  // Fare breakdown
+  currency            String         @default("USD") @db.Char(3)
+  serviceCost         Decimal        @default(0) @db.Decimal(10, 2)
+  waitCost            Decimal        @default(0) @db.Decimal(10, 2)
+  optionsCost         Decimal        @default(0) @db.Decimal(10, 2)
+  taxCost             Decimal        @default(0) @db.Decimal(10, 2)
+  costBest            Decimal        @default(0) @db.Decimal(10, 2)
+  costAfterCoupon     Decimal        @default(0) @db.Decimal(10, 2)
+  tipAmount           Decimal        @default(0) @db.Decimal(10, 2)
+  paidAmount          Decimal        @default(0) @db.Decimal(10, 2)
+  providerShare       Decimal        @default(0) @db.Decimal(10, 2)
+
+  // Payment
+  paymentMode         PaymentMode    @default(cash)
+  paymentGatewayId    Int?
+  paymentGateway      PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
+  savedPaymentMethodId Int?
+  savedPaymentMethod  SavedPaymentMethod? @relation(fields: [savedPaymentMethodId], references: [id])
+
+  // Cancel
+  cancelReasonId      Int?
+  cancelReason        OrderCancelReason? @relation(fields: [cancelReasonId], references: [id])
+  cancelReasonNote    String?        @db.Text
+
+  // Chat tracking
+  driverLastSeenMessagesAt DateTime?
+  riderLastSeenMessagesAt  DateTime?
+
+  // Timestamps
+  acceptedAt          DateTime?
+  arrivedAt           DateTime?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  canceledAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relations
+  messages            OrderMessage[]
+  activities          OrderActivity[]
+  notes               OrderNote[]
+  options             OrderServiceOption[]
+  feedback            Feedback?
+  riderReview         RiderReview?
+  sosCalls            SOS[]
+  customerTransactions CustomerTransaction[]
+  driverTransactions   DriverTransaction[]
+  fleetTransactions    FleetTransaction[]
+  supportRequests      SupportRequest[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([driverId])
+  @@map("orders")
+}
+
+model OrderCancelReason {
+  id              Int       @id @default(autoincrement())
+  title           String
+  isForDriver     Boolean   @default(false)
+  isForRider      Boolean   @default(true)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  orders          Order[]
+
+  @@map("order_cancel_reasons")
+}
+
+model OrderMessage {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sentByDriver Boolean
+  content     String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId])
+  @@map("order_messages")
+}
+
+model OrderActivity {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      OrderStatus
+  note        String?
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId])
+  @@map("order_activities")
+}
+
+model OrderNote {
+  id          Int       @id @default(autoincrement())
+  orderId     Int
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operatorId  Int
+  operator    Operator  @relation(fields: [operatorId], references: [id])
+  note        String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("order_notes")
+}
+
+model OrderServiceOption {
+  id              Int           @id @default(autoincrement())
+  orderId         Int
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  serviceOptionId Int
+  serviceOption   ServiceOption @relation(fields: [serviceOptionId], references: [id])
+  price           Decimal       @db.Decimal(10, 2)
+
+  @@unique([orderId, serviceOptionId])
+  @@map("order_service_options")
+}
+
+// ==================== FEEDBACK MODELS ====================
+
+model Feedback {
+  id          Int       @id @default(autoincrement())
+  orderId     Int       @unique
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id])
+  score       Int
+  review      String?   @db.Text
+  createdAt   DateTime  @default(now())
+  parameters  FeedbackParameter[]
+
+  @@map("feedbacks")
+}
+
+model FeedbackParameter {
+  id          Int       @id @default(autoincrement())
+  feedbackId  Int
+  feedback    Feedback  @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  parameterId Int
+  parameter   ReviewParameter @relation(fields: [parameterId], references: [id])
+  isGood      Boolean
+
+  @@map("feedback_parameters")
+}
+
+model ReviewParameter {
+  id          Int       @id @default(autoincrement())
+  title       String
+  isGood      Boolean   @default(true)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  feedbacks   FeedbackParameter[]
+
+  @@map("review_parameters")
+}
+
+model RiderReview {
+  id          Int       @id @default(autoincrement())
+  orderId     Int       @unique
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId    Int
+  driver      Driver    @relation(fields: [driverId], references: [id])
+  score       Int
+  review      String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("rider_reviews")
+}
+
+// ==================== SUPPORT MODELS ====================
+
+model SupportRequest {
+  id          Int                   @id @default(autoincrement())
+  orderId     Int?
+  order       Order?                @relation(fields: [orderId], references: [id])
+  customerId  Int?
+  customer    Customer?             @relation(fields: [customerId], references: [id])
+  subject     String
+  content     String                @db.Text
+  status      SupportRequestStatus  @default(submitted)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  activities  SupportRequestActivity[]
+
+  @@map("support_requests")
+}
+
+model SupportRequestActivity {
+  id                Int            @id @default(autoincrement())
+  supportRequestId  Int
+  supportRequest    SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+  operatorId        Int?
+  operator          Operator?      @relation(fields: [operatorId], references: [id])
+  actorType         String         @db.VarChar(20)
+  content           String         @db.Text
+  createdAt         DateTime       @default(now())
+
+  @@map("support_request_activities")
+}
+
+model SOS {
+  id              Int       @id @default(autoincrement())
+  orderId         Int
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reasonId        Int?
+  reason          SOSReason? @relation(fields: [reasonId], references: [id])
+  status          SOSStatus @default(submitted)
+  submittedByRider Boolean
+  comment         String?   @db.Text
+  latitude        Decimal?  @db.Decimal(10, 7)
+  longitude       Decimal?  @db.Decimal(10, 7)
+  createdAt       DateTime  @default(now())
+  activities      SOSActivity[]
+
+  @@map("sos")
+}
+
+model SOSReason {
+  id          Int       @id @default(autoincrement())
+  title       String
+  isForDriver Boolean   @default(false)
+  isForRider  Boolean   @default(true)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  sosCalls    SOS[]
+
+  @@map("sos_reasons")
+}
+
+model SOSActivity {
+  id          Int       @id @default(autoincrement())
+  sosId       Int
+  sos         SOS       @relation(fields: [sosId], references: [id], onDelete: Cascade)
+  operatorId  Int?
+  operator    Operator? @relation(fields: [operatorId], references: [id])
+  action      String
+  note        String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("sos_activities")
+}
+
+// ==================== PAYMENT MODELS ====================
+
+model PaymentGateway {
+  id          Int                @id @default(autoincrement())
+  type        PaymentGatewayType
+  title       String
+  description String?
+  publicKey   String?            @db.Text
+  privateKey  String             @db.Text
+  merchantId  String?
+  saltKey     String?            @db.Text
+  mediaId     Int?
+  media       Media?             @relation(fields: [mediaId], references: [id])
+  isEnabled   Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+  orders      Order[]
+  savedPaymentMethods SavedPaymentMethod[]
+
+  @@map("payment_gateways")
+}
+
+model SavedPaymentMethod {
+  id                Int            @id @default(autoincrement())
+  customerId        Int?
+  customer          Customer?      @relation("CustomerPaymentMethods", fields: [customerId], references: [id], onDelete: Cascade)
+  driverId          Int?
+  driver            Driver?        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  paymentGatewayId  Int
+  paymentGateway    PaymentGateway @relation(fields: [paymentGatewayId], references: [id])
+  title             String
+  lastFour          String?        @db.VarChar(4)
+  providerBrand     String?
+  token             String         @db.Text
+  isDefault         Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  orders            Order[]
+  defaultForCustomers Customer[]   @relation("DefaultPaymentMethod")
+
+  @@map("saved_payment_methods")
+}
+
+model Coupon {
+  id                  Int             @id @default(autoincrement())
+  code                String          @unique
+  title               String
+  description         String?         @db.Text
+  manyUsersCanUse     Int             @default(0)
+  manyTimesUserCanUse Int             @default(1)
+  minimumCost         Decimal         @default(0) @db.Decimal(10, 2)
+  maximumCost         Decimal         @default(0) @db.Decimal(10, 2)
+  startAt             DateTime
+  expireAt            DateTime?
+  discountPercent     Int             @default(0)
+  discountFlat        Decimal         @default(0) @db.Decimal(10, 2)
+  creditGift          Decimal         @default(0) @db.Decimal(10, 2)
+  isEnabled           Boolean         @default(true)
+  isFirstTravelOnly   Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  orders              Order[]
+  customers           CustomerCoupon[]
+  services            CouponService[]
+
+  @@map("coupons")
+}
+
+model CouponService {
+  id          Int       @id @default(autoincrement())
+  couponId    Int
+  coupon      Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  serviceId   Int
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, serviceId])
+  @@map("coupon_services")
+}
+
+// ==================== OPERATOR MODELS ====================
+
+model Operator {
+  id                    Int            @id @default(autoincrement())
+  firstName             String
+  lastName              String
+  email                 String         @unique
+  password              String
+  role                  OperatorRole   @default(operator)
+  isActive              Boolean        @default(true)
+  notificationToken     String?
+  lastLoginAt           DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relations
+  customerNotes         CustomerNote[]
+  driverNotes           DriverNote[]
+  orderNotes            OrderNote[]
+  verifiedDocuments     DriverDocument[]
+  supportActivities     SupportRequestActivity[]
+  sosActivities         SOSActivity[]
+
+  @@map("operators")
+}
+
+// ==================== MEDIA & SYSTEM MODELS ====================
+
+model Media {
+  id              Int       @id @default(autoincrement())
+  fileName        String
+  address         String    @db.LongText
+  mimeType        String?
+  size            Int?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  customers       Customer[]
+  drivers         Driver[]
+  services        Service[]
+  fleets          Fleet[]
+  paymentGateways PaymentGateway[]
+  documents       DriverDocument[]
+  announcements   Announcement[]
+
+  @@map("media")
+}
+
+model Announcement {
+  id              Int                  @id @default(autoincrement())
+  title           String
+  description     String               @db.Text
+  url             String?
+  userType        AnnouncementUserType @default(all)
+  mediaId         Int?
+  media           Media?               @relation(fields: [mediaId], references: [id])
+  startAt         DateTime
+  expireAt        DateTime?
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@map("announcements")
+}
+
+model AppVersion {
+  id              Int            @id @default(autoincrement())
+  platform        DevicePlatform
+  appType         String         @db.VarChar(20)
+  versionCode     Int
+  versionName     String
+  releaseNotes    String?        @db.Text
+  forceUpdate     Boolean        @default(false)
+  storeUrl        String?
+  createdAt       DateTime       @default(now())
+
+  @@map("app_versions")
+}
+
+model Setting {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  value       String    @db.Text
+  description String?
+  updatedAt   DateTime  @updatedAt
+
+  @@map("settings")
+}
