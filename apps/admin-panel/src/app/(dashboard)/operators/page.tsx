@@ -17,7 +17,7 @@ interface Operator {
   role: string;
   isActive: boolean;
   createdAt: string;
-  lastLogin?: string;
+  lastLoginAt?: string;
 }
 
 const roleLabels: Record<string, { label: string; className: string }> = {
@@ -192,7 +192,7 @@ export default function OperatorsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {operator.lastLogin ? formatDateTime(operator.lastLogin) : 'Never'}
+                      {operator.lastLoginAt ? formatDateTime(operator.lastLoginAt) : 'Never'}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

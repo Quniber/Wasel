@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.wasel.rider",
       "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
@@ -32,11 +32,17 @@
       "package": "com.wasel.rider",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+          "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
       }
     },
@@ -58,6 +64,17 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"
+      }
+    },
+    "owner": "quniber",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"
     }
   }
 }

@@ -44,7 +44,15 @@ export class OperatorsService {
       this.prisma.operator.count({ where }),
     ]);
 
-    return { operators, total, page, limit };
+    return {
+      data: operators,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: number) {

@@ -11,7 +11,16 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
-      "Bash(npm run db:generate:*)"
+      "Bash(npm run db:generate:*)",
+      "mcp__hostinger-mcp__VPS_getProjectListV1",
+      "mcp__hostinger-mcp__VPS_getVirtualMachineDetailsV1",
+      "mcp__hostinger-mcp__VPS_recreateVirtualMachineV1",
+      "mcp__hostinger-mcp__VPS_getActionDetailsV1",
+      "mcp__hostinger-mcp__VPS_setRootPasswordV1",
+      "mcp__hostinger-mcp__VPS_createFirewallRuleV1",
+      "mcp__hostinger-mcp__VPS_activateFirewallV1",
+      "Bash(tar:*)",
+      "mcp__hostinger-mcp__billing_getPaymentMethodListV1"
     ],
     "deny": [],
     "ask": []

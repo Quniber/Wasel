@@ -9,6 +9,7 @@ import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { PaymentModule } from './payment/payment.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { SocketModule } from './socket/socket.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SocketModule } from './socket/socket.module';
     PaymentModule,
     CouponsModule,
     SocketModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

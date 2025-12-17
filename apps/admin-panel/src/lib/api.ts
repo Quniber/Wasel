@@ -1144,7 +1144,7 @@ export interface Operator {
   role: string;
   isActive: boolean;
   createdAt: string;
-  lastLogin?: string;
+  lastLoginAt?: string;
 }
 
 export interface CreateOperatorDto {
