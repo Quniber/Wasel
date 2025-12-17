@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, RefreshControl, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
+import { orderApi } from '@/lib/api';
 
 interface ScheduledRide {
   id: string;
@@ -21,32 +22,53 @@ export default function ScheduledRidesScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [rides, setRides] = useState<ScheduledRide[]>([
-    {
-      id: '1',
-      scheduledDate: 'Dec 20, 2025',
-      scheduledTime: '10:30 AM',
-      pickup: 'Home',
-      dropoff: 'Airport',
-      service: 'Economy',
-      estimatedFare: 35.00,
-    },
-    {
-      id: '2',
-      scheduledDate: 'Dec 25, 2025',
-      scheduledTime: '8:00 AM',
-      pickup: '123 Main Street',
-      dropoff: 'Downtown Mall',
-      service: 'Premium',
-      estimatedFare: 25.00,
-    },
-  ]);
+  const [rides, setRides] = useState<ScheduledRide[]>([]);
+
+  useEffect(() => {
+    loadScheduledRides();
+  }, []);
+
+  const loadScheduledRides = async () => {
+    try {
+      const response = await orderApi.getScheduledOrders();
+      const orders = response.data || [];
+
+      // Transform API data to display format
+      const transformedRides = orders.map((order: any) => {
+        const scheduledAt = new Date(order.scheduledAt);
+        return {
+          id: order.id.toString(),
+          scheduledDate: scheduledAt.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }),
+          scheduledTime: scheduledAt.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          pickup: order.pickupAddress || 'Unknown',
+          dropoff: order.dropoffAddress || 'Unknown',
+          service: order.service?.name || 'Standard',
+          estimatedFare: parseFloat(order.fare) || 0,
+        };
+      });
+
+      setRides(transformedRides);
+    } catch (error) {
+      console.error('Error loading scheduled rides:', error);
+      setRides([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // Fetch scheduled rides from API
-    setTimeout(() => setIsRefreshing(false), 1000);
+    await loadScheduledRides();
+    setIsRefreshing(false);
   };
 
   const handleCancel = (id: string) => {
@@ -58,8 +80,14 @@ export default function ScheduledRidesScreen() {
         {
           text: t('common.yes'),
           style: 'destructive',
-          onPress: () => {
-            setRides(rides.filter((r) => r.id !== id));
+          onPress: async () => {
+            try {
+              await orderApi.cancelOrder(id);
+              setRides(rides.filter((r) => r.id !== id));
+            } catch (error) {
+              console.error('Error cancelling scheduled ride:', error);
+              Alert.alert(t('common.error'), t('errors.generic'));
+            }
           },
         },
       ]
@@ -112,6 +140,14 @@ export default function ScheduledRidesScreen() {
       </TouchableOpacity>
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
+import { getColors } from '@/constants/Colors';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY';
 
@@ -19,10 +20,11 @@ interface Prediction {
 }
 
 export default function SearchScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const { pickup, setPickup, setDropoff } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
 
   const [pickupText, setPickupText] = useState(pickup?.address || '');
   const [destinationText, setDestinationText] = useState('');
@@ -60,12 +62,26 @@ export default function SearchScreen() {
 
   const fetchPredictions = async (input: string) => {
     try {
+      // Get current language for localized results
+      const language = i18n.language === 'ar' ? 'ar' : 'en';
+
+      // Focus on Qatar region but allow worldwide results
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}&types=geocode|establishment`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}&types=geocode|establishment&language=${language}&components=country:qa&location=25.2854,51.5310&radius=50000`
       );
       const data = await response.json();
-      if (data.predictions) {
+
+      if (data.status === 'OK' && data.predictions) {
         setPredictions(data.predictions);
+      } else if (data.status === 'ZERO_RESULTS') {
+        // Try without country restriction for broader results
+        const fallbackResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}&types=geocode|establishment&language=${language}`
+        );
+        const fallbackData = await fallbackResponse.json();
+        if (fallbackData.predictions) {
+          setPredictions(fallbackData.predictions);
+        }
       }
     } catch (error) {
       console.error('Error fetching predictions:', error);

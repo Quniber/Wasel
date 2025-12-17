@@ -1,41 +1,61 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { getColors } from '@/constants/Colors';
+import { authApi } from '@/lib/api';
 
 export default function ProfileSetupScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { user, setUser } = useAuthStore();
+  const { setToken, setUser } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
+  const { phone, otp } = useLocalSearchParams<{ phone: string; otp: string }>();
 
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || '');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [gender, setGender] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleComplete = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Call API to update profile
-      // await authApi.updateProfile({ firstName, lastName, gender });
+    if (!firstName || !lastName) return;
 
-      if (user) {
-        setUser({
-          ...user,
-          firstName,
-          lastName,
-          gender: gender || undefined,
-        });
-      }
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Complete registration with OTP and profile info
+      const response = await authApi.verifyOtpAndRegister({
+        mobileNumber: phone || '',
+        otp: otp || '',
+        firstName,
+        lastName,
+        email: email || undefined,
+      });
+
+      // Save token and user data
+      await setToken(response.data.accessToken);
+      setUser({
+        id: response.data.customer.id.toString(),
+        firstName: response.data.customer.firstName || '',
+        lastName: response.data.customer.lastName || '',
+        email: response.data.customer.email || '',
+        mobileNumber: response.data.customer.mobileNumber,
+        gender: response.data.customer.gender,
+        walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
+      });
 
       router.replace('/(main)');
-    } catch (error) {
-      console.error(error);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || t('errors.generic'));
     } finally {
       setIsLoading(false);
     }

@@ -53,65 +53,61 @@ export default function FindingDriverScreen() {
     if (!pickup || !dropoff || !selectedService) return;
 
     try {
-      // const response = await orderApi.createOrder({
-      //   serviceId: selectedService.id,
-      //   pickupAddress: pickup.address,
-      //   pickupLatitude: pickup.latitude,
-      //   pickupLongitude: pickup.longitude,
-      //   dropoffAddress: dropoff.address,
-      //   dropoffLatitude: dropoff.latitude,
-      //   dropoffLongitude: dropoff.longitude,
-      // });
+      // Create order via API
+      const response = await orderApi.createOrder({
+        serviceId: selectedService.id,
+        pickupAddress: pickup.address,
+        pickupLatitude: pickup.latitude,
+        pickupLongitude: pickup.longitude,
+        dropoffAddress: dropoff.address,
+        dropoffLatitude: dropoff.latitude,
+        dropoffLongitude: dropoff.longitude,
+      });
 
-      // socketService.joinOrderRoom(response.data.id);
+      const order = response.data;
+
+      // Join order room for real-time updates
+      socketService.emit('join-order', { orderId: order.id });
 
       // Listen for driver acceptance
       const unsubscribe = socketService.on('order-status', (data) => {
         if (data.status === 'driver_accepted' && data.driver) {
           setActiveOrder({
-            id: data.orderId,
+            id: data.orderId || order.id,
             status: 'driver_accepted',
             pickup,
             dropoff,
             service: selectedService,
-            fare: 15, // Get from response
+            fare: data.fare || parseFloat(order.fare) || 15,
             driver: data.driver,
-            createdAt: new Date().toISOString(),
+            createdAt: order.createdAt || new Date().toISOString(),
           });
           router.replace('/(main)/ride-active');
+        } else if (data.status === 'no_drivers') {
+          setStatus('not_found');
         }
       });
 
-      // Simulate driver found after 5 seconds (for demo)
-      setTimeout(() => {
-        setActiveOrder({
-          id: 'demo-order-1',
-          status: 'driver_accepted',
-          pickup,
-          dropoff,
-          service: selectedService,
-          fare: 15.50,
-          driver: {
-            id: 'driver-1',
-            firstName: 'Ahmed',
-            lastName: 'Mohamed',
-            mobileNumber: '+1234567890',
-            rating: 4.8,
-            reviewCount: 124,
-            avatar: undefined,
-            carModel: 'Toyota Camry',
-            carColor: 'White',
-            carPlate: 'ABC 123',
-            latitude: pickup.latitude + 0.005,
-            longitude: pickup.longitude + 0.003,
-          },
-          createdAt: new Date().toISOString(),
-        });
-        router.replace('/(main)/ride-active');
-      }, 5000);
+      // Set initial active order with pending status
+      setActiveOrder({
+        id: order.id.toString(),
+        status: 'searching',
+        pickup,
+        dropoff,
+        service: selectedService,
+        fare: parseFloat(order.fare) || 15,
+        driver: null,
+        createdAt: order.createdAt || new Date().toISOString(),
+      });
+
+      // Timeout after 60 seconds if no driver found
+      const timeout = setTimeout(() => {
+        setStatus('not_found');
+      }, 60000);
 
       return () => {
         unsubscribe?.();
+        clearTimeout(timeout);
       };
     } catch (error) {
       console.error('Error creating order:', error);
@@ -154,7 +150,7 @@ export default function FindingDriverScreen() {
       {/* Map */}
       <MapView
         ref={mapRef}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={{
           latitude: pickup.latitude,

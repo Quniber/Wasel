@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { DrawerActions } from '@react-navigation/native';
 import { changeLanguage } from '@/i18n';
 import { socketService } from '@/lib/socket';
+import { getColors } from '@/constants/Colors';
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
@@ -20,6 +21,7 @@ export default function HomeScreen() {
   const { pickup, setPickup } = useBookingStore();
   const { user, logout } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
 
   const mapRef = useRef<MapView>(null);
   const [currentLocation, setCurrentLocation] = useState<{
@@ -49,7 +51,6 @@ export default function HomeScreen() {
       const { latitude, longitude } = location.coords;
       setCurrentLocation({ latitude, longitude });
 
-      // Get address for current location
       const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
       const addressString = [
         address?.street,
@@ -124,7 +125,7 @@ export default function HomeScreen() {
         {currentLocation ? (
           <MapView
             ref={mapRef}
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             style={{ flex: 1 }}
             initialRegion={{
               ...currentLocation,
@@ -143,15 +144,21 @@ export default function HomeScreen() {
                 title={t('booking.pickup')}
               >
                 <View className="items-center">
-                  <View className="w-4 h-4 rounded-full bg-primary border-2 border-white" />
+                  <View
+                    style={{ backgroundColor: colors.primary }}
+                    className="w-4 h-4 rounded-full border-2 border-white"
+                  />
                 </View>
               </Marker>
             )}
           </MapView>
         ) : (
-          <View className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-muted'}`}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text className="mt-4 text-muted-foreground">
+          <View
+            style={{ backgroundColor: colors.muted }}
+            className="flex-1 items-center justify-center"
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={{ color: colors.mutedForeground }} className="mt-4">
               {t('common.loading')}
             </Text>
           </View>
@@ -162,20 +169,18 @@ export default function HomeScreen() {
           <View className="flex-row items-center justify-between px-4 py-2">
             <TouchableOpacity
               onPress={openDrawer}
-              className={`w-12 h-12 rounded-full items-center justify-center shadow-lg ${
-                isDark ? 'bg-background-dark' : 'bg-white'
-              }`}
+              style={{ backgroundColor: colors.card }}
+              className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
             >
-              <Ionicons name="menu" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+              <Ionicons name="menu" size={24} color={colors.foreground} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => router.push('/(main)/notifications')}
-              className={`w-12 h-12 rounded-full items-center justify-center shadow-lg ${
-                isDark ? 'bg-background-dark' : 'bg-white'
-              }`}
+              style={{ backgroundColor: colors.card }}
+              className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
             >
-              <Ionicons name="notifications" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+              <Ionicons name="notifications" size={24} color={colors.foreground} />
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -183,39 +188,40 @@ export default function HomeScreen() {
         {/* My Location Button */}
         <TouchableOpacity
           onPress={centerOnCurrentLocation}
-          className={`absolute right-4 bottom-48 w-12 h-12 rounded-full items-center justify-center shadow-lg ${
-            isDark ? 'bg-background-dark' : 'bg-white'
-          }`}
+          style={{ backgroundColor: colors.card }}
+          className="absolute right-4 bottom-48 w-12 h-12 rounded-full items-center justify-center shadow-lg"
         >
-          <Ionicons name="locate" size={24} color="#4CAF50" />
+          <Ionicons name="locate" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Bottom Sheet */}
       <View
-        className={`rounded-t-3xl shadow-lg px-5 py-6 ${
-          isDark ? 'bg-background-dark' : 'bg-white'
-        }`}
         style={{
+          backgroundColor: colors.card,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.1,
           shadowRadius: 12,
           elevation: 10,
         }}
+        className="rounded-t-3xl px-5 py-6"
       >
         {/* Search Bar */}
         <TouchableOpacity
           onPress={() => router.push('/(main)/search')}
-          className={`flex-row items-center px-4 py-4 rounded-xl ${
-            isDark ? 'bg-muted-dark' : 'bg-muted'
-          }`}
+          style={{
+            backgroundColor: colors.secondary,
+            borderColor: colors.border,
+            borderWidth: 1,
+          }}
+          className="flex-row items-center px-4 py-4 rounded-xl"
         >
-          <Ionicons name="search" size={24} color="#4CAF50" />
-          <Text className="ml-3 text-base text-muted-foreground flex-1">
+          <Ionicons name="search" size={24} color={colors.primary} />
+          <Text style={{ color: colors.mutedForeground }} className="ml-3 text-base flex-1">
             {t('home.whereTo')}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
+          <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
         </TouchableOpacity>
 
         {/* Saved Places */}
@@ -230,17 +236,18 @@ export default function HomeScreen() {
                   router.push('/(main)/places');
                 }
               }}
-              className={`flex-1 flex-row items-center px-4 py-3 rounded-xl ${
-                isDark ? 'bg-muted-dark' : 'bg-muted'
-              }`}
+              style={{ backgroundColor: colors.secondary }}
+              className="flex-1 flex-row items-center px-4 py-3 rounded-xl"
             >
-              <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
-                <Ionicons name={place.icon as any} size={18} color="#4CAF50" />
+              <View
+                style={{ backgroundColor: `${colors.primary}15` }}
+                className="w-8 h-8 rounded-full items-center justify-center"
+              >
+                <Ionicons name={place.icon as any} size={18} color={colors.primary} />
               </View>
               <Text
-                className={`ml-2 text-sm font-medium ${
-                  isDark ? 'text-foreground-dark' : 'text-foreground'
-                }`}
+                style={{ color: colors.foreground }}
+                className="ml-2 text-sm font-medium"
                 numberOfLines={1}
               >
                 {place.label}
@@ -249,11 +256,10 @@ export default function HomeScreen() {
           ))}
           <TouchableOpacity
             onPress={() => router.push('/(main)/places')}
-            className={`w-14 items-center justify-center px-3 py-3 rounded-xl ${
-              isDark ? 'bg-muted-dark' : 'bg-muted'
-            }`}
+            style={{ backgroundColor: colors.secondary }}
+            className="w-14 items-center justify-center px-3 py-3 rounded-xl"
           >
-            <Ionicons name="add" size={24} color="#4CAF50" />
+            <Ionicons name="add" size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -270,7 +276,7 @@ export default function HomeScreen() {
               style={{
                 width: 300,
                 height: '100%',
-                backgroundColor: isDark ? '#121212' : '#FFFFFF',
+                backgroundColor: colors.card,
               }}
             >
               <SafeAreaView style={{ flex: 1 }}>
@@ -283,7 +289,7 @@ export default function HomeScreen() {
                   style={{
                     padding: 16,
                     borderBottomWidth: 1,
-                    borderBottomColor: isDark ? '#333' : '#E0E0E0',
+                    borderBottomColor: colors.border,
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -292,12 +298,12 @@ export default function HomeScreen() {
                         width: 56,
                         height: 56,
                         borderRadius: 28,
-                        backgroundColor: '#4CAF50',
+                        backgroundColor: colors.primary,
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}
                     >
-                      <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>
+                      <Text style={{ color: colors.primaryForeground, fontSize: 20, fontWeight: 'bold' }}>
                         {user?.firstName?.[0]}{user?.lastName?.[0]}
                       </Text>
                     </View>
@@ -306,12 +312,12 @@ export default function HomeScreen() {
                         style={{
                           fontSize: 16,
                           fontWeight: '600',
-                          color: isDark ? '#FAFAFA' : '#212121',
+                          color: colors.foreground,
                         }}
                       >
                         {user?.firstName} {user?.lastName}
                       </Text>
-                      <Text style={{ color: '#757575', fontSize: 14 }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
                         {user?.mobileNumber}
                       </Text>
                     </View>
@@ -337,13 +343,13 @@ export default function HomeScreen() {
                       <Ionicons
                         name={item.icon as any}
                         size={24}
-                        color={isDark ? '#FAFAFA' : '#212121'}
+                        color={colors.foreground}
                       />
                       <Text
                         style={{
                           marginLeft: 16,
                           fontSize: 15,
-                          color: isDark ? '#FAFAFA' : '#212121',
+                          color: colors.foreground,
                         }}
                       >
                         {item.label}
@@ -356,7 +362,7 @@ export default function HomeScreen() {
                 <View
                   style={{
                     borderTopWidth: 1,
-                    borderTopColor: isDark ? '#333' : '#E0E0E0',
+                    borderTopColor: colors.border,
                     paddingVertical: 8,
                   }}
                 >
@@ -370,12 +376,12 @@ export default function HomeScreen() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="moon" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+                      <Ionicons name="moon" size={24} color={colors.foreground} />
                       <Text
                         style={{
                           marginLeft: 16,
                           fontSize: 15,
-                          color: isDark ? '#FAFAFA' : '#212121',
+                          color: colors.foreground,
                         }}
                       >
                         {t('drawer.darkMode')}
@@ -384,7 +390,7 @@ export default function HomeScreen() {
                     <Switch
                       value={mode === 'dark'}
                       onValueChange={toggleDarkMode}
-                      trackColor={{ false: '#E0E0E0', true: '#4CAF50' }}
+                      trackColor={{ false: colors.border, true: colors.primary }}
                       thumbColor="#FFFFFF"
                     />
                   </View>
@@ -400,18 +406,18 @@ export default function HomeScreen() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="globe" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+                      <Ionicons name="globe" size={24} color={colors.foreground} />
                       <Text
                         style={{
                           marginLeft: 16,
                           fontSize: 15,
-                          color: isDark ? '#FAFAFA' : '#212121',
+                          color: colors.foreground,
                         }}
                       >
                         {i18n.language === 'en' ? 'العربية' : 'English'}
                       </Text>
                     </View>
-                    <Text style={{ color: '#4CAF50', fontWeight: '500' }}>
+                    <Text style={{ color: colors.primary, fontWeight: '500' }}>
                       {i18n.language.toUpperCase()}
                     </Text>
                   </TouchableOpacity>
@@ -429,11 +435,11 @@ export default function HomeScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 14,
                     borderTopWidth: 1,
-                    borderTopColor: isDark ? '#333' : '#E0E0E0',
+                    borderTopColor: colors.border,
                   }}
                 >
-                  <Ionicons name="log-out" size={24} color="#F44336" />
-                  <Text style={{ marginLeft: 16, fontSize: 15, color: '#F44336', fontWeight: '500' }}>
+                  <Ionicons name="log-out" size={24} color={colors.destructive} />
+                  <Text style={{ marginLeft: 16, fontSize: 15, color: colors.destructive, fontWeight: '500' }}>
                     {t('drawer.logout')}
                   </Text>
                 </TouchableOpacity>

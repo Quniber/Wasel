@@ -94,7 +94,7 @@ export default function ConfirmLocationScreen() {
       {/* Map */}
       <MapView
         ref={mapRef}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={region}
         onRegionChangeComplete={handleRegionChangeComplete}

@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, TextInput, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
+import { couponApi } from '@/lib/api';
 
 interface Coupon {
   id: string;
@@ -20,34 +21,46 @@ export default function PromotionsScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
+  const [isLoading, setIsLoading] = useState(true);
   const [promoCode, setPromoCode] = useState('');
   const [isApplying, setIsApplying] = useState(false);
-  const [coupons, setCoupons] = useState<Coupon[]>([
-    {
-      id: '1',
-      code: 'WELCOME10',
-      description: '10% off your first ride',
-      discount: '10%',
-      expiresAt: 'Dec 31, 2025',
-      isUsed: false,
-    },
-    {
-      id: '2',
-      code: 'HOLIDAY25',
-      description: '$5 off your next ride',
-      discount: '$5',
-      expiresAt: 'Jan 1, 2026',
-      isUsed: false,
-    },
-    {
-      id: '3',
-      code: 'SUMMER20',
-      description: '20% off (up to $10)',
-      discount: '20%',
-      expiresAt: 'Aug 31, 2025',
-      isUsed: true,
-    },
-  ]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+
+  useEffect(() => {
+    loadCoupons();
+  }, []);
+
+  const loadCoupons = async () => {
+    try {
+      const response = await couponApi.getAvailableCoupons();
+      const availableCoupons = response.data || [];
+
+      // Transform API data to display format
+      const transformedCoupons = availableCoupons.map((coupon: any) => ({
+        id: coupon.id.toString(),
+        code: coupon.code,
+        description: coupon.description || '',
+        discount: coupon.discountType === 'percentage'
+          ? `${coupon.discountValue}%`
+          : `$${coupon.discountValue}`,
+        expiresAt: coupon.expiryDate
+          ? new Date(coupon.expiryDate).toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })
+          : 'No expiry',
+        isUsed: coupon.isUsed || false,
+      }));
+
+      setCoupons(transformedCoupons);
+    } catch (error) {
+      console.error('Error loading coupons:', error);
+      setCoupons([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleApplyCode = async () => {
     if (!promoCode.trim()) {
@@ -57,35 +70,41 @@ export default function PromotionsScreen() {
 
     setIsApplying(true);
     try {
-      // API call to validate coupon
-      // const result = await couponApi.validate(promoCode);
+      // Validate and add the coupon
+      const response = await couponApi.validateCoupon(promoCode, '');
+      const couponData = response.data;
 
-      // Simulate API response
-      setTimeout(() => {
-        const existingCoupon = coupons.find(
-          (c) => c.code.toLowerCase() === promoCode.toLowerCase()
-        );
+      const existingCoupon = coupons.find(
+        (c) => c.code.toLowerCase() === promoCode.toLowerCase()
+      );
 
-        if (existingCoupon) {
-          Alert.alert(t('promotions.alreadyAdded'), t('promotions.alreadyAddedMessage'));
-        } else {
-          // Add new coupon
-          const newCoupon: Coupon = {
-            id: Date.now().toString(),
-            code: promoCode.toUpperCase(),
-            description: 'New promotional discount',
-            discount: '15%',
-            expiresAt: 'Feb 28, 2026',
-            isUsed: false,
-          };
-          setCoupons([newCoupon, ...coupons]);
-          Alert.alert(t('promotions.success'), t('promotions.codeAdded'));
-        }
-        setPromoCode('');
-        setIsApplying(false);
-      }, 1000);
-    } catch (error) {
-      Alert.alert(t('common.error'), t('promotions.invalidCode'));
+      if (existingCoupon) {
+        Alert.alert(t('promotions.alreadyAdded'), t('promotions.alreadyAddedMessage'));
+      } else {
+        // Add validated coupon
+        const newCoupon: Coupon = {
+          id: couponData.id?.toString() || Date.now().toString(),
+          code: couponData.code || promoCode.toUpperCase(),
+          description: couponData.description || 'Promotional discount',
+          discount: couponData.discountType === 'percentage'
+            ? `${couponData.discountValue}%`
+            : `$${couponData.discountValue || couponData.discount}`,
+          expiresAt: couponData.expiryDate
+            ? new Date(couponData.expiryDate).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              })
+            : 'No expiry',
+          isUsed: false,
+        };
+        setCoupons([newCoupon, ...coupons]);
+        Alert.alert(t('promotions.success'), t('promotions.codeAdded'));
+      }
+      setPromoCode('');
+    } catch (error: any) {
+      Alert.alert(t('common.error'), error.response?.data?.message || t('promotions.invalidCode'));
+    } finally {
       setIsApplying(false);
     }
   };
@@ -184,28 +203,34 @@ export default function PromotionsScreen() {
       </View>
 
       {/* Coupons List */}
-      <FlatList
-        data={coupons}
-        renderItem={renderCouponItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        ListHeaderComponent={() => (
-          <Text className="text-muted-foreground text-sm font-semibold mx-4 mb-2">
-            {t('promotions.yourCoupons')} ({activeCoupons.length} {t('promotions.active')})
-          </Text>
-        )}
-        ListEmptyComponent={() => (
-          <View className="items-center justify-center py-20 px-8">
-            <Ionicons name="ticket-outline" size={64} color={isDark ? '#333' : '#E0E0E0'} />
-            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {t('promotions.empty')}
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center py-20">
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={coupons}
+          renderItem={renderCouponItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          ListHeaderComponent={() => (
+            <Text className="text-muted-foreground text-sm font-semibold mx-4 mb-2">
+              {t('promotions.yourCoupons')} ({activeCoupons.length} {t('promotions.active')})
             </Text>
-            <Text className="text-muted-foreground mt-2 text-center">
-              {t('promotions.emptySubtitle')}
-            </Text>
-          </View>
-        )}
-      />
+          )}
+          ListEmptyComponent={() => (
+            <View className="items-center justify-center py-20 px-8">
+              <Ionicons name="ticket-outline" size={64} color={isDark ? '#333' : '#E0E0E0'} />
+              <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {t('promotions.empty')}
+              </Text>
+              <Text className="text-muted-foreground mt-2 text-center">
+                {t('promotions.emptySubtitle')}
+              </Text>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }

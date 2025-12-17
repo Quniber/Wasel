@@ -1,32 +1,59 @@
-import { StyleSheet, View, Text, FlatList } from 'react-native';
+import { StyleSheet, View, Text, FlatList, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { useTranslation } from 'react-i18next';
+import { orderApi } from '@/lib/api';
 
-const mockRides = [
-  { id: '1', from: '123 Main St', to: 'Airport', date: 'Dec 7, 2024', fare: '$25.50', status: 'completed' },
-  { id: '2', from: 'Downtown Mall', to: 'Home', date: 'Dec 6, 2024', fare: '$12.00', status: 'completed' },
-  { id: '3', from: 'Office', to: 'Restaurant', date: 'Dec 5, 2024', fare: '$8.75', status: 'completed' },
-];
+interface Ride {
+  id: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  createdAt: string;
+  fare: string;
+  status: string;
+}
 
 export default function HistoryScreen() {
-  const renderRide = ({ item }: { item: typeof mockRides[0] }) => (
+  const { t } = useTranslation();
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const response = await orderApi.getOrderHistory();
+      setRides(response.data.orders || []);
+    } catch (error) {
+      console.error('Error loading history:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderRide = ({ item }: { item: Ride }) => (
     <View style={styles.rideCard}>
       <View style={styles.rideHeader}>
         <Ionicons name="car" size={24} color={Colors.primary} />
-        <Text style={styles.rideDate}>{item.date}</Text>
+        <Text style={styles.rideDate}>
+          {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
       </View>
       <View style={styles.rideLocations}>
         <View style={styles.locationRow}>
           <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
-          <Text style={styles.locationText}>{item.from}</Text>
+          <Text style={styles.locationText}>{item.pickupAddress}</Text>
         </View>
         <View style={styles.locationRow}>
           <View style={[styles.dot, { backgroundColor: Colors.error }]} />
-          <Text style={styles.locationText}>{item.to}</Text>
+          <Text style={styles.locationText}>{item.dropoffAddress}</Text>
         </View>
       </View>
       <View style={styles.rideFooter}>
-        <Text style={styles.fareText}>{item.fare}</Text>
+        <Text style={styles.fareText}>{item.fare} QAR</Text>
         <View style={styles.statusBadge}>
           <Text style={styles.statusText}>{item.status}</Text>
         </View>
@@ -34,17 +61,26 @@ export default function HistoryScreen() {
     </View>
   );
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={mockRides}
+        data={rides}
         renderItem={renderRide}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="time-outline" size={64} color={Colors.textLight} />
-            <Text style={styles.emptyText}>No rides yet</Text>
+            <Text style={styles.emptyText}>{t('history.noRides') || 'No rides yet'}</Text>
+            <Text style={styles.emptySubtext}>{t('history.noRidesDesc') || 'Your ride history will appear here'}</Text>
           </View>
         }
       />
@@ -133,5 +169,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.textLight,
     marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.textLight,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

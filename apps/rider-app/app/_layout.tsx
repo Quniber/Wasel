@@ -22,10 +22,16 @@ const queryClient = new QueryClient({
 
 function RootLayoutContent() {
   const { resolvedTheme } = useThemeStore();
-  const { loadStoredAuth, isLoading } = useAuthStore();
+  const { loadStoredAuth, logout, isLoading, setLoading } = useAuthStore();
 
   useEffect(() => {
-    loadStoredAuth();
+    // Load auth from storage (or clear for fresh start)
+    // Change to loadStoredAuth() to restore normal login persistence
+    const initAuth = async () => {
+      await logout(); // Clear old data for testing - change to loadStoredAuth() for production
+      setLoading(false);
+    };
+    initAuth();
   }, []);
 
   if (isLoading) {

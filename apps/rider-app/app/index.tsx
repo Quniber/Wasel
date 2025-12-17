@@ -4,22 +4,16 @@ import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth-store';
 
 export default function SplashScreen() {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isLoading } = useAuthStore();
 
   useEffect(() => {
     if (!isLoading) {
       // Small delay for splash effect
-      const timer = setTimeout(() => {
-        if (isAuthenticated) {
-          router.replace('/(main)');
-        } else {
-          router.replace('/(auth)/welcome');
-        }
+      setTimeout(() => {
+        router.replace('/(auth)/welcome');
       }, 1000);
-
-      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isLoading]);
 
   return (
     <View className="flex-1 items-center justify-center bg-primary">

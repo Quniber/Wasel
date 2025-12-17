@@ -24,22 +24,7 @@ export default function ChatScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      text: 'I\'m on my way to pick you up.',
-      senderId: 'driver',
-      timestamp: new Date(Date.now() - 5 * 60000),
-      isDriver: true,
-    },
-    {
-      id: '2',
-      text: 'Great, I\'m waiting at the entrance.',
-      senderId: 'rider',
-      timestamp: new Date(Date.now() - 4 * 60000),
-      isDriver: false,
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const quickReplies = [
     { key: 'onMyWay', label: t('chat.quickReplies.onMyWay') },

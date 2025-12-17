@@ -1,33 +1,56 @@
 import { StyleSheet, View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { useAuthStore } from '@/stores/auth-store';
+import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
+  const { user, logout } = useAuthStore();
+
   const menuItems = [
-    { icon: 'card-outline', label: 'Payment Methods' },
-    { icon: 'location-outline', label: 'Saved Places' },
-    { icon: 'notifications-outline', label: 'Notifications' },
-    { icon: 'shield-checkmark-outline', label: 'Safety' },
-    { icon: 'help-circle-outline', label: 'Help & Support' },
-    { icon: 'settings-outline', label: 'Settings' },
+    { icon: 'card-outline', label: t('profile.paymentMethods') || 'Payment Methods', route: '/(main)/payments' },
+    { icon: 'location-outline', label: t('profile.savedPlaces') || 'Saved Places', route: '/(main)/places' },
+    { icon: 'notifications-outline', label: t('profile.notifications') || 'Notifications', route: '/(main)/notifications' },
+    { icon: 'shield-checkmark-outline', label: t('profile.safety') || 'Safety', route: '/(main)/safety' },
+    { icon: 'help-circle-outline', label: t('profile.support') || 'Help & Support', route: '/(main)/support' },
+    { icon: 'settings-outline', label: t('profile.settings') || 'Settings', route: '/(main)/settings' },
   ];
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/welcome');
+  };
+
+  const userInitials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase() || '?';
 
   return (
     <View style={styles.container}>
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle" size={80} color={Colors.primary} />
+          {user?.avatar ? (
+            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>{userInitials}</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.userName}>John Doe</Text>
-        <Text style={styles.userEmail}>john.doe@example.com</Text>
-        <TouchableOpacity style={styles.editButton}>
-          <Text style={styles.editButtonText}>Edit Profile</Text>
+        <Text style={styles.userName}>{user?.firstName} {user?.lastName}</Text>
+        <Text style={styles.userEmail}>{user?.email || user?.mobileNumber}</Text>
+        <TouchableOpacity style={styles.editButton} onPress={() => router.push('/(main)/profile')}>
+          <Text style={styles.editButtonText}>{t('profile.edit') || 'Edit Profile'}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.menuContainer}>
         {menuItems.map((item, index) => (
-          <TouchableOpacity key={index} style={styles.menuItem}>
+          <TouchableOpacity
+            key={index}
+            style={styles.menuItem}
+            onPress={() => router.push(item.route as any)}
+          >
             <Ionicons name={item.icon as any} size={24} color={Colors.text} />
             <Text style={styles.menuLabel}>{item.label}</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
@@ -35,9 +58,9 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={24} color={Colors.error} />
-        <Text style={styles.logoutText}>Log Out</Text>
+        <Text style={styles.logoutText}>{t('profile.logout') || 'Log Out'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -57,6 +80,24 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 12,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: 'bold',
   },
   userName: {
     fontSize: 24,

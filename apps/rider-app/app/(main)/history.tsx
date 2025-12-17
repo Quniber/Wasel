@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
+import { orderApi } from '@/lib/api';
 
 interface RideHistoryItem {
   id: string;
@@ -22,44 +23,44 @@ export default function HistoryScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [rides, setRides] = useState<RideHistoryItem[]>([
-    {
-      id: '1',
-      date: 'Dec 15, 2025',
-      time: '2:30 PM',
-      pickup: '123 Main Street',
-      dropoff: '456 Oak Avenue',
-      service: 'Economy',
-      fare: 12.50,
-      status: 'completed',
-    },
-    {
-      id: '2',
-      date: 'Dec 14, 2025',
-      time: '9:00 AM',
-      pickup: 'Home',
-      dropoff: 'Airport',
-      service: 'Premium',
-      fare: 45.00,
-      status: 'completed',
-    },
-    {
-      id: '3',
-      date: 'Dec 13, 2025',
-      time: '6:45 PM',
-      pickup: 'Office',
-      dropoff: 'Mall',
-      service: 'Economy',
-      fare: 8.00,
-      status: 'cancelled',
-    },
-  ]);
+  const [rides, setRides] = useState<RideHistoryItem[]>([]);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const response = await orderApi.getOrderHistory();
+      const orders = response.data.orders || [];
+
+      // Transform API data to display format
+      const transformedRides = orders.map((order: any) => ({
+        id: order.id.toString(),
+        date: new Date(order.createdAt).toLocaleDateString(),
+        time: new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        pickup: order.pickupAddress || 'Unknown',
+        dropoff: order.dropoffAddress || 'Unknown',
+        service: order.service?.name || 'Standard',
+        fare: parseFloat(order.fare) || 0,
+        status: order.status === 'completed' ? 'completed' : 'cancelled',
+      }));
+
+      setRides(transformedRides);
+    } catch (error) {
+      console.error('Error loading history:', error);
+      setRides([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // Fetch rides from API
-    setTimeout(() => setIsRefreshing(false), 1000);
+    await loadHistory();
+    setIsRefreshing(false);
   };
 
   const renderRideItem = ({ item }: { item: RideHistoryItem }) => (

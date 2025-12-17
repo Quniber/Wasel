@@ -43,17 +43,9 @@ export default function RideActiveScreen() {
       }
     });
 
-    // Simulate status changes for demo
-    const timer1 = setTimeout(() => setStatus('driver_arrived'), 8000);
-    const timer2 = setTimeout(() => setStatus('trip_started'), 15000);
-    const timer3 = setTimeout(() => router.replace('/(main)/ride-complete'), 25000);
-
     return () => {
       locationUnsub?.();
       statusUnsub?.();
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
     };
   }, []);
 
@@ -103,8 +95,7 @@ export default function RideActiveScreen() {
   };
 
   const handleCancel = () => {
-    // Show confirmation dialog
-    // For demo, just go back
+    // TODO: Show confirmation dialog and cancel via API
     resetBooking();
     router.replace('/(main)');
   };
@@ -139,7 +130,7 @@ export default function RideActiveScreen() {
       {/* Map */}
       <MapView
         ref={mapRef}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={{
           latitude: driver.latitude,

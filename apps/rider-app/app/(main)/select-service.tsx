@@ -54,68 +54,56 @@ export default function SelectServiceScreen() {
 
   const loadServicesAndFares = async () => {
     try {
-      // Load services
-      // const servicesResponse = await orderApi.getServices();
-      // setServices(servicesResponse.data);
-
-      // Mock services for now
-      const mockServices: Service[] = [
-        {
-          id: '1',
-          name: 'Economy',
-          description: 'Affordable rides',
-          baseFare: 5,
-          perKilometer: 1.5,
-          perMinute: 0.3,
-          minimumFare: 8,
-          personCapacity: 4,
-        },
-        {
-          id: '2',
-          name: 'Comfort',
-          description: 'More space and comfort',
-          baseFare: 8,
-          perKilometer: 2,
-          perMinute: 0.4,
-          minimumFare: 12,
-          personCapacity: 4,
-        },
-        {
-          id: '3',
-          name: 'Premium',
-          description: 'Premium vehicles',
-          baseFare: 12,
-          perKilometer: 3,
-          perMinute: 0.6,
-          minimumFare: 20,
-          personCapacity: 4,
-        },
-      ];
-      setServices(mockServices);
+      // Load services from API
+      const servicesResponse = await orderApi.getServices();
+      const loadedServices: Service[] = (servicesResponse.data || []).map((s: any) => ({
+        id: s.id.toString(),
+        name: s.name,
+        description: s.description || '',
+        baseFare: parseFloat(s.baseFare) || 0,
+        perKilometer: parseFloat(s.perKilometer) || 0,
+        perMinute: parseFloat(s.perMinute) || 0,
+        minimumFare: parseFloat(s.minimumFare) || 0,
+        personCapacity: s.personCapacity || 4,
+      }));
+      setServices(loadedServices);
 
       // Calculate fares for each service
-      if (pickup && dropoff) {
-        // const fareResponse = await orderApi.calculateFare({...});
-        // setFareEstimates(fareResponse.data);
+      if (pickup && dropoff && loadedServices.length > 0) {
+        const farePromises = loadedServices.map(async (service) => {
+          try {
+            const fareResponse = await orderApi.calculateFare({
+              serviceId: service.id,
+              pickupLat: pickup.latitude,
+              pickupLng: pickup.longitude,
+              dropoffLat: dropoff.latitude,
+              dropoffLng: dropoff.longitude,
+            });
+            const data = fareResponse.data;
+            return {
+              serviceId: service.id,
+              baseFare: parseFloat(data.baseFare) || 0,
+              distanceFare: parseFloat(data.distanceFare) || 0,
+              timeFare: parseFloat(data.timeFare) || 0,
+              totalFare: parseFloat(data.totalFare) || 0,
+              currency: data.currency || 'QAR',
+              distance: parseFloat(data.distance) || 0,
+              duration: parseFloat(data.duration) || 0,
+              eta: parseInt(data.eta) || 5,
+            };
+          } catch (err) {
+            console.error('Error calculating fare for service:', service.id, err);
+            return null;
+          }
+        });
 
-        // Mock fare estimates
-        const mockFares: FareEstimate[] = mockServices.map((service, index) => ({
-          serviceId: service.id,
-          baseFare: service.baseFare,
-          distanceFare: 8 + index * 3,
-          timeFare: 2 + index * 0.5,
-          totalFare: 15 + index * 8,
-          currency: 'USD',
-          distance: 5.2,
-          duration: 12,
-          eta: 3 + index * 2,
-        }));
-        setFareEstimates(mockFares);
+        const fares = (await Promise.all(farePromises)).filter(Boolean) as FareEstimate[];
+        setFareEstimates(fares);
       }
 
       // Auto-select first service
-      if (!selectedService && mockServices.length > 0) {
-        setSelectedService(mockServices[0]);
+      if (!selectedService && loadedServices.length > 0) {
+        setSelectedService(loadedServices[0]);
       }
     } catch (error) {
       console.error('Error loading services:', error);
@@ -128,20 +116,13 @@ export default function SelectServiceScreen() {
     if (!couponInput || !selectedService) return;
 
     try {
-      // const response = await couponApi.validateCoupon(couponInput, selectedService.id);
-      // setCoupon(couponInput, response.data.discount);
-
-      // Mock coupon
-      if (couponInput.toUpperCase() === 'SAVE10') {
-        setCoupon(couponInput, 10);
-        setShowCouponModal(false);
-        setCouponInput('');
-        setCouponError('');
-      } else {
-        setCouponError('Invalid coupon code');
-      }
-    } catch (error) {
-      setCouponError('Invalid coupon code');
+      const response = await couponApi.validateCoupon(couponInput, selectedService.id);
+      setCoupon(couponInput, response.data.discount || 0);
+      setShowCouponModal(false);
+      setCouponInput('');
+      setCouponError('');
+    } catch (error: any) {
+      setCouponError(error.response?.data?.message || t('booking.coupon.invalid'));
     }
   };
 
@@ -170,7 +151,7 @@ export default function SelectServiceScreen() {
       <View className="h-48">
         <MapView
           ref={mapRef}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          provider={PROVIDER_GOOGLE}
           style={{ flex: 1 }}
           initialRegion={{
             latitude: (pickup.latitude + dropoff.latitude) / 2,

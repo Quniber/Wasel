@@ -8,47 +8,71 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: '#4CAF50',
-          foreground: '#FFFFFF',
-        },
-        secondary: {
-          DEFAULT: '#2196F3',
-          foreground: '#FFFFFF',
-        },
+        // Match admin panel color scheme (converted to hex)
+        border: '#e2e8f0',
+        input: '#e2e8f0',
+        ring: '#020817',
         background: {
-          DEFAULT: '#FFFFFF',
-          dark: '#121212',
+          DEFAULT: '#ffffff',
+          dark: '#020817',
         },
         foreground: {
-          DEFAULT: '#212121',
-          dark: '#FAFAFA',
+          DEFAULT: '#020817',
+          dark: '#f8fafc',
         },
-        muted: {
-          DEFAULT: '#F5F5F5',
-          dark: '#1E1E1E',
-          foreground: '#757575',
+        primary: {
+          DEFAULT: '#1e293b',
+          foreground: '#f8fafc',
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
         },
-        card: {
-          DEFAULT: '#FFFFFF',
-          dark: '#1E1E1E',
-        },
-        border: {
-          DEFAULT: '#E0E0E0',
-          dark: '#333333',
+        secondary: {
+          DEFAULT: '#f1f5f9',
+          foreground: '#1e293b',
         },
         destructive: {
-          DEFAULT: '#F44336',
-          foreground: '#FFFFFF',
+          DEFAULT: '#ef4444',
+          foreground: '#f8fafc',
+        },
+        muted: {
+          DEFAULT: '#f1f5f9',
+          dark: '#1e293b',
+          foreground: '#64748b',
+        },
+        accent: {
+          DEFAULT: '#f1f5f9',
+          foreground: '#1e293b',
+        },
+        popover: {
+          DEFAULT: '#ffffff',
+          foreground: '#020817',
+        },
+        card: {
+          DEFAULT: '#ffffff',
+          dark: '#020817',
+          foreground: '#020817',
         },
         success: {
-          DEFAULT: '#4CAF50',
-          foreground: '#FFFFFF',
+          DEFAULT: '#22c55e',
+          foreground: '#f8fafc',
         },
         warning: {
-          DEFAULT: '#FF9800',
-          foreground: '#FFFFFF',
+          DEFAULT: '#f59e0b',
+          foreground: '#f8fafc',
         },
+      },
+      borderRadius: {
+        lg: 8,
+        md: 6,
+        sm: 4,
       },
       fontFamily: {
         sans: ['System'],

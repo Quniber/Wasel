@@ -1,16 +1,17 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Alert, TextInput, Modal } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
+import { addressApi } from '@/lib/api';
 
 interface SavedPlace {
   id: string;
   name: string;
   address: string;
-  type: 'home' | 'work' | 'custom';
+  type: 'home' | 'work' | 'other';
   latitude: number;
   longitude: number;
 }
@@ -20,37 +21,41 @@ export default function PlacesScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
-  const [places, setPlaces] = useState<SavedPlace[]>([
-    {
-      id: '1',
-      name: t('places.home'),
-      address: '123 Main Street, Downtown',
-      type: 'home',
-      latitude: 30.0444,
-      longitude: 31.2357,
-    },
-    {
-      id: '2',
-      name: t('places.work'),
-      address: '456 Business Avenue, Financial District',
-      type: 'work',
-      latitude: 30.0500,
-      longitude: 31.2400,
-    },
-    {
-      id: '3',
-      name: 'Mom\'s House',
-      address: '789 Family Road, Suburbs',
-      type: 'custom',
-      latitude: 30.0600,
-      longitude: 31.2500,
-    },
-  ]);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingPlace, setEditingPlace] = useState<SavedPlace | null>(null);
   const [placeName, setPlaceName] = useState('');
   const [placeAddress, setPlaceAddress] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    loadPlaces();
+  }, []);
+
+  const loadPlaces = async () => {
+    try {
+      const response = await addressApi.getAddresses();
+      const addresses = response.data || [];
+
+      // Transform API data to display format
+      const transformedPlaces = addresses.map((addr: any) => ({
+        id: addr.id.toString(),
+        name: addr.title || addr.type || 'Place',
+        address: addr.address || '',
+        type: addr.type || 'other',
+        latitude: parseFloat(addr.latitude) || 0,
+        longitude: parseFloat(addr.longitude) || 0,
+      }));
+
+      setPlaces(transformedPlaces);
+    } catch (error) {
+      console.error('Error loading places:', error);
+      setPlaces([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
@@ -72,53 +77,80 @@ export default function PlacesScreen() {
 
   const handleDelete = (id: string) => {
     const place = places.find((p) => p.id === id);
-    if (place?.type === 'home' || place?.type === 'work') {
-      // Just clear the address for home/work
-      setPlaces(places.map((p) => (p.id === id ? { ...p, address: '' } : p)));
-    } else {
-      Alert.alert(
-        t('places.deleteTitle'),
-        t('places.deleteConfirm'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('common.delete'),
-            style: 'destructive',
-            onPress: () => setPlaces(places.filter((p) => p.id !== id)),
+
+    Alert.alert(
+      t('places.deleteTitle'),
+      t('places.deleteConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await addressApi.deleteAddress(id);
+              setPlaces(places.filter((p) => p.id !== id));
+            } catch (error) {
+              console.error('Error deleting place:', error);
+              Alert.alert(t('common.error'), t('errors.generic'));
+            }
           },
-        ]
-      );
-    }
+        },
+      ]
+    );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!placeName.trim() || !placeAddress.trim()) {
       Alert.alert(t('common.error'), t('places.fillFields'));
       return;
     }
 
-    if (editingPlace) {
-      setPlaces(
-        places.map((p) =>
-          p.id === editingPlace.id ? { ...p, name: placeName, address: placeAddress } : p
-        )
-      );
-    } else {
-      const newPlace: SavedPlace = {
-        id: Date.now().toString(),
-        name: placeName,
-        address: placeAddress,
-        type: 'custom',
-        latitude: 0,
-        longitude: 0,
-      };
-      setPlaces([...places, newPlace]);
-    }
+    setIsSaving(true);
 
-    setShowModal(false);
-    setEditingPlace(null);
-    setPlaceName('');
-    setPlaceAddress('');
+    try {
+      if (editingPlace) {
+        // Update existing place
+        await addressApi.updateAddress(editingPlace.id, {
+          title: placeName,
+          address: placeAddress,
+        });
+        setPlaces(
+          places.map((p) =>
+            p.id === editingPlace.id ? { ...p, name: placeName, address: placeAddress } : p
+          )
+        );
+      } else {
+        // Create new place
+        const response = await addressApi.createAddress({
+          title: placeName,
+          address: placeAddress,
+          latitude: 0,
+          longitude: 0,
+          type: 'other',
+        });
+
+        const newPlace: SavedPlace = {
+          id: response.data.id.toString(),
+          name: placeName,
+          address: placeAddress,
+          type: 'other',
+          latitude: 0,
+          longitude: 0,
+        };
+        setPlaces([...places, newPlace]);
+      }
+
+      setShowModal(false);
+      setEditingPlace(null);
+      setPlaceName('');
+      setPlaceAddress('');
+    } catch (error) {
+      console.error('Error saving place:', error);
+      Alert.alert(t('common.error'), t('errors.generic'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddNew = () => {
@@ -161,18 +193,24 @@ export default function PlacesScreen() {
           >
             <Ionicons name="pencil" size={18} color={isDark ? '#FAFAFA' : '#757575'} />
           </TouchableOpacity>
-          {item.type === 'custom' && (
-            <TouchableOpacity
-              onPress={() => handleDelete(item.id)}
-              className="w-10 h-10 items-center justify-center"
-            >
-              <Ionicons name="trash" size={18} color="#EF5350" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={() => handleDelete(item.id)}
+            className="w-10 h-10 items-center justify-center"
+          >
+            <Ionicons name="trash" size={18} color="#EF5350" />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
@@ -192,6 +230,17 @@ export default function PlacesScreen() {
         renderItem={renderPlaceItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingVertical: 8 }}
+        ListEmptyComponent={() => (
+          <View className="flex-1 items-center justify-center py-20">
+            <Ionicons name="location-outline" size={64} color={isDark ? '#333' : '#E0E0E0'} />
+            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+              {t('places.empty')}
+            </Text>
+            <Text className="text-muted-foreground mt-2 text-center px-8">
+              {t('places.emptySubtitle')}
+            </Text>
+          </View>
+        )}
         ListFooterComponent={() => (
           <TouchableOpacity
             onPress={handleAddNew}
@@ -225,7 +274,6 @@ export default function PlacesScreen() {
               placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
               value={placeName}
               onChangeText={setPlaceName}
-              editable={editingPlace?.type === 'custom' || !editingPlace}
             />
 
             <Text className="text-muted-foreground text-sm mb-2">{t('places.addressLabel')}</Text>
@@ -240,9 +288,12 @@ export default function PlacesScreen() {
 
             <TouchableOpacity
               onPress={handleSave}
+              disabled={isSaving}
               className="bg-primary py-4 rounded-xl items-center mb-4"
             >
-              <Text className="text-white text-lg font-semibold">{t('common.save')}</Text>
+              <Text className="text-white text-lg font-semibold">
+                {isSaving ? t('common.loading') : t('common.save')}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity

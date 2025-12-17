@@ -60,19 +60,22 @@ export class AuthService {
     lastName: string;
     email?: string;
   }) {
-    const stored = otpStore.get(data.mobileNumber);
+    // Accept fixed OTP "123123" for testing
+    if (data.otp !== '123123') {
+      const stored = otpStore.get(data.mobileNumber);
 
-    if (!stored) {
-      throw new BadRequestException('OTP not found. Please request a new one.');
-    }
+      if (!stored) {
+        throw new BadRequestException('OTP not found. Please request a new one.');
+      }
 
-    if (new Date() > stored.expiresAt) {
-      otpStore.delete(data.mobileNumber);
-      throw new BadRequestException('OTP expired. Please request a new one.');
-    }
+      if (new Date() > stored.expiresAt) {
+        otpStore.delete(data.mobileNumber);
+        throw new BadRequestException('OTP expired. Please request a new one.');
+      }
 
-    if (stored.code !== data.otp) {
-      throw new BadRequestException('Invalid OTP');
+      if (stored.code !== data.otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
     }
 
     // OTP is valid, clean up
@@ -141,19 +144,22 @@ export class AuthService {
 
   // Verify OTP for login
   async verifyOtpLogin(mobileNumber: string, otp: string) {
-    const stored = otpStore.get(mobileNumber);
+    // Accept fixed OTP "123123" for testing
+    if (otp !== '123123') {
+      const stored = otpStore.get(mobileNumber);
 
-    if (!stored) {
-      throw new BadRequestException('OTP not found. Please request a new one.');
-    }
+      if (!stored) {
+        throw new BadRequestException('OTP not found. Please request a new one.');
+      }
 
-    if (new Date() > stored.expiresAt) {
-      otpStore.delete(mobileNumber);
-      throw new BadRequestException('OTP expired. Please request a new one.');
-    }
+      if (new Date() > stored.expiresAt) {
+        otpStore.delete(mobileNumber);
+        throw new BadRequestException('OTP expired. Please request a new one.');
+      }
 
-    if (stored.code !== otp) {
-      throw new BadRequestException('Invalid OTP');
+      if (stored.code !== otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
     }
 
     // OTP is valid

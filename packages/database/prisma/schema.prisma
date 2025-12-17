@@ -57,8 +57,10 @@ enum PaymentMode {
 }
 
 enum OperatorRole {
+  super_admin
   admin
   operator
+  support
   viewer
 }
 

@@ -8,11 +8,15 @@ let Marker: any = null;
 let Polyline: any = null;
 
 if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  NativeMapView = Maps.default;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-  Marker = Maps.Marker;
-  Polyline = Maps.Polyline;
+  try {
+    const Maps = require('react-native-maps');
+    NativeMapView = Maps.default;
+    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+    Marker = Maps.Marker;
+    Polyline = Maps.Polyline;
+  } catch (error) {
+    console.warn('react-native-maps failed to load:', error);
+  }
 }
 
 // Web placeholder component - don't render children to avoid text node issues
@@ -39,10 +43,10 @@ const WebMarker = ({ children, ...props }: any) => null;
 // Web-safe polyline - just return null
 const WebPolyline = (props: any) => null;
 
-// Export platform-specific components
-export const MapView = Platform.OS === 'web' ? WebMapPlaceholder : NativeMapView;
-export const MapMarker = Platform.OS === 'web' ? WebMarker : Marker;
-export const MapPolyline = Platform.OS === 'web' ? WebPolyline : Polyline;
+// Export platform-specific components with fallbacks
+export const MapView = Platform.OS === 'web' || !NativeMapView ? WebMapPlaceholder : NativeMapView;
+export const MapMarker = Platform.OS === 'web' || !Marker ? WebMarker : Marker;
+export const MapPolyline = Platform.OS === 'web' || !Polyline ? WebPolyline : Polyline;
 export const MAP_PROVIDER_GOOGLE = PROVIDER_GOOGLE;
 
 export default MapView;

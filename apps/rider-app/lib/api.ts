@@ -56,31 +56,64 @@ api.interceptors.response.use(
 
 // Auth APIs
 export const authApi = {
-  register: (data: {
+  // Phone-based OTP registration - Step 1: Request OTP
+  registerWithPhone: (mobileNumber: string) =>
+    api.post('/auth/register', { mobileNumber }),
+
+  // Phone-based OTP registration - Step 2: Verify OTP and complete registration
+  verifyOtpAndRegister: (data: {
+    mobileNumber: string;
+    otp: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  }) => api.post('/auth/verify-otp', data),
+
+  // Phone-based login - Request OTP
+  loginWithPhone: (mobileNumber: string) =>
+    api.post('/auth/login', { mobileNumber }),
+
+  // Phone-based login - Verify OTP
+  verifyOtpLogin: (data: { mobileNumber: string; otp: string }) =>
+    api.post('/auth/login/verify-otp', data),
+
+  // Resend OTP
+  resendOtp: (mobileNumber: string) =>
+    api.post('/auth/resend-otp', { mobileNumber }),
+
+  // Email-based registration
+  registerWithEmail: (data: {
     firstName: string;
     lastName: string;
     email: string;
     mobileNumber: string;
     password: string;
-  }) => api.post('/auth/register', data),
+  }) => api.post('/auth/register/email', data),
 
-  login: (data: { email: string; password: string }) =>
-    api.post('/auth/login', data),
+  // Email-based login
+  loginWithEmail: (data: { email: string; password: string }) =>
+    api.post('/auth/login/email', data),
 
-  loginWithPhone: (data: { mobileNumber: string }) =>
-    api.post('/auth/phone-login', data),
-
-  verifyOtp: (data: { mobileNumber: string; otp: string }) =>
-    api.post('/auth/verify-otp', data),
-
-  getProfile: () => api.get('/profile'),
+  // Profile
+  getProfile: () => api.get('/auth/profile'),
 
   updateProfile: (data: Partial<{
     firstName: string;
     lastName: string;
     email: string;
     gender: string;
-  }>) => api.patch('/profile', data),
+    countryIso: string;
+    isResident: boolean;
+    idNumber: string;
+    presetAvatarNumber: number;
+  }>) => api.patch('/auth/profile', data),
+
+  // Notification token
+  updateNotificationToken: (token: string) =>
+    api.post('/auth/notification-token', { token }),
+
+  // Delete account
+  deleteAccount: () => api.delete('/auth/account'),
 };
 
 // Order APIs
@@ -166,6 +199,13 @@ export const couponApi = {
 // Cancel Reasons
 export const cancelReasonApi = {
   getCancelReasons: () => api.get('/cancel-reasons'),
+};
+
+// Notification APIs
+export const notificationApi = {
+  getNotifications: () => api.get('/notifications'),
+  markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.patch('/notifications/read-all'),
 };
 
 export default api;

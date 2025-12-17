@@ -17,12 +17,20 @@ export default function EmailRegisterScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [countryCode, setCountryCode] = useState('+974');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [gender, setGender] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const genderOptions = [
+    { value: 'male', label: t('auth.profile.male') },
+    { value: 'female', label: t('auth.profile.female') },
+    { value: 'other', label: t('auth.profile.other') },
+  ];
 
   const isValid = firstName && lastName && email && phone && password && password === confirmPassword;
 
@@ -33,26 +41,25 @@ export default function EmailRegisterScreen() {
     setError('');
 
     try {
-      // TODO: Uncomment when API is ready
-      // const response = await authApi.register({
-      //   firstName,
-      //   lastName,
-      //   email,
-      //   mobileNumber: phone,
-      //   password,
-      // });
-      // await setToken(response.data.token);
-      // setUser(response.data.user);
-
-      // For now, simulate success
-      await setToken('demo-token');
-      setUser({
-        id: '1',
+      const response = await authApi.registerWithEmail({
         firstName,
         lastName,
         email,
-        mobileNumber: phone,
-        walletBalance: 0,
+        mobileNumber: countryCode + phone,
+        password,
+        gender: gender || undefined,
+      });
+
+      // Save token and user data (backend returns accessToken and customer)
+      await setToken(response.data.accessToken);
+      setUser({
+        id: response.data.customer.id.toString(),
+        firstName: response.data.customer.firstName || '',
+        lastName: response.data.customer.lastName || '',
+        email: response.data.customer.email || '',
+        mobileNumber: response.data.customer.mobileNumber,
+        gender: response.data.customer.gender,
+        walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
       });
 
       router.replace('/(main)');
@@ -95,6 +102,20 @@ export default function EmailRegisterScreen() {
               {t('auth.email.registerSubtitle')}
             </Text>
           </View>
+
+          {/* Avatar */}
+          <TouchableOpacity className="self-center mt-6">
+            <View className={`w-24 h-24 rounded-full items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
+              <Ionicons
+                name="camera"
+                size={32}
+                color={isDark ? '#757575' : '#9E9E9E'}
+              />
+            </View>
+            <Text className="text-primary text-center mt-2 font-medium">
+              {t('auth.profile.addPhoto')}
+            </Text>
+          </TouchableOpacity>
 
           {/* Error Message */}
           {error && (
@@ -153,14 +174,21 @@ export default function EmailRegisterScreen() {
               <Text className={`mb-2 font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
                 {t('auth.email.phone')}
               </Text>
-              <TextInput
-                className={inputStyle}
-                placeholder={t('auth.email.phone')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-              />
+              <View className="flex-row gap-3">
+                <View className={`px-4 py-4 rounded-xl items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
+                  <Text className={`text-base font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                    {countryCode}
+                  </Text>
+                </View>
+                <TextInput
+                  className={`flex-1 ${inputStyle}`}
+                  placeholder={t('auth.email.phonePlaceholder') || 'Phone number'}
+                  placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                />
+              </View>
             </View>
 
             <View>
@@ -206,6 +234,40 @@ export default function EmailRegisterScreen() {
                   Passwords do not match
                 </Text>
               )}
+            </View>
+
+            {/* Gender Selection */}
+            <View>
+              <Text className={`mb-2 font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {t('profile.gender')}
+              </Text>
+              <View className="flex-row gap-2">
+                {genderOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setGender(option.value)}
+                    className={`flex-1 py-3 rounded-xl items-center border-2 ${
+                      gender === option.value
+                        ? 'border-primary bg-primary/10'
+                        : isDark
+                        ? 'border-border-dark bg-muted-dark'
+                        : 'border-border bg-muted'
+                    }`}
+                  >
+                    <Text
+                      className={`font-medium ${
+                        gender === option.value
+                          ? 'text-primary'
+                          : isDark
+                          ? 'text-foreground-dark'
+                          : 'text-foreground'
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             {/* Register Button */}

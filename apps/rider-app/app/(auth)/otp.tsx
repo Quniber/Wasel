@@ -1,22 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { getColors } from '@/constants/Colors';
+import { authApi } from '@/lib/api';
 
 export default function OTPScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const { setToken, setUser } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const colors = getColors(isDark);
+  const { phone, mode } = useLocalSearchParams<{ phone: string; mode: string }>();
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -52,26 +56,41 @@ export default function OTPScreen() {
 
   const handleVerify = async (code: string) => {
     setIsLoading(true);
+    setError('');
+
     try {
-      // TODO: Call API to verify OTP
-      // const response = await authApi.verifyOtp({ mobileNumber: phone, otp: code });
-      // await setToken(response.data.token);
-      // setUser(response.data.user);
+      if (mode === 'register') {
+        // For new users, go to profile setup with OTP
+        router.push({
+          pathname: '/(auth)/profile-setup',
+          params: { phone, otp: code },
+        });
+        return;
+      } else {
+        // For existing users, verify OTP and login
+        const response = await authApi.verifyOtpLogin({
+          mobileNumber: phone || '',
+          otp: code,
+        });
 
-      // For now, simulate success
-      await setToken('demo-token');
-      setUser({
-        id: '1',
-        firstName: 'Demo',
-        lastName: 'User',
-        email: 'demo@example.com',
-        mobileNumber: phone || '',
-        walletBalance: 0,
-      });
+        // Save token and user data
+        await setToken(response.data.accessToken);
+        setUser({
+          id: response.data.customer.id.toString(),
+          firstName: response.data.customer.firstName || '',
+          lastName: response.data.customer.lastName || '',
+          email: response.data.customer.email || '',
+          mobileNumber: response.data.customer.mobileNumber,
+          gender: response.data.customer.gender,
+          walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
+        });
 
-      router.replace('/(main)');
-    } catch (error) {
-      console.error(error);
+        router.replace('/(main)');
+        return;
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || t('errors.invalidOtp'));
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
@@ -82,8 +101,16 @@ export default function OTPScreen() {
   const handleResend = async () => {
     if (countdown > 0) return;
     setCountdown(60);
-    // TODO: Call API to resend OTP
-    // await authApi.loginWithPhone({ mobileNumber: phone });
+    setError('');
+
+    try {
+      const response = await authApi.resendOtp(phone || '');
+      if (response.data.devOtp) {
+        Alert.alert('Dev OTP', `Your new OTP is: ${response.data.devOtp}`);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || t('errors.generic'));
+    }
   };
 
   return (

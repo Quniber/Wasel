@@ -49,7 +49,7 @@ export default function RideCompleteScreen() {
       {/* Mini Map */}
       <View className="h-40 mx-4 rounded-xl overflow-hidden">
         <MapView
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          provider={PROVIDER_GOOGLE}
           style={{ flex: 1 }}
           initialRegion={{
             latitude: (pickup.latitude + dropoff.latitude) / 2,

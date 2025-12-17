@@ -1,46 +1,47 @@
-import { View, Text, TouchableOpacity, Platform, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import { useThemeStore } from '@/stores/theme-store';
+import { orderApi } from '@/lib/api';
 
-// Mock data - in real app, fetch from API based on ID
-const mockRideDetails = {
-  id: '1',
-  date: 'December 15, 2025',
-  time: '2:30 PM',
+interface RideDetails {
+  id: string;
+  date: string;
+  time: string;
   pickup: {
-    address: '123 Main Street, Downtown',
-    latitude: 30.0444,
-    longitude: 31.2357,
-  },
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
   dropoff: {
-    address: '456 Oak Avenue, Business District',
-    latitude: 30.0500,
-    longitude: 31.2400,
-  },
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
   driver: {
-    name: 'Ahmed Mohamed',
-    rating: 4.8,
-    carModel: 'Toyota Camry',
-    carColor: 'White',
-    carPlate: 'ABC 123',
-  },
-  service: 'Economy',
+    name: string;
+    rating: number;
+    carModel: string;
+    carColor: string;
+    carPlate: string;
+  } | null;
+  service: string;
   fare: {
-    tripFare: 11.00,
-    serviceFee: 1.50,
-    discount: 0,
-    total: 12.50,
-  },
-  paymentMethod: 'Cash',
-  status: 'completed' as const,
-  rating: 5,
-  duration: '18 min',
-  distance: '5.2 km',
-};
+    tripFare: number;
+    serviceFee: number;
+    discount: number;
+    total: number;
+  };
+  paymentMethod: string;
+  status: 'completed' | 'cancelled';
+  rating: number | null;
+  duration: string;
+  distance: string;
+}
 
 export default function RideDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,12 +49,98 @@ export default function RideDetailsScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
-  // In real app, fetch ride details based on ID
-  const ride = mockRideDetails;
+  const [isLoading, setIsLoading] = useState(true);
+  const [ride, setRide] = useState<RideDetails | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadRideDetails();
+  }, [id]);
+
+  const loadRideDetails = async () => {
+    if (!id) return;
+
+    try {
+      const response = await orderApi.getOrderDetails(id);
+      const order = response.data;
+
+      // Transform API data to display format
+      const rideDetails: RideDetails = {
+        id: order.id.toString(),
+        date: new Date(order.createdAt).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        time: new Date(order.createdAt).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        pickup: {
+          address: order.pickupAddress || 'Unknown',
+          latitude: parseFloat(order.pickupLatitude) || 0,
+          longitude: parseFloat(order.pickupLongitude) || 0,
+        },
+        dropoff: {
+          address: order.dropoffAddress || 'Unknown',
+          latitude: parseFloat(order.dropoffLatitude) || 0,
+          longitude: parseFloat(order.dropoffLongitude) || 0,
+        },
+        driver: order.driver ? {
+          name: `${order.driver.firstName || ''} ${order.driver.lastName || ''}`.trim() || 'Driver',
+          rating: parseFloat(order.driver.rating) || 0,
+          carModel: order.driver.carModel || 'Unknown',
+          carColor: order.driver.carColor || 'Unknown',
+          carPlate: order.driver.carPlate || 'Unknown',
+        } : null,
+        service: order.service?.name || 'Standard',
+        fare: {
+          tripFare: parseFloat(order.fare) || 0,
+          serviceFee: parseFloat(order.serviceFee) || 1.5,
+          discount: parseFloat(order.discount) || 0,
+          total: parseFloat(order.totalFare) || parseFloat(order.fare) || 0,
+        },
+        paymentMethod: order.paymentMode || 'Cash',
+        status: order.status === 'completed' ? 'completed' : 'cancelled',
+        rating: order.customerRating || null,
+        duration: order.duration ? `${Math.round(order.duration)} min` : 'N/A',
+        distance: order.distance ? `${(order.distance / 1000).toFixed(1)} km` : 'N/A',
+      };
+
+      setRide(rideDetails);
+    } catch (err) {
+      console.error('Error loading ride details:', err);
+      setError(t('errors.generic'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleReportIssue = () => {
     router.push('/(main)/support');
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !ride) {
+    return (
+      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+        <Ionicons name="alert-circle" size={64} color={isDark ? '#333' : '#E0E0E0'} />
+        <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+          {error || t('errors.generic')}
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-4">
+          <Text className="text-primary">{t('common.back')}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
@@ -71,7 +158,7 @@ export default function RideDetailsScreen() {
         {/* Mini Map */}
         <View className="h-48 mx-4 rounded-xl overflow-hidden">
           <MapView
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             style={{ flex: 1 }}
             initialRegion={{
               latitude: (ride.pickup.latitude + ride.dropoff.latitude) / 2,
@@ -156,44 +243,46 @@ export default function RideDetailsScreen() {
         </View>
 
         {/* Driver Info */}
-        <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-          <Text className="text-muted-foreground text-xs mb-3">{t('history.details.driver')}</Text>
-          <View className="flex-row items-center">
-            <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
-              <Text className="text-white font-bold">{ride.driver.name.split(' ').map(n => n[0]).join('')}</Text>
-            </View>
-            <View className="flex-1 ml-3">
-              <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {ride.driver.name}
-              </Text>
-              <View className="flex-row items-center mt-1">
-                <Ionicons name="star" size={14} color="#FFB300" />
-                <Text className="text-muted-foreground ml-1">{ride.driver.rating}</Text>
+        {ride.driver && (
+          <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
+            <Text className="text-muted-foreground text-xs mb-3">{t('history.details.driver')}</Text>
+            <View className="flex-row items-center">
+              <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
+                <Text className="text-white font-bold">{ride.driver.name.split(' ').map(n => n[0]).join('')}</Text>
               </View>
-            </View>
-            {ride.rating && (
-              <View className="items-end">
-                <Text className="text-muted-foreground text-xs">{t('history.details.yourRating')}</Text>
-                <View className="flex-row items-center">
-                  <Ionicons name="star" size={16} color="#FFB300" />
-                  <Text className={`ml-1 font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                    {ride.rating}
-                  </Text>
+              <View className="flex-1 ml-3">
+                <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                  {ride.driver.name}
+                </Text>
+                <View className="flex-row items-center mt-1">
+                  <Ionicons name="star" size={14} color="#FFB300" />
+                  <Text className="text-muted-foreground ml-1">{ride.driver.rating.toFixed(1)}</Text>
                 </View>
               </View>
-            )}
-          </View>
-          <View className={`flex-row items-center mt-3 pt-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Ionicons name="car" size={16} color={isDark ? '#FAFAFA' : '#212121'} />
-            <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {ride.driver.carColor} {ride.driver.carModel}
-            </Text>
-            <View className="flex-1" />
-            <View className="px-2 py-1 rounded bg-primary/10">
-              <Text className="text-primary font-medium">{ride.driver.carPlate}</Text>
+              {ride.rating && (
+                <View className="items-end">
+                  <Text className="text-muted-foreground text-xs">{t('history.details.yourRating')}</Text>
+                  <View className="flex-row items-center">
+                    <Ionicons name="star" size={16} color="#FFB300" />
+                    <Text className={`ml-1 font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                      {ride.rating}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+            <View className={`flex-row items-center mt-3 pt-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
+              <Ionicons name="car" size={16} color={isDark ? '#FAFAFA' : '#212121'} />
+              <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {ride.driver.carColor} {ride.driver.carModel}
+              </Text>
+              <View className="flex-1" />
+              <View className="px-2 py-1 rounded bg-primary/10">
+                <Text className="text-primary font-medium">{ride.driver.carPlate}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Fare Breakdown */}
         <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>

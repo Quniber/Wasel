@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
+import { notificationApi } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -20,56 +21,84 @@ export default function NotificationsScreen() {
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'ride',
-      title: t('notifications.driverAssigned'),
-      message: 'Ahmed is on his way in Toyota Camry (ABC 123)',
-      timestamp: '2 min ago',
-      isRead: false,
-    },
-    {
-      id: '2',
-      type: 'ride',
-      title: t('notifications.tripCompleted'),
-      message: 'Thanks for riding with us! Your fare was $12.50',
-      timestamp: 'Yesterday',
-      isRead: true,
-    },
-    {
-      id: '3',
-      type: 'promo',
-      title: t('notifications.newPromo'),
-      message: 'Use code HOLIDAY25 for $5 off your next ride!',
-      timestamp: '2 days ago',
-      isRead: true,
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: t('notifications.appUpdate'),
-      message: 'A new version of the app is available. Update now for the best experience.',
-      timestamp: '1 week ago',
-      isRead: true,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationApi.getNotifications();
+      const notificationsData = response.data || [];
+
+      // Transform API data to display format
+      const transformedNotifications = notificationsData.map((notif: any) => {
+        const createdAt = new Date(notif.createdAt);
+        const now = new Date();
+        const diffMs = now.getTime() - createdAt.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        let timestamp = '';
+        if (diffMins < 60) {
+          timestamp = `${diffMins} min ago`;
+        } else if (diffHours < 24) {
+          timestamp = `${diffHours} hours ago`;
+        } else if (diffDays === 1) {
+          timestamp = 'Yesterday';
+        } else if (diffDays < 7) {
+          timestamp = `${diffDays} days ago`;
+        } else {
+          timestamp = createdAt.toLocaleDateString();
+        }
+
+        return {
+          id: notif.id.toString(),
+          type: notif.type || 'system',
+          title: notif.title,
+          message: notif.message || notif.body || '',
+          timestamp,
+          isRead: notif.isRead || false,
+        };
+      });
+
+      setNotifications(transformedNotifications);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      setNotifications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // Fetch notifications from API
-    setTimeout(() => setIsRefreshing(false), 1000);
+    await loadNotifications();
+    setIsRefreshing(false);
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationApi.markAsRead(id);
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
   };
 
   const getIcon = (type: string) => {
@@ -150,26 +179,32 @@ export default function NotificationsScreen() {
       </View>
 
       {/* Notifications List */}
-      <FlatList
-        data={notifications}
-        renderItem={renderNotificationItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingVertical: 8 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#4CAF50" />
-        }
-        ListEmptyComponent={() => (
-          <View className="flex-1 items-center justify-center py-20">
-            <Ionicons name="notifications-off" size={64} color={isDark ? '#333' : '#E0E0E0'} />
-            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {t('notifications.empty')}
-            </Text>
-            <Text className="text-muted-foreground mt-2 text-center px-8">
-              {t('notifications.emptySubtitle')}
-            </Text>
-          </View>
-        )}
-      />
+      {isLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          renderItem={renderNotificationItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingVertical: 8 }}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#4CAF50" />
+          }
+          ListEmptyComponent={() => (
+            <View className="flex-1 items-center justify-center py-20">
+              <Ionicons name="notifications-off" size={64} color={isDark ? '#333' : '#E0E0E0'} />
+              <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {t('notifications.empty')}
+              </Text>
+              <Text className="text-muted-foreground mt-2 text-center px-8">
+                {t('notifications.emptySubtitle')}
+              </Text>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
