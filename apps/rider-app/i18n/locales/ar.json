@@ -1,0 +1,356 @@
+{
+  "common": {
+    "continue": "متابعة",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "done": "تم",
+    "skip": "تخطي",
+    "retry": "إعادة المحاولة",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجاح",
+    "ok": "موافق",
+    "yes": "نعم",
+    "no": "لا",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "search": "بحث",
+    "close": "إغلاق"
+  },
+  "auth": {
+    "welcome": {
+      "title": "واصل",
+      "subtitle": "رحلتك، طريقتك",
+      "getStarted": "ابدأ الآن",
+      "loginWithEmail": "تسجيل الدخول بالبريد الإلكتروني"
+    },
+    "phone": {
+      "title": "أدخل رقم هاتفك",
+      "subtitle": "سنرسل لك رمز التحقق",
+      "placeholder": "رقم الهاتف",
+      "useEmail": "استخدم البريد الإلكتروني بدلاً من ذلك"
+    },
+    "otp": {
+      "title": "تحقق من رقمك",
+      "subtitle": "أدخل الرمز الذي أرسلناه إلى",
+      "resend": "إعادة إرسال الرمز",
+      "resendIn": "إعادة الإرسال خلال {{seconds}} ثانية",
+      "changeNumber": "تغيير الرقم"
+    },
+    "email": {
+      "loginTitle": "مرحباً بعودتك",
+      "loginSubtitle": "سجل دخولك للمتابعة",
+      "registerTitle": "إنشاء حساب",
+      "registerSubtitle": "سجل للبدء",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "phone": "رقم الهاتف",
+      "login": "تسجيل الدخول",
+      "register": "تسجيل",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "noAccount": "ليس لديك حساب؟",
+      "hasAccount": "لديك حساب بالفعل؟",
+      "signUp": "إنشاء حساب",
+      "signIn": "تسجيل الدخول",
+      "usePhone": "استخدم الهاتف بدلاً من ذلك"
+    },
+    "profile": {
+      "setupTitle": "أكمل ملفك الشخصي",
+      "setupSubtitle": "ساعدنا في تخصيص تجربتك",
+      "addPhoto": "إضافة صورة",
+      "male": "ذكر",
+      "female": "أنثى",
+      "other": "آخر"
+    }
+  },
+  "home": {
+    "whereTo": "إلى أين؟",
+    "currentLocation": "الموقع الحالي",
+    "myLocation": "موقعي",
+    "savedPlaces": "الأماكن المحفوظة",
+    "recentPlaces": "الأماكن الأخيرة",
+    "home": "المنزل",
+    "work": "العمل",
+    "addPlace": "إضافة مكان"
+  },
+  "booking": {
+    "enterDestination": "أدخل الوجهة",
+    "pickup": "نقطة الانطلاق",
+    "dropoff": "نقطة الوصول",
+    "confirmLocation": "تأكيد الموقع",
+    "chooseRide": "اختر رحلتك",
+    "seats": "{{count}} مقاعد",
+    "minutes": "{{count}} دقيقة",
+    "requestRide": "طلب رحلة",
+    "scheduleLater": "جدولة لاحقاً",
+    "schedule": {
+      "title": "جدولة رحلة",
+      "selectDate": "اختر التاريخ",
+      "selectTime": "اختر الوقت",
+      "note": "احجز قبل 30 دقيقة على الأقل",
+      "confirm": "تأكيد الجدولة"
+    },
+    "payment": {
+      "title": "طريقة الدفع",
+      "cash": "نقداً",
+      "change": "تغيير"
+    },
+    "coupon": {
+      "apply": "تطبيق كوبون",
+      "enter": "أدخل رمز الخصم",
+      "applied": "تم تطبيق الكوبون",
+      "discount": "وفرت {{amount}}"
+    }
+  },
+  "ride": {
+    "findingDriver": "جاري البحث عن سائق",
+    "lookingForDriver": "نبحث عن سائقين قريبين...",
+    "noDrivers": "لا يوجد سائقون متاحون",
+    "tryAgain": "حاول مرة أخرى",
+    "cancelSearch": "إلغاء البحث",
+    "driverAccepted": {
+      "title": "السائق في الطريق",
+      "arriving": "يصل خلال {{minutes}} دقيقة"
+    },
+    "driverArrived": {
+      "title": "وصل السائق!",
+      "lookFor": "ابحث عن:",
+      "waiting": "سائقك بانتظارك"
+    },
+    "inProgress": {
+      "title": "بدأت الرحلة",
+      "remaining": "{{minutes}} دقيقة متبقية",
+      "distance": "{{km}} كم"
+    },
+    "completed": {
+      "title": "اكتملت الرحلة!",
+      "tripFare": "أجرة الرحلة",
+      "serviceFee": "رسوم الخدمة",
+      "discount": "الخصم",
+      "total": "الإجمالي",
+      "paidWith": "تم الدفع بـ {{method}}",
+      "rateTrip": "قيم رحلتك"
+    },
+    "rating": {
+      "title": "كيف كانت رحلتك؟",
+      "addComment": "أضف تعليقاً...",
+      "quickFeedback": "تقييم سريع:",
+      "cleanCar": "سيارة نظيفة",
+      "goodDriver": "سائق جيد",
+      "safeRide": "رحلة آمنة",
+      "onTime": "في الوقت"
+    },
+    "cancel": {
+      "title": "إلغاء الرحلة",
+      "confirm": "هل أنت متأكد من إلغاء الرحلة؟",
+      "fee": "قد يتم تطبيق رسوم إلغاء"
+    },
+    "call": "اتصال",
+    "chat": "محادثة"
+  },
+  "history": {
+    "title": "رحلاتي",
+    "empty": "لا توجد رحلات بعد",
+    "emptySubtitle": "سيظهر سجل رحلاتك هنا",
+    "completed": "مكتملة",
+    "cancelled": "ملغاة",
+    "scheduled": "مجدولة",
+    "details": {
+      "title": "تفاصيل الرحلة",
+      "pickup": "نقطة الانطلاق",
+      "dropoff": "نقطة الوصول",
+      "duration": "المدة",
+      "distance": "المسافة",
+      "driver": "السائق",
+      "yourRating": "تقييمك",
+      "fareBreakdown": "تفاصيل الأجرة",
+      "serviceFee": "رسوم الخدمة",
+      "discount": "الخصم",
+      "total": "الإجمالي",
+      "paidWith": "تم الدفع بـ {{method}}",
+      "reportIssue": "الإبلاغ عن مشكلة"
+    }
+  },
+  "schedule": {
+    "title": "جدولة رحلة",
+    "selectDate": "اختر التاريخ",
+    "selectTime": "اختر الوقت",
+    "note": "احجز قبل 30 دقيقة على الأقل",
+    "confirm": "تأكيد الجدولة",
+    "error": "خطأ",
+    "minTimeError": "يرجى الجدولة قبل 30 دقيقة على الأقل",
+    "success": "تم الجدولة!",
+    "successMessage": "تم جدولة رحلتك بنجاح",
+    "submitError": "فشل في جدولة الرحلة. يرجى المحاولة مرة أخرى."
+  },
+  "scheduled": {
+    "title": "الرحلات المجدولة",
+    "empty": "لا توجد رحلات مجدولة",
+    "emptySubtitle": "جدول رحلة لاحقاً",
+    "bookNow": "احجز رحلة",
+    "cancel": "إلغاء الرحلة",
+    "cancelTitle": "إلغاء الرحلة المجدولة",
+    "cancelConfirm": "هل أنت متأكد من إلغاء هذه الرحلة المجدولة؟"
+  },
+  "places": {
+    "title": "الأماكن المحفوظة",
+    "home": "المنزل",
+    "work": "العمل",
+    "addNew": "إضافة مكان جديد",
+    "editPlace": "تعديل المكان",
+    "addPlace": "إضافة مكان",
+    "notSet": "غير محدد",
+    "deleteTitle": "حذف المكان",
+    "deleteConfirm": "هل أنت متأكد من حذف هذا المكان؟",
+    "fillFields": "يرجى ملء جميع الحقول",
+    "nameLabel": "اسم المكان",
+    "namePlaceholder": "مثال: بيت الأم",
+    "addressLabel": "العنوان",
+    "addressPlaceholder": "أدخل العنوان"
+  },
+  "promotions": {
+    "title": "العروض",
+    "haveCode": "لديك رمز خصم؟",
+    "enterPromoCode": "أدخل رمز الخصم",
+    "enterCode": "يرجى إدخال رمز الخصم",
+    "apply": "تطبيق",
+    "yourCoupons": "كوبوناتك",
+    "active": "نشطة",
+    "expires": "ينتهي",
+    "used": "مستخدم",
+    "termsApply": "الشروط والأحكام سارية",
+    "empty": "لا توجد كوبونات بعد",
+    "emptySubtitle": "أدخل رمز الخصم أعلاه لإضافة كوبونات",
+    "alreadyAdded": "تمت الإضافة مسبقاً",
+    "alreadyAddedMessage": "هذا الكوبون موجود في قائمتك بالفعل",
+    "success": "نجاح!",
+    "codeAdded": "تمت إضافة رمز الخصم إلى كوبوناتك",
+    "invalidCode": "رمز خصم غير صالح أو منتهي الصلاحية"
+  },
+  "chat": {
+    "title": "المحادثة",
+    "driver": "السائق",
+    "yourDriver": "سائقك",
+    "placeholder": "اكتب رسالة...",
+    "send": "إرسال",
+    "quickReplies": {
+      "onMyWay": "في طريقي",
+      "waitPlease": "انتظر من فضلك",
+      "outside": "أنا بالخارج",
+      "callMe": "اتصل بي"
+    }
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "editProfile": "تعديل الملف الشخصي",
+    "firstName": "الاسم الأول",
+    "firstNamePlaceholder": "أدخل الاسم الأول",
+    "lastName": "اسم العائلة",
+    "lastNamePlaceholder": "أدخل اسم العائلة",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "أدخل البريد الإلكتروني",
+    "phone": "رقم الهاتف",
+    "phoneChangeNote": "تواصل مع الدعم لتغيير رقم هاتفك",
+    "gender": "الجنس",
+    "male": "ذكر",
+    "female": "أنثى",
+    "other": "آخر",
+    "nameRequired": "الاسم الأول واسم العائلة مطلوبان",
+    "updateSuccess": "تم تحديث الملف الشخصي بنجاح",
+    "updateError": "فشل في تحديث الملف الشخصي",
+    "changePhoto": "تغيير الصورة",
+    "chooseOption": "اختر خياراً",
+    "takePhoto": "التقاط صورة",
+    "chooseLibrary": "اختر من المعرض"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "appearance": "المظهر",
+    "theme": "السمة",
+    "light": "فاتح",
+    "dark": "داكن",
+    "system": "النظام",
+    "language": "اللغة",
+    "appLanguage": "لغة التطبيق",
+    "english": "English",
+    "arabic": "العربية",
+    "notifications": "الإشعارات",
+    "pushNotifications": "إشعارات الدفع",
+    "account": "الحساب",
+    "changePassword": "تغيير كلمة المرور",
+    "deleteAccount": "حذف الحساب",
+    "about": "حول",
+    "version": "الإصدار",
+    "terms": "شروط الخدمة",
+    "privacy": "سياسة الخصوصية",
+    "logout": "تسجيل الخروج",
+    "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟"
+  },
+  "support": {
+    "title": "الدعم",
+    "howCanWeHelp": "كيف يمكننا مساعدتك؟",
+    "subtitle": "نحن هنا لمساعدتك على مدار الساعة",
+    "recentTrips": "الرحلات الأخيرة",
+    "recentTripsDesc": "الإبلاغ عن مشكلة في رحلة",
+    "faq": "الأسئلة الشائعة",
+    "faqDesc": "اعثر على إجابات للأسئلة الشائعة",
+    "callUs": "اتصل بنا",
+    "callUsDesc": "تحدث مع فريق الدعم",
+    "emailUs": "راسلنا",
+    "emailUsDesc": "أرسل لنا رسالة",
+    "liveChat": "المحادثة المباشرة",
+    "liveChatDesc": "تحدث معنا في الوقت الفعلي",
+    "frequentQuestions": "الأسئلة المتكررة",
+    "faqQuestions": {
+      "q1": "كيف ألغي رحلة؟",
+      "q2": "كيف يتم حساب الأجرة؟",
+      "q3": "ما هي طرق الدفع المقبولة؟"
+    },
+    "faqAnswers": {
+      "a1": "يمكنك إلغاء الرحلة من شاشة الرحلة النشطة قبل وصول السائق. قد يتم تطبيق رسوم إلغاء.",
+      "a2": "يتم حساب الأجرة بناءً على المسافة والوقت ونوع الخدمة المختارة. تظهر الأسعار قبل التأكيد.",
+      "a3": "نقبل حالياً الدفع نقداً. المزيد من خيارات الدفع قريباً."
+    },
+    "available": "دعم العملاء متاح",
+    "hours": "24 ساعة، 7 أيام في الأسبوع"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "empty": "لا توجد إشعارات",
+    "emptySubtitle": "ستظهر إشعاراتك هنا",
+    "markAllRead": "تحديد الكل كمقروء",
+    "driverAssigned": "تم تعيين سائق",
+    "driverArrived": "وصل السائق",
+    "tripStarted": "بدأت الرحلة",
+    "tripCompleted": "اكتملت الرحلة",
+    "scheduledReminder": "تذكير بالرحلة المجدولة",
+    "newPromo": "عرض جديد",
+    "appUpdate": "تحديث التطبيق متاح"
+  },
+  "drawer": {
+    "home": "الرئيسية",
+    "myRides": "رحلاتي",
+    "scheduledRides": "الرحلات المجدولة",
+    "savedPlaces": "الأماكن المحفوظة",
+    "promotions": "العروض",
+    "support": "الدعم",
+    "settings": "الإعدادات",
+    "darkMode": "الوضع الداكن",
+    "logout": "تسجيل الخروج"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما",
+    "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "invalidCredentials": "بريد إلكتروني أو كلمة مرور غير صالحة",
+    "invalidOtp": "رمز التحقق غير صالح",
+    "locationPermission": "يلزم إذن الموقع",
+    "noDrivers": "لا يوجد سائقون متاحون في منطقتك"
+  }
+}

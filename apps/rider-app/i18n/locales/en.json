@@ -1,0 +1,356 @@
+{
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "done": "Done",
+    "skip": "Skip",
+    "retry": "Retry",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "ok": "OK",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "search": "Search",
+    "close": "Close"
+  },
+  "auth": {
+    "welcome": {
+      "title": "Wasel",
+      "subtitle": "Your ride, your way",
+      "getStarted": "Get Started",
+      "loginWithEmail": "Login with Email"
+    },
+    "phone": {
+      "title": "Enter your phone number",
+      "subtitle": "We'll send you a verification code",
+      "placeholder": "Phone number",
+      "useEmail": "Use Email Instead"
+    },
+    "otp": {
+      "title": "Verify your number",
+      "subtitle": "Enter the code we sent to",
+      "resend": "Resend Code",
+      "resendIn": "Resend in {{seconds}}s",
+      "changeNumber": "Change Number"
+    },
+    "email": {
+      "loginTitle": "Welcome Back",
+      "loginSubtitle": "Sign in to continue",
+      "registerTitle": "Create Account",
+      "registerSubtitle": "Sign up to get started",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "phone": "Phone Number",
+      "login": "Log In",
+      "register": "Register",
+      "forgotPassword": "Forgot Password?",
+      "noAccount": "Don't have an account?",
+      "hasAccount": "Already have an account?",
+      "signUp": "Sign Up",
+      "signIn": "Sign In",
+      "usePhone": "Use Phone Instead"
+    },
+    "profile": {
+      "setupTitle": "Complete Your Profile",
+      "setupSubtitle": "Help us personalize your experience",
+      "addPhoto": "Add Photo",
+      "male": "Male",
+      "female": "Female",
+      "other": "Other"
+    }
+  },
+  "home": {
+    "whereTo": "Where to?",
+    "currentLocation": "Current Location",
+    "myLocation": "My Location",
+    "savedPlaces": "Saved Places",
+    "recentPlaces": "Recent Places",
+    "home": "Home",
+    "work": "Work",
+    "addPlace": "Add Place"
+  },
+  "booking": {
+    "enterDestination": "Enter Destination",
+    "pickup": "Pickup",
+    "dropoff": "Dropoff",
+    "confirmLocation": "Confirm Location",
+    "chooseRide": "Choose Your Ride",
+    "seats": "{{count}} seats",
+    "minutes": "{{count}} min",
+    "requestRide": "Request Ride",
+    "scheduleLater": "Schedule Later",
+    "schedule": {
+      "title": "Schedule Ride",
+      "selectDate": "Select Date",
+      "selectTime": "Select Time",
+      "note": "Book at least 30 minutes in advance",
+      "confirm": "Confirm Schedule"
+    },
+    "payment": {
+      "title": "Payment Method",
+      "cash": "Cash",
+      "change": "Change"
+    },
+    "coupon": {
+      "apply": "Apply Coupon",
+      "enter": "Enter promo code",
+      "applied": "Coupon Applied",
+      "discount": "You save {{amount}}"
+    }
+  },
+  "ride": {
+    "findingDriver": "Finding Driver",
+    "lookingForDriver": "Looking for nearby drivers...",
+    "noDrivers": "No drivers available",
+    "tryAgain": "Try Again",
+    "cancelSearch": "Cancel Search",
+    "driverAccepted": {
+      "title": "Driver on the way",
+      "arriving": "Arriving in {{minutes}} min"
+    },
+    "driverArrived": {
+      "title": "Driver Arrived!",
+      "lookFor": "Look for:",
+      "waiting": "Your driver is waiting"
+    },
+    "inProgress": {
+      "title": "Trip Started",
+      "remaining": "{{minutes}} min remaining",
+      "distance": "{{km}} km"
+    },
+    "completed": {
+      "title": "Trip Completed!",
+      "tripFare": "Trip fare",
+      "serviceFee": "Service fee",
+      "discount": "Discount",
+      "total": "Total",
+      "paidWith": "Paid with {{method}}",
+      "rateTrip": "Rate Your Trip"
+    },
+    "rating": {
+      "title": "How was your ride?",
+      "addComment": "Add a comment...",
+      "quickFeedback": "Quick feedback:",
+      "cleanCar": "Clean car",
+      "goodDriver": "Good driver",
+      "safeRide": "Safe ride",
+      "onTime": "On time"
+    },
+    "cancel": {
+      "title": "Cancel Ride",
+      "confirm": "Are you sure you want to cancel?",
+      "fee": "Cancellation fee may apply"
+    },
+    "call": "Call",
+    "chat": "Chat"
+  },
+  "history": {
+    "title": "My Rides",
+    "empty": "No rides yet",
+    "emptySubtitle": "Your ride history will appear here",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "scheduled": "Scheduled",
+    "details": {
+      "title": "Ride Details",
+      "pickup": "Pickup",
+      "dropoff": "Dropoff",
+      "duration": "Duration",
+      "distance": "Distance",
+      "driver": "Driver",
+      "yourRating": "Your rating",
+      "fareBreakdown": "Fare Breakdown",
+      "serviceFee": "Service fee",
+      "discount": "Discount",
+      "total": "Total",
+      "paidWith": "Paid with {{method}}",
+      "reportIssue": "Report Issue"
+    }
+  },
+  "schedule": {
+    "title": "Schedule Ride",
+    "selectDate": "Select Date",
+    "selectTime": "Select Time",
+    "note": "Book at least 30 minutes in advance",
+    "confirm": "Confirm Schedule",
+    "error": "Error",
+    "minTimeError": "Please schedule at least 30 minutes in advance",
+    "success": "Scheduled!",
+    "successMessage": "Your ride has been scheduled successfully",
+    "submitError": "Failed to schedule ride. Please try again."
+  },
+  "scheduled": {
+    "title": "Scheduled Rides",
+    "empty": "No scheduled rides",
+    "emptySubtitle": "Schedule a ride for later",
+    "bookNow": "Book a Ride",
+    "cancel": "Cancel Ride",
+    "cancelTitle": "Cancel Scheduled Ride",
+    "cancelConfirm": "Are you sure you want to cancel this scheduled ride?"
+  },
+  "places": {
+    "title": "Saved Places",
+    "home": "Home",
+    "work": "Work",
+    "addNew": "Add New Place",
+    "editPlace": "Edit Place",
+    "addPlace": "Add Place",
+    "notSet": "Not set",
+    "deleteTitle": "Delete Place",
+    "deleteConfirm": "Are you sure you want to delete this place?",
+    "fillFields": "Please fill in all fields",
+    "nameLabel": "Place Name",
+    "namePlaceholder": "e.g., Mom's House",
+    "addressLabel": "Address",
+    "addressPlaceholder": "Enter the address"
+  },
+  "promotions": {
+    "title": "Promotions",
+    "haveCode": "Have a promo code?",
+    "enterPromoCode": "Enter promo code",
+    "enterCode": "Please enter a promo code",
+    "apply": "Apply",
+    "yourCoupons": "Your Coupons",
+    "active": "active",
+    "expires": "Expires",
+    "used": "Used",
+    "termsApply": "Terms and conditions apply",
+    "empty": "No coupons yet",
+    "emptySubtitle": "Enter a promo code above to add coupons",
+    "alreadyAdded": "Already Added",
+    "alreadyAddedMessage": "This coupon is already in your list",
+    "success": "Success!",
+    "codeAdded": "Promo code has been added to your coupons",
+    "invalidCode": "Invalid or expired promo code"
+  },
+  "chat": {
+    "title": "Chat",
+    "driver": "Driver",
+    "yourDriver": "Your driver",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "quickReplies": {
+      "onMyWay": "On my way",
+      "waitPlease": "Wait please",
+      "outside": "I'm outside",
+      "callMe": "Call me"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "editProfile": "Edit Profile",
+    "firstName": "First Name",
+    "firstNamePlaceholder": "Enter first name",
+    "lastName": "Last Name",
+    "lastNamePlaceholder": "Enter last name",
+    "email": "Email",
+    "emailPlaceholder": "Enter email",
+    "phone": "Phone Number",
+    "phoneChangeNote": "Contact support to change your phone number",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "other": "Other",
+    "nameRequired": "First name and last name are required",
+    "updateSuccess": "Profile updated successfully",
+    "updateError": "Failed to update profile",
+    "changePhoto": "Change Photo",
+    "chooseOption": "Choose an option",
+    "takePhoto": "Take Photo",
+    "chooseLibrary": "Choose from Library"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "language": "Language",
+    "appLanguage": "App Language",
+    "english": "English",
+    "arabic": "العربية",
+    "notifications": "Notifications",
+    "pushNotifications": "Push Notifications",
+    "account": "Account",
+    "changePassword": "Change Password",
+    "deleteAccount": "Delete Account",
+    "about": "About",
+    "version": "Version",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "logout": "Logout",
+    "logoutConfirm": "Are you sure you want to logout?"
+  },
+  "support": {
+    "title": "Support",
+    "howCanWeHelp": "How can we help?",
+    "subtitle": "We're here to help you 24/7",
+    "recentTrips": "Recent Trips",
+    "recentTripsDesc": "Report issue with a ride",
+    "faq": "FAQs",
+    "faqDesc": "Find answers to common questions",
+    "callUs": "Call Us",
+    "callUsDesc": "Talk to our support team",
+    "emailUs": "Email Us",
+    "emailUsDesc": "Send us a message",
+    "liveChat": "Live Chat",
+    "liveChatDesc": "Chat with us in real-time",
+    "frequentQuestions": "Frequently Asked Questions",
+    "faqQuestions": {
+      "q1": "How do I cancel a ride?",
+      "q2": "How is the fare calculated?",
+      "q3": "What payment methods are accepted?"
+    },
+    "faqAnswers": {
+      "a1": "You can cancel a ride from the active ride screen before the driver arrives. Cancellation fees may apply.",
+      "a2": "Fares are calculated based on distance, time, and the service type you select. Prices are shown before you confirm.",
+      "a3": "Currently we accept cash payments. More payment options coming soon."
+    },
+    "available": "Customer Support Available",
+    "hours": "24 hours, 7 days a week"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "emptySubtitle": "You'll see your notifications here",
+    "markAllRead": "Mark all as read",
+    "driverAssigned": "Driver Assigned",
+    "driverArrived": "Driver Arrived",
+    "tripStarted": "Trip Started",
+    "tripCompleted": "Trip Completed",
+    "scheduledReminder": "Scheduled Ride Reminder",
+    "newPromo": "New Promotion",
+    "appUpdate": "App Update Available"
+  },
+  "drawer": {
+    "home": "Home",
+    "myRides": "My Rides",
+    "scheduledRides": "Scheduled Rides",
+    "savedPlaces": "Saved Places",
+    "promotions": "Promotions",
+    "support": "Support",
+    "settings": "Settings",
+    "darkMode": "Dark Mode",
+    "logout": "Logout"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "network": "Network error. Please check your connection.",
+    "invalidCredentials": "Invalid email or password",
+    "invalidOtp": "Invalid verification code",
+    "locationPermission": "Location permission required",
+    "noDrivers": "No drivers available in your area"
+  }
+}

@@ -5,7 +5,13 @@
       "Bash(rm:*)",
       "Bash(curl:*)",
       "Bash(jq:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git pull:*)",
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run db:generate:*)"
     ],
     "deny": [],
     "ask": []

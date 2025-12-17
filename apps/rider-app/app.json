@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Taxi Rider",
+    "name": "Wasel Rider",
     "slug": "rider-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "rider-app",
+    "scheme": "wasel-rider",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,14 +15,30 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.taxi.rider"
+      "bundleIdentifier": "com.wasel.rider",
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
+        "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4CAF50"
       },
-      "package": "com.taxi.rider"
+      "package": "com.wasel.rider",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +46,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Wasel to use your location to show nearby drivers and track your rides."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
