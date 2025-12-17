@@ -153,8 +153,8 @@ export const orderApi = {
 
   getScheduledOrders: () => api.get('/orders/scheduled'),
 
-  getOrderHistory: (page = 1, limit = 20) =>
-    api.get(`/orders/history?page=${page}&limit=${limit}`),
+  getOrderHistory: (offset = 0, limit = 20) =>
+    api.get(`/orders?limit=${limit}&offset=${offset}`),
 
   getOrderDetails: (orderId: string) => api.get(`/orders/${orderId}`),
 
