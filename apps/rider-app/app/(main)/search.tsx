@@ -44,14 +44,14 @@ export default function SearchScreen() {
     }
 
     const searchText = activeInput === 'pickup' ? pickupText : destinationText;
-    if (searchText.length < 3) {
+    if (searchText.length < 2) {
       setPredictions([]);
       return;
     }
 
     debounceRef.current = setTimeout(() => {
       fetchPredictions(searchText);
-    }, 300);
+    }, 200);
 
     return () => {
       if (debounceRef.current) {
@@ -121,10 +121,6 @@ export default function SearchScreen() {
     }
   };
 
-  const savedPlaces = [
-    { icon: 'home', label: t('home.home'), address: null, type: 'home' },
-    { icon: 'briefcase', label: t('home.work'), address: null, type: 'work' },
-  ];
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
@@ -204,70 +200,30 @@ export default function SearchScreen() {
         className="flex-1"
         ListHeaderComponent={() => (
           <View>
-            {/* Saved Places */}
-            {predictions.length === 0 && (
+            {/* Recent Places */}
+            {predictions.length === 0 && recentPlaces.length > 0 && (
               <View className="px-4 py-4">
                 <Text className={`text-sm font-semibold mb-3 ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                  {t('home.savedPlaces')}
+                  {t('home.recentPlaces')}
                 </Text>
-                {savedPlaces.map((place, index) => (
+                {recentPlaces.map((place, index) => (
                   <TouchableOpacity
                     key={index}
-                    onPress={() => {
-                      if (place.address) {
-                        // Use saved place
-                      } else {
-                        router.push('/(main)/places');
-                      }
-                    }}
                     className={`flex-row items-center py-3 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}
                   >
                     <View className={`w-10 h-10 rounded-full items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-                      <Ionicons name={place.icon as any} size={20} color={isDark ? '#FAFAFA' : '#212121'} />
+                      <Ionicons name="time" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
                     </View>
                     <View className="ml-3 flex-1">
-                      <Text className={`text-base font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                        {place.label}
+                      <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                        {place.name}
                       </Text>
-                      {place.address ? (
-                        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                          {place.address}
-                        </Text>
-                      ) : (
-                        <Text className="text-sm text-primary">
-                          {t('home.addPlace')}
-                        </Text>
-                      )}
+                      <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                        {place.address}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 ))}
-
-                {/* Recent Places */}
-                {recentPlaces.length > 0 && (
-                  <>
-                    <Text className={`text-sm font-semibold mb-3 mt-6 ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                      {t('home.recentPlaces')}
-                    </Text>
-                    {recentPlaces.map((place, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        className={`flex-row items-center py-3 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}
-                      >
-                        <View className={`w-10 h-10 rounded-full items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-                          <Ionicons name="time" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
-                        </View>
-                        <View className="ml-3 flex-1">
-                          <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                            {place.name}
-                          </Text>
-                          <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                            {place.address}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                )}
               </View>
             )}
           </View>

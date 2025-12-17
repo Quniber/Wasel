@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
 import { Gender } from 'database';
 
 // In-memory OTP storage for development (use Redis in production)
@@ -12,6 +13,8 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    @Inject(forwardRef(() => SessionsService))
+    private sessionsService: SessionsService,
   ) {}
 
   // Generate 6-digit OTP
@@ -113,6 +116,72 @@ export class AuthService {
     return this.generateToken(customer);
   }
 
+  // Step 2: Verify OTP and complete registration (with session)
+  async verifyOtpAndRegisterWithSession(
+    data: {
+      mobileNumber: string;
+      otp: string;
+      firstName: string;
+      lastName: string;
+      email?: string;
+    },
+    deviceInfo: DeviceInfo,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    // Accept fixed OTP "123123" for testing
+    if (data.otp !== '123123') {
+      const stored = otpStore.get(data.mobileNumber);
+
+      if (!stored) {
+        throw new BadRequestException('OTP not found. Please request a new one.');
+      }
+
+      if (new Date() > stored.expiresAt) {
+        otpStore.delete(data.mobileNumber);
+        throw new BadRequestException('OTP expired. Please request a new one.');
+      }
+
+      if (stored.code !== data.otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
+    }
+
+    // OTP is valid, clean up
+    otpStore.delete(data.mobileNumber);
+
+    // Check for existing customer
+    let customer = await this.prisma.customer.findFirst({
+      where: { mobileNumber: data.mobileNumber },
+    });
+
+    if (customer) {
+      // Update existing customer
+      customer = await this.prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          status: 'enabled',
+        },
+      });
+    } else {
+      // Create new customer
+      customer = await this.prisma.customer.create({
+        data: {
+          mobileNumber: data.mobileNumber,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          status: 'enabled',
+        },
+      });
+    }
+
+    return this.generateTokenWithSession(customer, deviceInfo, ipAddress, userAgent);
+  }
+
   // Login with phone - sends OTP
   async loginWithPhone(mobileNumber: string) {
     const customer = await this.prisma.customer.findFirst({
@@ -182,6 +251,52 @@ export class AuthService {
     return this.generateToken(customer);
   }
 
+  // Verify OTP for login (with session)
+  async verifyOtpLoginWithSession(
+    mobileNumber: string,
+    otp: string,
+    deviceInfo: DeviceInfo,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    // Accept fixed OTP "123123" for testing
+    if (otp !== '123123') {
+      const stored = otpStore.get(mobileNumber);
+
+      if (!stored) {
+        throw new BadRequestException('OTP not found. Please request a new one.');
+      }
+
+      if (new Date() > stored.expiresAt) {
+        otpStore.delete(mobileNumber);
+        throw new BadRequestException('OTP expired. Please request a new one.');
+      }
+
+      if (stored.code !== otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
+    }
+
+    // OTP is valid
+    otpStore.delete(mobileNumber);
+
+    const customer = await this.prisma.customer.findFirst({
+      where: { mobileNumber },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    // Update last activity
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { lastActivityAt: new Date() },
+    });
+
+    return this.generateTokenWithSession(customer, deviceInfo, ipAddress, userAgent);
+  }
+
   // Resend OTP
   async resendOtp(mobileNumber: string) {
     // Generate new OTP
@@ -222,6 +337,29 @@ export class AuthService {
     return this.generateToken(customer);
   }
 
+  // Email/password registration (with session)
+  async registerWithSession(
+    data: { firstName: string; lastName: string; email: string; mobileNumber: string; password: string },
+    deviceInfo: DeviceInfo,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const existing = await this.prisma.customer.findFirst({
+      where: { OR: [{ email: data.email }, { mobileNumber: data.mobileNumber }] },
+    });
+
+    if (existing) {
+      throw new ConflictException('Email or phone already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const customer = await this.prisma.customer.create({
+      data: { ...data, password: hashedPassword, status: 'enabled' },
+    });
+
+    return this.generateTokenWithSession(customer, deviceInfo, ipAddress, userAgent);
+  }
+
   // Legacy email/password login
   async login(email: string, password: string) {
     const customer = await this.prisma.customer.findUnique({ where: { email } });
@@ -248,10 +386,75 @@ export class AuthService {
     return this.generateToken(customer);
   }
 
+  // Email/password login (with session)
+  async loginWithSession(
+    email: string,
+    password: string,
+    deviceInfo: DeviceInfo,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const customer = await this.prisma.customer.findUnique({ where: { email } });
+
+    if (!customer) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, customer.password || '');
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (customer.status !== 'enabled') {
+      throw new UnauthorizedException('Account is disabled');
+    }
+
+    // Update last activity
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { lastActivityAt: new Date() },
+    });
+
+    return this.generateTokenWithSession(customer, deviceInfo, ipAddress, userAgent);
+  }
+
   private generateToken(customer: any) {
     const payload = { sub: customer.id, email: customer.email, type: 'customer' };
     return {
       accessToken: this.jwtService.sign(payload),
+      customer: {
+        id: customer.id,
+        email: customer.email,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        mobileNumber: customer.mobileNumber,
+        gender: customer.gender,
+        mediaId: customer.mediaId,
+        presetAvatarNumber: customer.presetAvatarNumber,
+        walletBalance: customer.walletBalance,
+      },
+    };
+  }
+
+  // Generate token with session (new method that creates session)
+  async generateTokenWithSession(
+    customer: any,
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    // Create session and get tokens
+    const tokens = await this.sessionsService.createSession(
+      customer.id,
+      deviceInfo,
+      ipAddress,
+      userAgent,
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
       customer: {
         id: customer.id,
         email: customer.email,

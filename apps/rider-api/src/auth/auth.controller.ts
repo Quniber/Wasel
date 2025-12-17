@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Patch, Delete, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, UseGuards, Req, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { DeviceInfo } from '../sessions/sessions.service';
 
 @Controller('auth')
 export class AuthController {
@@ -14,9 +15,11 @@ export class AuthController {
     return this.authService.registerWithPhone(body.mobileNumber);
   }
 
-  // Step 2: Verify OTP and complete registration
+  // Step 2: Verify OTP and complete registration (with session)
   @Post('verify-otp')
   verifyOtpAndRegister(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
     @Body()
     body: {
       mobileNumber: string;
@@ -24,9 +27,15 @@ export class AuthController {
       firstName: string;
       lastName: string;
       email?: string;
+      deviceInfo?: DeviceInfo;
     },
   ) {
-    return this.authService.verifyOtpAndRegister(body);
+    return this.authService.verifyOtpAndRegisterWithSession(
+      body,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // Request OTP for login
@@ -35,10 +44,20 @@ export class AuthController {
     return this.authService.loginWithPhone(body.mobileNumber);
   }
 
-  // Verify OTP for login
+  // Verify OTP for login (with session)
   @Post('login/verify-otp')
-  verifyOtpLogin(@Body() body: { mobileNumber: string; otp: string }) {
-    return this.authService.verifyOtpLogin(body.mobileNumber, body.otp);
+  verifyOtpLogin(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
+    @Body() body: { mobileNumber: string; otp: string; deviceInfo?: DeviceInfo },
+  ) {
+    return this.authService.verifyOtpLoginWithSession(
+      body.mobileNumber,
+      body.otp,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // Resend OTP
@@ -51,6 +70,8 @@ export class AuthController {
 
   @Post('register/email')
   registerWithEmail(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
     @Body()
     body: {
       firstName: string;
@@ -58,14 +79,30 @@ export class AuthController {
       email: string;
       mobileNumber: string;
       password: string;
+      deviceInfo?: DeviceInfo;
     },
   ) {
-    return this.authService.register(body);
+    return this.authService.registerWithSession(
+      body,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   @Post('login/email')
-  loginWithEmail(@Body() body: { email: string; password: string }) {
-    return this.authService.login(body.email, body.password);
+  loginWithEmail(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
+    @Body() body: { email: string; password: string; deviceInfo?: DeviceInfo },
+  ) {
+    return this.authService.loginWithSession(
+      body.email,
+      body.password,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // ========== Profile Endpoints ==========

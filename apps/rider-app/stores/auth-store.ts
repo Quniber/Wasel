@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { sessionManager, SessionTokens, getDeviceInfo } from '@/lib/session';
 
 export interface User {
   id: string;
@@ -21,9 +22,12 @@ interface AuthState {
 
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => Promise<void>;
+  setSession: (tokens: SessionTokens, user: User) => Promise<void>;
   setLoading: (loading: boolean) => void;
   logout: () => Promise<void>;
+  logoutEverywhere: () => Promise<void>;
   loadStoredAuth: () => Promise<void>;
+  getDeviceInfo: () => ReturnType<typeof getDeviceInfo>;
 }
 
 // Helper functions for cross-platform storage
@@ -61,19 +65,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user, isAuthenticated: !!user });
     // Also persist user to storage
     if (user) {
-      storage.setItem('authUser', JSON.stringify(user));
-    } else {
-      storage.removeItem('authUser');
+      sessionManager.saveUser(user);
     }
   },
 
   setToken: async (token) => {
     if (token) {
-      await storage.setItem('authToken', token);
+      await storage.setItem('accessToken', token);
     } else {
-      await storage.removeItem('authToken');
+      await storage.removeItem('accessToken');
     }
     set({ token });
+  },
+
+  // New method to save session with tokens
+  setSession: async (tokens: SessionTokens, user: User) => {
+    await sessionManager.saveSession(tokens);
+    await sessionManager.saveUser(user);
+    set({
+      user,
+      token: tokens.accessToken,
+      isAuthenticated: true
+    });
   },
 
   setLoading: (isLoading) => {
@@ -81,23 +94,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    await storage.removeItem('authToken');
-    await storage.removeItem('authUser');
+    await sessionManager.logout();
+    set({ user: null, isAuthenticated: false, token: null });
+  },
+
+  logoutEverywhere: async () => {
+    await sessionManager.logoutEverywhere();
     set({ user: null, isAuthenticated: false, token: null });
   },
 
   loadStoredAuth: async () => {
     try {
-      const token = await storage.getItem('authToken');
-      const userJson = await storage.getItem('authUser');
-      if (token) {
-        const user = userJson ? JSON.parse(userJson) : null;
-        set({ token, isAuthenticated: true, user });
+      const isAuth = await sessionManager.isAuthenticated();
+      if (isAuth) {
+        const accessToken = await sessionManager.getValidAccessToken();
+        const user = await sessionManager.getUser();
+        if (accessToken && user) {
+          set({ token: accessToken, isAuthenticated: true, user });
+        } else {
+          // Clear invalid session
+          await sessionManager.clearSession();
+        }
       }
     } catch (error) {
       console.error('Error loading auth:', error);
+      await sessionManager.clearSession();
     } finally {
       set({ isLoading: false });
     }
   },
+
+  getDeviceInfo,
 }));

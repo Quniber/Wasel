@@ -210,16 +210,25 @@ model CustomerTransaction {
 }
 
 model CustomerSession {
-  id            Int            @id @default(autoincrement())
-  customerId    Int
-  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deviceToken   String?
+  id             Int            @id @default(autoincrement())
+  customerId     Int
+  customer       Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  refreshToken   String         @unique @db.VarChar(255)
+  accessToken    String?        @db.Text
+  deviceToken    String?
   devicePlatform DevicePlatform?
-  deviceModel   String?
-  appVersion    String?
-  lastActiveAt  DateTime       @default(now())
-  createdAt     DateTime       @default(now())
+  deviceModel    String?
+  deviceId       String?        @db.VarChar(100)
+  appVersion     String?
+  ipAddress      String?        @db.VarChar(45)
+  userAgent      String?        @db.Text
+  isActive       Boolean        @default(true)
+  expiresAt      DateTime
+  lastActiveAt   DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
+  @@index([customerId])
+  @@index([refreshToken])
   @@map("customer_sessions")
 }
 

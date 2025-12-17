@@ -113,10 +113,6 @@ export default function HomeScreen() {
     { icon: 'settings', label: t('drawer.settings'), route: '/(main)/settings' },
   ];
 
-  const savedPlaces = [
-    { icon: 'home', label: t('home.home'), address: null },
-    { icon: 'briefcase', label: t('home.work'), address: null },
-  ];
 
   return (
     <View className="flex-1">
@@ -166,21 +162,43 @@ export default function HomeScreen() {
 
         {/* Header Overlay */}
         <SafeAreaView className="absolute top-0 left-0 right-0" edges={['top']}>
-          <View className="flex-row items-center justify-between px-4 py-2">
-            <TouchableOpacity
-              onPress={openDrawer}
-              style={{ backgroundColor: colors.card }}
-              className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
-            >
-              <Ionicons name="menu" size={24} color={colors.foreground} />
-            </TouchableOpacity>
+          <View className="px-4 py-2">
+            {/* Menu and Notification Icons */}
+            <View className="flex-row items-center justify-between mb-3">
+              <TouchableOpacity
+                onPress={openDrawer}
+                style={{ backgroundColor: colors.card }}
+                className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
+              >
+                <Ionicons name="menu" size={24} color={colors.foreground} />
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                onPress={() => router.push('/(main)/notifications')}
+                style={{ backgroundColor: colors.card }}
+                className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
+              >
+                <Ionicons name="notifications" size={24} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
             <TouchableOpacity
-              onPress={() => router.push('/(main)/notifications')}
-              style={{ backgroundColor: colors.card }}
-              className="w-12 h-12 rounded-full items-center justify-center shadow-lg"
+              onPress={() => router.push('/(main)/search')}
+              style={{
+                backgroundColor: colors.card,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 5,
+              }}
+              className="flex-row items-center px-4 py-4 rounded-xl"
             >
-              <Ionicons name="notifications" size={24} color={colors.foreground} />
+              <Ionicons name="search" size={22} color={colors.primary} />
+              <Text style={{ color: colors.mutedForeground }} className="ml-3 text-base flex-1">
+                {t('home.whereTo')}
+              </Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -189,80 +207,12 @@ export default function HomeScreen() {
         <TouchableOpacity
           onPress={centerOnCurrentLocation}
           style={{ backgroundColor: colors.card }}
-          className="absolute right-4 bottom-48 w-12 h-12 rounded-full items-center justify-center shadow-lg"
+          className="absolute right-4 bottom-8 w-12 h-12 rounded-full items-center justify-center shadow-lg"
         >
           <Ionicons name="locate" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Sheet */}
-      <View
-        style={{
-          backgroundColor: colors.card,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 10,
-        }}
-        className="rounded-t-3xl px-5 py-6"
-      >
-        {/* Search Bar */}
-        <TouchableOpacity
-          onPress={() => router.push('/(main)/search')}
-          style={{
-            backgroundColor: colors.secondary,
-            borderColor: colors.border,
-            borderWidth: 1,
-          }}
-          className="flex-row items-center px-4 py-4 rounded-xl"
-        >
-          <Ionicons name="search" size={24} color={colors.primary} />
-          <Text style={{ color: colors.mutedForeground }} className="ml-3 text-base flex-1">
-            {t('home.whereTo')}
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
-        </TouchableOpacity>
-
-        {/* Saved Places */}
-        <View className="flex-row mt-4 gap-3">
-          {savedPlaces.map((place, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => {
-                if (place.address) {
-                  // Use saved address
-                } else {
-                  router.push('/(main)/places');
-                }
-              }}
-              style={{ backgroundColor: colors.secondary }}
-              className="flex-1 flex-row items-center px-4 py-3 rounded-xl"
-            >
-              <View
-                style={{ backgroundColor: `${colors.primary}15` }}
-                className="w-8 h-8 rounded-full items-center justify-center"
-              >
-                <Ionicons name={place.icon as any} size={18} color={colors.primary} />
-              </View>
-              <Text
-                style={{ color: colors.foreground }}
-                className="ml-2 text-sm font-medium"
-                numberOfLines={1}
-              >
-                {place.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            onPress={() => router.push('/(main)/places')}
-            style={{ backgroundColor: colors.secondary }}
-            className="w-14 items-center justify-center px-3 py-3 rounded-xl"
-          >
-            <Ionicons name="add" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       {/* Web Menu Modal */}
       {Platform.OS === 'web' && (
