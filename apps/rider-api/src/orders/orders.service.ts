@@ -18,6 +18,54 @@ export class OrdersService {
     });
   }
 
+  // Get directions from Google Directions API
+  async getDirections(data: {
+    originLat: number;
+    originLng: number;
+    destLat: number;
+    destLng: number;
+  }) {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException('Google Maps API key not configured');
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${data.originLat},${data.originLng}&destination=${data.destLat},${data.destLng}&key=${apiKey}&mode=driving`;
+
+    try {
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.status === 'OK' && result.routes.length > 0) {
+        const route = result.routes[0];
+        const leg = route.legs[0];
+
+        return {
+          status: 'OK',
+          polyline: route.overview_polyline.points,
+          distance: {
+            text: leg.distance.text,
+            value: leg.distance.value, // meters
+          },
+          duration: {
+            text: leg.duration.text,
+            value: leg.duration.value, // seconds
+          },
+          startAddress: leg.start_address,
+          endAddress: leg.end_address,
+        };
+      } else {
+        return {
+          status: result.status,
+          error: result.error_message || 'No route found',
+        };
+      }
+    } catch (error) {
+      console.error('Directions API error:', error);
+      throw new BadRequestException('Failed to get directions');
+    }
+  }
+
   // Calculate fare estimate before booking
   async calculateFare(data: {
     serviceId: number;

@@ -25,6 +25,20 @@ export class OrdersController {
     return this.ordersService.getServices();
   }
 
+  // Get directions between two points (proxy for Google Directions API)
+  @Post('directions')
+  getDirections(
+    @Body()
+    body: {
+      originLat: number;
+      originLng: number;
+      destLat: number;
+      destLng: number;
+    },
+  ) {
+    return this.ordersService.getDirections(body);
+  }
+
   // Calculate fare estimate
   @Post('calculate')
   calculateFare(

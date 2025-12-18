@@ -12,7 +12,7 @@ import { authApi } from '@/lib/api';
 export default function ProfileSetupScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { setToken, setUser } = useAuthStore();
+  const { setSession } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
   const { phone, otp } = useLocalSearchParams<{ phone: string; otp: string }>();
@@ -40,17 +40,23 @@ export default function ProfileSetupScreen() {
         email: email || undefined,
       });
 
-      // Save token and user data
-      await setToken(response.data.accessToken);
-      setUser({
-        id: response.data.customer.id.toString(),
-        firstName: response.data.customer.firstName || '',
-        lastName: response.data.customer.lastName || '',
-        email: response.data.customer.email || '',
-        mobileNumber: response.data.customer.mobileNumber,
-        gender: response.data.customer.gender,
-        walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
-      });
+      // Save session with tokens (for persistence)
+      await setSession(
+        {
+          accessToken: response.data.accessToken,
+          refreshToken: response.data.refreshToken,
+          expiresIn: response.data.expiresIn || 3600,
+        },
+        {
+          id: response.data.customer.id.toString(),
+          firstName: response.data.customer.firstName || '',
+          lastName: response.data.customer.lastName || '',
+          email: response.data.customer.email || '',
+          mobileNumber: response.data.customer.mobileNumber,
+          gender: response.data.customer.gender,
+          walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
+        }
+      );
 
       router.replace('/(main)');
     } catch (err: any) {

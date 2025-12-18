@@ -90,6 +90,12 @@
     "minutes": "{{count}} min",
     "requestRide": "Request Ride",
     "scheduleLater": "Schedule Later",
+    "distance": "Distance",
+    "time": "Time",
+    "baseFare": "Base Fare",
+    "distanceFare": "Distance Fare",
+    "timeFare": "Time Fare",
+    "total": "Total",
     "schedule": {
       "title": "Schedule Ride",
       "selectDate": "Select Date",

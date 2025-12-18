@@ -210,8 +210,16 @@ export const authApi = {
 export const orderApi = {
   getServices: () => api.get('/orders/services'),
 
+  // Get directions from backend (proxy to Google Directions API)
+  getDirections: (data: {
+    originLat: number;
+    originLng: number;
+    destLat: number;
+    destLng: number;
+  }) => api.post('/orders/directions', data),
+
   calculateFare: (data: {
-    serviceId: string;
+    serviceId: number;
     pickupLat: number;
     pickupLng: number;
     dropoffLat: number;
@@ -219,7 +227,7 @@ export const orderApi = {
   }) => api.post('/orders/calculate', data),
 
   createOrder: (data: {
-    serviceId: string;
+    serviceId: number;
     pickupAddress: string;
     pickupLatitude: number;
     pickupLongitude: number;

@@ -90,6 +90,12 @@
     "minutes": "{{count}} دقيقة",
     "requestRide": "طلب رحلة",
     "scheduleLater": "جدولة لاحقاً",
+    "distance": "المسافة",
+    "time": "الوقت",
+    "baseFare": "الأجرة الأساسية",
+    "distanceFare": "أجرة المسافة",
+    "timeFare": "أجرة الوقت",
+    "total": "الإجمالي",
     "schedule": {
       "title": "جدولة رحلة",
       "selectDate": "اختر التاريخ",

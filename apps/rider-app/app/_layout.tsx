@@ -25,11 +25,9 @@ function RootLayoutContent() {
   const { loadStoredAuth, logout, isLoading, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Load auth from storage (or clear for fresh start)
-    // Change to loadStoredAuth() to restore normal login persistence
+    // Load auth from storage to persist login
     const initAuth = async () => {
-      await logout(); // Clear old data for testing - change to loadStoredAuth() for production
-      setLoading(false);
+      await loadStoredAuth();
     };
     initAuth();
   }, []);
