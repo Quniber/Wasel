@@ -220,10 +220,10 @@ export const orderApi = {
 
   calculateFare: (data: {
     serviceId: number;
-    pickupLat: number;
-    pickupLng: number;
-    dropoffLat: number;
-    dropoffLng: number;
+    pickupLatitude: number;
+    pickupLongitude: number;
+    dropoffLatitude: number;
+    dropoffLongitude: number;
   }) => api.post('/orders/calculate', data),
 
   createOrder: (data: {

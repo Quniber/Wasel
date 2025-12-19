@@ -142,22 +142,23 @@ export default function RoutePreviewScreen() {
           try {
             const fareResponse = await orderApi.calculateFare({
               serviceId: parseInt(service.id, 10),
-              pickupLat: pickup.latitude,
-              pickupLng: pickup.longitude,
-              dropoffLat: dropoff.latitude,
-              dropoffLng: dropoff.longitude,
+              pickupLatitude: pickup.latitude,
+              pickupLongitude: pickup.longitude,
+              dropoffLatitude: dropoff.latitude,
+              dropoffLongitude: dropoff.longitude,
             });
             const data = fareResponse.data;
+            // Backend returns: estimatedFare, breakdown.baseFare, breakdown.distanceCost, breakdown.timeCost
             return {
               serviceId: service.id,
-              baseFare: parseFloat(data.baseFare) || 0,
-              distanceFare: parseFloat(data.distanceFare) || 0,
-              timeFare: parseFloat(data.timeFare) || 0,
-              totalFare: parseFloat(data.totalFare) || 0,
+              baseFare: parseFloat(data.breakdown?.baseFare) || 0,
+              distanceFare: parseFloat(data.breakdown?.distanceCost) || 0,
+              timeFare: parseFloat(data.breakdown?.timeCost) || 0,
+              totalFare: parseFloat(data.estimatedFare) || 0,
               currency: data.currency || 'QAR',
               distance: parseFloat(data.distance) || 0,
-              duration: parseFloat(data.duration) || 0,
-              eta: parseInt(data.eta) || 5,
+              duration: parseFloat(data.estimatedDuration) || 0,
+              eta: parseInt(data.estimatedDuration) || 5,
             };
           } catch (err) {
             console.error('Error calculating fare for service:', service.id, err);

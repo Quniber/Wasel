@@ -122,7 +122,7 @@ export class OrdersService {
         minimumFare,
       },
       estimatedFare: Math.round(totalFare * 100) / 100,
-      currency: 'USD',
+      currency: service.currency || 'QAR',
     };
   }
 
