@@ -74,8 +74,11 @@ export class OrdersService {
     dropoffLatitude: number;
     dropoffLongitude: number;
   }) {
+    // Ensure serviceId is an integer (JSON may send as string)
+    const serviceId = typeof data.serviceId === 'string' ? parseInt(data.serviceId, 10) : data.serviceId;
+
     const service = await this.prisma.service.findUnique({
-      where: { id: data.serviceId },
+      where: { id: serviceId },
     });
 
     if (!service || !service.isActive) {
@@ -142,8 +145,11 @@ export class OrdersService {
       scheduledAt?: string;
     },
   ) {
+    // Ensure serviceId is an integer (JSON may send as string)
+    const serviceId = typeof data.serviceId === 'string' ? parseInt(data.serviceId, 10) : data.serviceId;
+
     const service = await this.prisma.service.findUnique({
-      where: { id: data.serviceId },
+      where: { id: serviceId },
     });
 
     if (!service || !service.isActive) {
@@ -152,7 +158,7 @@ export class OrdersService {
 
     // Calculate fare
     const fareEstimate = await this.calculateFare({
-      serviceId: data.serviceId,
+      serviceId: serviceId,
       pickupLatitude: data.pickupLatitude,
       pickupLongitude: data.pickupLongitude,
       dropoffLatitude: data.dropoffLatitude,
@@ -216,7 +222,7 @@ export class OrdersService {
     const order = await this.prisma.order.create({
       data: {
         customerId,
-        serviceId: data.serviceId,
+        serviceId: serviceId,
         couponId,
         status: data.scheduledAt ? OrderStatus.Booked : OrderStatus.Requested,
         addresses,
