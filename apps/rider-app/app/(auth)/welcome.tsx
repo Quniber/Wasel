@@ -55,7 +55,7 @@ export default function WelcomeScreen() {
             style={{ color: colors.foreground }}
             className="text-4xl font-bold tracking-tight"
           >
-            Wasel
+            WASEL1
           </Text>
 
           {/* Tagline */}
