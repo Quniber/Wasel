@@ -76,15 +76,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"
-      }
+      "router": {}
     },
-    "owner": "quniber",
-    "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"
-    }
+    "owner": "quniber"
   }
 }
