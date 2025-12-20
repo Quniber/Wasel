@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -58,6 +58,14 @@ export default function WelcomeScreen() {
             WASEL
           </Text>
 
+          {/* Subtitle */}
+          <Text
+            style={{ color: colors.mutedForeground }}
+            className="text-base mt-1"
+          >
+            DRIVER
+          </Text>
+
           {/* Tagline */}
           <Text
             style={{ color: colors.mutedForeground }}
@@ -69,9 +77,9 @@ export default function WelcomeScreen() {
           {/* Features */}
           <View className="mt-10 w-full px-4">
             {[
-              { icon: 'shield-checkmark', text: t('auth.welcome.feature1') || 'Safe & Secure Rides' },
-              { icon: 'time', text: t('auth.welcome.feature2') || 'Available 24/7' },
-              { icon: 'wallet', text: t('auth.welcome.feature3') || 'Easy Payments' },
+              { icon: 'time-outline', text: t('auth.welcome.feature1') },
+              { icon: 'wallet-outline', text: t('auth.welcome.feature2') },
+              { icon: 'headset-outline', text: t('auth.welcome.feature3') },
             ].map((feature, index) => (
               <View
                 key={index}
@@ -133,7 +141,7 @@ export default function WelcomeScreen() {
             style={{ color: colors.mutedForeground }}
             className="text-xs text-center mt-6 px-4"
           >
-            {t('auth.welcome.terms') || 'By continuing, you agree to our Terms of Service and Privacy Policy'}
+            {t('auth.welcome.terms')}
           </Text>
         </View>
       </View>
