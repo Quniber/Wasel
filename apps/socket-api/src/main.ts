@@ -11,7 +11,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
-  const port = process.env.PORT || 3003;
+  const port = process.env.PORT || 3004;
   await app.listen(port);
   console.log(`Socket API running on http://localhost:${port}`);
 }

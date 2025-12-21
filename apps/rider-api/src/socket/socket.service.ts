@@ -8,7 +8,7 @@ export class SocketService {
   private readonly socketApiUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.socketApiUrl = this.configService.get('SOCKET_API_URL') || 'http://localhost:3003';
+    this.socketApiUrl = this.configService.get('SOCKET_API_URL') || 'http://localhost:3004';
   }
 
   private async callSocketApi(endpoint: string, data?: any): Promise<any> {
