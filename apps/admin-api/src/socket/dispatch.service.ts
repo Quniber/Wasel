@@ -315,7 +315,7 @@ export class DispatchService {
         where: { id: orderId },
         include: {
           customer: {
-            select: { firstName: true, lastName: true, media: { select: { url: true } } },
+            select: { firstName: true, lastName: true, media: { select: { address: true } } },
           },
           service: { select: { name: true } },
         },
