@@ -7,12 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { getColors } from '@/constants/Colors';
-import { driverApi, vehicleApi } from '@/lib/api';
+import { authApi } from '@/lib/api';
 
 export default function ProfileSetupScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { user, updateUser } = useAuthStore();
+  const { updateUser } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
 
@@ -42,19 +42,14 @@ export default function ProfileSetupScreen() {
     setError('');
 
     try {
-      await vehicleApi.create({
-        make: vehicleMake,
-        model: vehicleModel,
-        year: parseInt(vehicleYear),
-        color: vehicleColor,
-        plateNumber,
-        type: vehicleType,
+      // Update driver profile with vehicle info
+      await authApi.updateProfile({
+        carPlate: plateNumber,
+        carProductionYear: parseInt(vehicleYear),
       });
 
-      // Update user status
-      if (user) {
-        updateUser({ ...user, status: 'pending_documents' });
-      }
+      // Update user status locally
+      updateUser({ status: 'waiting_documents' });
 
       router.replace('/(main)');
     } catch (err: any) {

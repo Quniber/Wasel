@@ -116,6 +116,20 @@ export class AuthController {
     return this.authService.login(body.email, body.password);
   }
 
+  // Email-based registration (simple signup without documents)
+  @Post('register/email')
+  registerWithEmail(
+    @Body() body: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      mobileNumber: string;
+      password: string;
+    },
+  ) {
+    return this.authService.registerWithEmail(body);
+  }
+
   // ========== Profile Endpoints ==========
 
   @UseGuards(JwtAuthGuard)

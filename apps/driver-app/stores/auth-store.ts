@@ -12,9 +12,10 @@ export interface Driver {
   gender?: string;
   avatar?: string;
   rating: number;
-  totalTrips: number;
-  isVerified: boolean;
-  documentsStatus: 'pending' | 'approved' | 'rejected' | 'incomplete';
+  totalTrips?: number;
+  isVerified?: boolean;
+  status?: string;
+  documentsStatus?: 'pending' | 'approved' | 'rejected' | 'incomplete';
   vehicle?: {
     id: number;
     make: string;
@@ -32,6 +33,7 @@ interface AuthState {
   token: string | null;
 
   setUser: (user: Driver | null) => void;
+  updateUser: (updates: Partial<Driver>) => void;
   setToken: (token: string | null) => Promise<void>;
   setSession: (tokens: SessionTokens, user: Driver) => Promise<void>;
   setLoading: (loading: boolean) => void;
@@ -77,6 +79,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Also persist user to storage
     if (user) {
       sessionManager.saveUser(user);
+    }
+  },
+
+  updateUser: (updates) => {
+    const currentUser = get().user;
+    if (currentUser) {
+      const updatedUser = { ...currentUser, ...updates };
+      set({ user: updatedUser });
+      sessionManager.saveUser(updatedUser);
     }
   },
 

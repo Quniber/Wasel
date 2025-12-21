@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { DriverStatus } from 'database';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3002';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://wasel.shafrah.qa/driver-api/api';
 
 // Cross-platform storage helpers
 const storage = {
@@ -181,6 +181,15 @@ export const authApi = {
   // Email-based login
   loginWithEmail: (data: { email: string; password: string }) =>
     api.post('/auth/login/email', data),
+
+  // Email-based registration (simple signup)
+  registerWithEmail: (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobileNumber: string;
+    password: string;
+  }) => api.post('/auth/register/email', data),
 
   // Profile
   getProfile: () => api.get('/auth/profile'),

@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3002';
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://wasel.shafrah.qa';
 
 // Helper to get token cross-platform
 const getAuthToken = async (): Promise<string | null> => {

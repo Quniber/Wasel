@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { getColors } from '@/constants/Colors';
-import { vehicleApi } from '@/lib/api';
+import { authApi } from '@/lib/api';
 
 interface Vehicle {
   id: string;
@@ -50,8 +50,18 @@ export default function VehicleScreen() {
   const fetchVehicle = async () => {
     setIsLoading(true);
     try {
-      const response = await vehicleApi.get();
-      const vehicleData = response.data;
+      const response = await authApi.getProfile();
+      const profile = response.data;
+      // Map profile data to vehicle format
+      const vehicleData: Vehicle = {
+        id: profile.id?.toString() || '',
+        make: profile.carModel?.brand?.name || '',
+        model: profile.carModel?.name || '',
+        year: profile.carProductionYear || 0,
+        color: profile.carColor?.nameEn || '',
+        plateNumber: profile.carPlate || '',
+        type: 'sedan', // Default type
+      };
       setVehicle(vehicleData);
       // Populate form
       setMake(vehicleData.make || '');
@@ -68,20 +78,17 @@ export default function VehicleScreen() {
   };
 
   const handleSave = async () => {
-    if (!make || !model || !year || !color || !plateNumber) {
+    if (!plateNumber || !year) {
       Alert.alert(t('errors.validationError'), t('errors.fillAllFields'));
       return;
     }
 
     setIsSaving(true);
     try {
-      await vehicleApi.update({
-        make,
-        model,
-        year: parseInt(year),
-        color,
-        plateNumber,
-        type: vehicleType,
+      // Update via profile API - only carPlate and carProductionYear are directly editable
+      await authApi.updateProfile({
+        carPlate: plateNumber,
+        carProductionYear: parseInt(year),
       });
       await fetchVehicle();
       setIsEditing(false);

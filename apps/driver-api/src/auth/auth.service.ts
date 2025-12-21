@@ -238,10 +238,56 @@ export class AuthService {
     return this.generateToken(driver);
   }
 
+  // Email-based registration (without documents - simple signup)
+  async registerWithEmail(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobileNumber: string;
+    password: string;
+  }) {
+    // Check if email already exists
+    const existingEmail = await this.prisma.driver.findUnique({
+      where: { email: data.email },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Email already registered');
+    }
+
+    // Check if phone already exists
+    const existingPhone = await this.prisma.driver.findFirst({
+      where: { mobileNumber: data.mobileNumber },
+    });
+    if (existingPhone) {
+      throw new ConflictException('Mobile number already registered');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    // Create driver with waiting_documents status (needs to complete profile/upload docs)
+    const driver = await this.prisma.driver.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: hashedPassword,
+        mobileNumber: data.mobileNumber,
+        status: DriverStatus.waiting_documents,
+      },
+    });
+
+    return this.generateToken(driver);
+  }
+
   private generateToken(driver: any) {
     const payload = { sub: driver.id, email: driver.email, type: 'driver' };
+    const expiresIn = 30 * 24 * 60 * 60; // 30 days in seconds
+
     return {
       accessToken: this.jwtService.sign(payload),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '60d' }), // Refresh token valid for 60 days
+      expiresIn,
       driver: {
         id: driver.id,
         email: driver.email,

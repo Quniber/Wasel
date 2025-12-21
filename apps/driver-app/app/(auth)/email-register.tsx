@@ -47,15 +47,15 @@ export default function EmailRegisterScreen() {
       const { accessToken, refreshToken, expiresIn, driver } = response.data;
 
       await setSession(
-        { accessToken, refreshToken, expiresIn },
+        { accessToken, refreshToken, expiresIn: expiresIn || 2592000 },
         {
-          id: driver.id.toString(),
+          id: driver.id,
           firstName: driver.firstName || '',
           lastName: driver.lastName || '',
           email: driver.email || '',
           mobileNumber: driver.mobileNumber,
           rating: driver.rating || 5.0,
-          status: driver.status || 'pending',
+          status: driver.status || 'waiting_documents',
         }
       );
 
