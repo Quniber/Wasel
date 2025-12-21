@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { api, Driver } from '@/lib/api';
 import { MapPin, Car, Users, Clock, RefreshCw, Filter, Search, Navigation, Locate } from 'lucide-react';
+import { useSocket } from '@/contexts/socket-context';
 
 const mapContainerStyle = {
   width: '100%',
@@ -12,10 +13,10 @@ const mapContainerStyle = {
   minHeight: '500px',
 };
 
-// Default center (can be adjusted based on your service area)
+// Default center - Qatar (Doha)
 const defaultCenter = {
-  lat: 24.7136, // Default to Riyadh, Saudi Arabia - adjust as needed
-  lng: 46.6753,
+  lat: 25.2854,
+  lng: 51.5310,
 };
 
 const mapOptions: google.maps.MapOptions = {
@@ -63,14 +64,31 @@ export default function LiveMapPage() {
     }
   }, []);
 
+  // Get real-time driver locations from socket
+  const { driverLocations } = useSocket();
+
   // Fetch all drivers with locations
   const { data: driversData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['drivers-locations', statusFilter],
     queryFn: () => api.getDriversWithLocations({ status: statusFilter !== 'all' ? statusFilter : undefined }),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 5000, // Refetch every 5 seconds for faster updates
   });
 
-  const drivers = driversData?.data || [];
+  // Apply real-time location updates to drivers
+  const drivers = useMemo(() => {
+    const baseDrivers = driversData?.data || [];
+    return baseDrivers.map((driver: Driver) => {
+      const liveLocation = driverLocations.get(driver.id);
+      if (liveLocation) {
+        return {
+          ...driver,
+          latitude: liveLocation.latitude,
+          longitude: liveLocation.longitude,
+        };
+      }
+      return driver;
+    });
+  }, [driversData?.data, driverLocations]);
 
   // Filter drivers based on search and those with valid coordinates
   const filteredDrivers = useMemo(() => {

@@ -77,8 +77,8 @@ api.interceptors.response.use(
     // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Don't retry for refresh or logout endpoints
-      if (originalRequest.url?.includes('/sessions/refresh') ||
-          originalRequest.url?.includes('/sessions/logout')) {
+      if (originalRequest.url?.includes('/auth/refresh') ||
+          originalRequest.url?.includes('/auth/logout')) {
         return Promise.reject(error);
       }
 
@@ -105,7 +105,7 @@ api.interceptors.response.use(
         }
 
         // Refresh the token
-        const response = await axios.post(`${API_BASE_URL}/sessions/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refreshToken,
         });
 
@@ -229,10 +229,10 @@ export const authApi = {
 // Driver APIs - convenience wrappers around auth endpoints
 export const driverApi = {
   // Go online
-  goOnline: () => authApi.updateStatus('Online' as DriverStatus),
+  goOnline: () => authApi.updateStatus('online' as DriverStatus),
 
   // Go offline
-  goOffline: () => authApi.updateStatus('Offline' as DriverStatus),
+  goOffline: () => authApi.updateStatus('offline' as DriverStatus),
 
   // Update location
   updateLocation: (latitude: number, longitude: number) =>

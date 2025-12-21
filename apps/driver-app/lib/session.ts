@@ -94,7 +94,7 @@ export const sessionManager = {
         return null;
       }
 
-      const response = await api.post('/sessions/refresh', { refreshToken });
+      const response = await api.post('/auth/refresh', { refreshToken });
       const tokens: SessionTokens = response.data;
 
       await this.saveSession(tokens);

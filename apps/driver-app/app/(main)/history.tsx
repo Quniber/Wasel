@@ -72,7 +72,7 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: RideHistory }) => (
     <TouchableOpacity
-      onPress={() => router.push(`/(main)/history/${item.id}`)}
+      onPress={() => router.push(`/(main)/history/${item.id}` as any)}
       className="mx-4 mb-3 p-4 rounded-xl"
       style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }}
     >

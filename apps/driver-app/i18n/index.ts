@@ -21,7 +21,7 @@ const getStoredLanguage = async (): Promise<string> => {
       return stored;
     }
     // Default to device language if supported
-    const deviceLang = Localization.locale.split('-')[0];
+    const deviceLang = Localization.getLocales()[0]?.languageCode || 'en';
     return deviceLang === 'ar' ? 'ar' : 'en';
   } catch {
     return 'en';

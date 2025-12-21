@@ -55,7 +55,7 @@ function CustomDrawerContent(props: any) {
               <View className="flex-row items-center mt-1">
                 <Ionicons name="star" size={14} color="#f59e0b" />
                 <Text style={{ color: colors.mutedForeground }} className="ml-1 text-sm">
-                  {user?.rating?.toFixed(1) || '5.0'} Rating
+                  {typeof user?.rating === 'number' ? user.rating.toFixed(1) : '5.0'} Rating
                 </Text>
               </View>
             </View>

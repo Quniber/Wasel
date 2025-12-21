@@ -188,4 +188,11 @@ export class AuthController {
   updateNotificationToken(@Req() req: any, @Body() body: { token: string }) {
     return this.authService.updateNotificationToken(req.user.id, body.token);
   }
+
+  // ========== Token Refresh ==========
+
+  @Post('refresh')
+  refreshToken(@Body() body: { refreshToken: string }) {
+    return this.authService.refreshToken(body.refreshToken);
+  }
 }

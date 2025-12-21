@@ -15,29 +15,45 @@ const getAuthToken = async (): Promise<string | null> => {
 class DriverSocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
-  private locationInterval: NodeJS.Timeout | null = null;
+  private locationInterval: ReturnType<typeof setInterval> | null = null;
 
   async connect() {
-    if (this.socket?.connected) return;
+    console.log('[Socket] connect() called');
+    if (this.socket?.connected) {
+      console.log('[Socket] Already connected, skipping');
+      return;
+    }
 
     const token = await getAuthToken();
+    console.log('[Socket] Token:', token ? 'exists' : 'missing');
+    console.log('[Socket] Connecting to:', SOCKET_URL);
 
     this.socket = io(SOCKET_URL, {
+      path: '/driver-api/socket.io',
       auth: { token, type: 'driver' },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     this.socket.on('connect', () => {
-      console.log('Driver socket connected');
+      console.log('[Socket] Connected! Socket ID:', this.socket?.id);
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Driver socket disconnected');
+    this.socket.on('disconnect', (reason) => {
+      console.log('[Socket] Disconnected:', reason);
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('[Socket] Connection error:', error.message);
+      console.error('[Socket] Error details:', JSON.stringify(error, null, 2));
     });
 
     this.socket.on('error', (error) => {
-      console.error('Driver socket error:', error);
+      console.error('[Socket] Error:', error);
     });
 
     // Re-emit events to registered listeners
@@ -79,8 +95,8 @@ class DriverSocketService {
   // Driver-specific methods
 
   // Go online - start receiving orders
-  goOnline() {
-    this.emit('driver:online');
+  goOnline(location?: { latitude: number; longitude: number }) {
+    this.emit('driver:online', { location });
   }
 
   // Go offline - stop receiving orders

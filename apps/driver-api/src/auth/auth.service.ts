@@ -305,6 +305,24 @@ export class AuthService {
     return this.prisma.driver.findUnique({ where: { id } });
   }
 
+  // Refresh token
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      const driver = await this.prisma.driver.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!driver) {
+        throw new UnauthorizedException('Driver not found');
+      }
+
+      return this.generateToken(driver);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
   // Get profile
   async getProfile(driverId: number) {
     const driver = await this.prisma.driver.findUnique({
@@ -472,7 +490,7 @@ export class AuthService {
         DriverStatus.blocked,
       ];
       if (blockedStatuses.includes(driver.status)) {
-        throw new BadRequestException('Your account is not approved yet');
+        throw new BadRequestException('Your account is not approved yet. Please wait for approval.');
       }
     }
 

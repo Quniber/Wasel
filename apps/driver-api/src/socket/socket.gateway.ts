@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface DriverLocation {
   latitude: number;
@@ -54,6 +55,7 @@ export class SocketGateway
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
+    private prisma: PrismaService,
   ) {}
 
   afterInit(server: Server) {
@@ -102,27 +104,42 @@ export class SocketGateway
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
+  async handleDisconnect(client: AuthenticatedSocket) {
     const user = client.data?.user;
     if (user) {
       this.onlineDrivers.delete(user.id);
+
+      // Update status in database
+      try {
+        await this.prisma.driver.update({
+          where: { id: user.id },
+          data: {
+            status: 'offline',
+            lastSeenAt: new Date(),
+          },
+        });
+      } catch (error) {
+        this.logger.error(`Failed to update driver ${user.id} status on disconnect: ${error.message}`);
+      }
+
       this.logger.log(`Driver ${user.id} disconnected`);
     }
   }
 
   // Driver goes online
   @SubscribeMessage('driver:online')
-  handleDriverOnline(
+  async handleDriverOnline(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { serviceIds: number[]; location: DriverLocation },
+    @MessageBody() data: { serviceIds?: number[]; location?: DriverLocation },
   ) {
-    const { serviceIds, location } = data;
+    const serviceIds = data?.serviceIds || [];
+    const location = data?.location;
     const driverId = client.data.user.id;
 
     this.onlineDrivers.set(driverId, {
       driverId,
       socketId: client.id,
-      location,
+      location: location || { latitude: 0, longitude: 0 },
       serviceIds,
       lastUpdate: new Date(),
     });
@@ -132,13 +149,31 @@ export class SocketGateway
       client.join(`service:${serviceId}`);
     });
 
+    // Update status in database
+    try {
+      const updateData: any = {
+        status: 'online',
+        lastSeenAt: new Date(),
+      };
+      if (location) {
+        updateData.latitude = location.latitude;
+        updateData.longitude = location.longitude;
+      }
+      await this.prisma.driver.update({
+        where: { id: driverId },
+        data: updateData,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update driver ${driverId} status: ${error.message}`);
+    }
+
     this.logger.log(`Driver ${driverId} is now online with services: ${serviceIds.join(', ')}`);
     return { success: true };
   }
 
   // Driver goes offline
   @SubscribeMessage('driver:offline')
-  handleDriverOffline(@ConnectedSocket() client: AuthenticatedSocket) {
+  async handleDriverOffline(@ConnectedSocket() client: AuthenticatedSocket) {
     const driverId = client.data.user.id;
     const driver = this.onlineDrivers.get(driverId);
 
@@ -149,13 +184,27 @@ export class SocketGateway
     }
 
     this.onlineDrivers.delete(driverId);
+
+    // Update status in database
+    try {
+      await this.prisma.driver.update({
+        where: { id: driverId },
+        data: {
+          status: 'offline',
+          lastSeenAt: new Date(),
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update driver ${driverId} status: ${error.message}`);
+    }
+
     this.logger.log(`Driver ${driverId} is now offline`);
     return { success: true };
   }
 
   // Driver location update
   @SubscribeMessage('driver:location')
-  handleLocationUpdate(
+  async handleLocationUpdate(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() location: DriverLocation,
   ) {
@@ -167,7 +216,37 @@ export class SocketGateway
       driver.lastUpdate = new Date();
     }
 
+    // Save location to database for admin panel to see
+    try {
+      await this.prisma.driver.update({
+        where: { id: driverId },
+        data: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          lastSeenAt: new Date(),
+        },
+      });
+
+      // Broadcast to admin dashboard for real-time map updates
+      this.server.to('admin:dashboard').emit('driver:location:update', {
+        driverId,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      this.logger.error(`Failed to save location for driver ${driverId}: ${error.message}`);
+    }
+
     return { success: true };
+  }
+
+  // Admin subscribes to dashboard updates
+  @SubscribeMessage('admin:subscribe')
+  handleAdminSubscribe(@ConnectedSocket() client: Socket) {
+    client.join('admin:dashboard');
+    this.logger.log(`Admin subscribed to dashboard updates`);
+    return { success: true, onlineDrivers: this.getOnlineDrivers() };
   }
 
   // Driver accepts order

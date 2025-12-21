@@ -16,6 +16,8 @@ export interface Driver {
   isVerified?: boolean;
   status?: string;
   documentsStatus?: 'pending' | 'approved' | 'rejected' | 'incomplete';
+  acceptanceRate?: number;
+  yearsActive?: number;
   vehicle?: {
     id: number;
     make: string;

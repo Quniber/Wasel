@@ -5,18 +5,29 @@ import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
+const DRIVER_API_SOCKET_URL = process.env.NEXT_PUBLIC_DRIVER_API_URL?.replace('/api', '') || 'https://wasel.shafrah.qa';
+
+interface DriverLocationUpdate {
+  driverId: number;
+  latitude: number;
+  longitude: number;
+  timestamp: Date;
+}
 
 interface SocketContextType {
   isConnected: boolean;
   onlineDriversCount: number;
+  driverLocations: Map<number, DriverLocationUpdate>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [driverSocket, setDriverSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineDriversCount, setOnlineDriversCount] = useState(0);
+  const [driverLocations, setDriverLocations] = useState<Map<number, DriverLocationUpdate>>(new Map());
   const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
@@ -83,9 +94,44 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     setSocket(newSocket);
 
+    // Also connect to driver-api socket for real-time driver locations
+    const driverApiSocket = io(DRIVER_API_SOCKET_URL, {
+      path: '/driver-api/socket.io',
+      auth: { token, type: 'admin' },
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    driverApiSocket.on('connect', () => {
+      console.log('[DriverSocket] Connected to driver-api');
+      // Subscribe to admin dashboard updates
+      driverApiSocket.emit('admin:subscribe');
+    });
+
+    driverApiSocket.on('disconnect', () => {
+      console.log('[DriverSocket] Disconnected');
+    });
+
+    // Listen for real-time driver location updates
+    driverApiSocket.on('driver:location:update', (data: DriverLocationUpdate) => {
+      console.log('[DriverSocket] Driver location update:', data);
+      setDriverLocations((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(data.driverId, data);
+        return newMap;
+      });
+      // Also invalidate the drivers-locations query to update the list
+      queryClient.invalidateQueries({ queryKey: ['drivers-locations'] });
+    });
+
+    setDriverSocket(driverApiSocket);
+
     return () => {
       newSocket.emit('dashboard:unsubscribe');
       newSocket.disconnect();
+      driverApiSocket.disconnect();
     };
   }, [queryClient]);
 
@@ -104,23 +150,31 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       if (e.key === 'token') {
         if (e.newValue) {
           connect();
-        } else if (socket) {
-          socket.disconnect();
-          setSocket(null);
+        } else {
+          if (socket) {
+            socket.disconnect();
+            setSocket(null);
+          }
+          if (driverSocket) {
+            driverSocket.disconnect();
+            setDriverSocket(null);
+          }
           setIsConnected(false);
+          setDriverLocations(new Map());
         }
       }
     };
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [connect, socket]);
+  }, [connect, socket, driverSocket]);
 
   return (
     <SocketContext.Provider
       value={{
         isConnected,
         onlineDriversCount,
+        driverLocations,
       }}
     >
       {children}

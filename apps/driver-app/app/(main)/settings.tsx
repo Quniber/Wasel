@@ -190,7 +190,7 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
 
-                  {item.type === 'switch' && (
+                  {item.type === 'switch' && 'value' in item && (
                     <Switch
                       value={item.value as boolean}
                       onValueChange={item.onPress}
@@ -198,10 +198,10 @@ export default function SettingsScreen() {
                       thumbColor={colors.background}
                     />
                   )}
-                  {item.type === 'value' && (
+                  {item.type === 'value' && 'value' in item && (
                     <View className="flex-row items-center">
                       <Text style={{ color: colors.mutedForeground }} className="mr-2">
-                        {item.value}
+                        {item.value as string}
                       </Text>
                       <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
                     </View>

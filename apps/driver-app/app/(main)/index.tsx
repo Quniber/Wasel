@@ -77,8 +77,13 @@ export default function HomeScreen() {
         return coords;
       }, 5000);
 
-      // Notify server
-      socketService.goOnline();
+      // Notify server with current location
+      socketService.goOnline(currentLocation || undefined);
+
+      // Send initial location update immediately
+      if (currentLocation) {
+        socketService.updateLocation(currentLocation.latitude, currentLocation.longitude);
+      }
     } else {
       socketService.stopLocationUpdates();
       socketService.goOffline();
@@ -102,8 +107,10 @@ export default function HomeScreen() {
         await driverApi.goOffline();
       }
       setOnline(!isOnline);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling online status:', error);
+      const message = error?.response?.data?.message || t('errors.generic');
+      Alert.alert(t('errors.error'), message);
     }
   };
 

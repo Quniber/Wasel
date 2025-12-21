@@ -3,10 +3,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SocketGateway } from './socket.gateway';
 import { SocketService } from './socket.service';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Global()
 @Module({
   imports: [
+    PrismaModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

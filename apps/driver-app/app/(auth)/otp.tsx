@@ -128,7 +128,7 @@ export default function OtpScreen() {
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref) => (inputRefs.current[index] = ref)}
+                  ref={(ref) => { inputRefs.current[index] = ref; }}
                   style={{
                     backgroundColor: colors.secondary,
                     borderColor: error ? colors.destructive : colors.border,
