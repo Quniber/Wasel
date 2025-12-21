@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useDriverStore } from '@/stores/driver-store';
 import { getColors } from '@/constants/Colors';
-import { ordersApi } from '@/lib/api';
 
 export default function RideCompleteScreen() {
   const { t } = useTranslation();
@@ -26,7 +25,7 @@ export default function RideCompleteScreen() {
     // Update today's stats
     if (activeRide) {
       updateStats({
-        earnings: todayStats.earnings + (activeRide.fare || 0),
+        earnings: todayStats.earnings + (activeRide.estimatedFare || 0),
         trips: todayStats.trips + 1,
         acceptanceRate: todayStats.acceptanceRate,
       });
@@ -41,11 +40,9 @@ export default function RideCompleteScreen() {
 
     setIsSubmitting(true);
     try {
-      // Submit rating for rider
-      await ordersApi.rateRider(activeRide.id, {
-        rating,
-        tip: parseFloat(tip) || 0,
-      });
+      // TODO: Add rating API endpoint when available
+      // For now, just complete the ride flow
+      console.log('Rating:', rating, 'Tip:', parseFloat(tip) || 0);
 
       setActiveRide(null);
       router.replace('/(main)');
@@ -89,7 +86,7 @@ export default function RideCompleteScreen() {
             {t('rideComplete.youEarned')}
           </Text>
           <Text style={{ color: colors.success }} className="text-4xl font-bold mt-2">
-            QAR {activeRide?.fare?.toFixed(0) || '0'}
+            QAR {activeRide?.estimatedFare?.toFixed(0) || '0'}
           </Text>
           <View className="flex-row items-center mt-3">
             <View className="flex-row items-center mr-4">

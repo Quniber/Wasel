@@ -197,6 +197,7 @@ export default function MainLayout() {
       <Drawer.Screen name="incoming-order" options={{ drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="active-ride" options={{ drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="ride-complete" options={{ drawerItemStyle: { display: 'none' } }} />
+      <Drawer.Screen name="chat" options={{ drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="profile" options={{ drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="notifications" options={{ drawerItemStyle: { display: 'none' } }} />
     </Drawer>

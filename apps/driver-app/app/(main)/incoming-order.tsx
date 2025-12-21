@@ -87,20 +87,23 @@ export default function IncomingOrderScreen() {
 
     setIsAccepting(true);
     try {
-      const response = await ordersApi.accept(incomingOrder.id);
-      socketService.acceptOrder(incomingOrder.id);
+      await ordersApi.accept(incomingOrder.orderId);
+      socketService.acceptOrder(incomingOrder.orderId);
 
       // Set as active ride
       setActiveRide({
-        id: incomingOrder.id,
+        orderId: incomingOrder.orderId,
         status: 'accepted',
         pickup: incomingOrder.pickup,
         dropoff: incomingOrder.dropoff,
-        rider: incomingOrder.rider,
-        fare: incomingOrder.estimatedFare,
+        rider: {
+          ...incomingOrder.rider,
+          mobileNumber: '', // Will be populated from order details
+        },
+        estimatedFare: incomingOrder.estimatedFare,
         distance: incomingOrder.distance,
+        duration: incomingOrder.duration,
         paymentMethod: incomingOrder.paymentMethod,
-        createdAt: new Date().toISOString(),
       });
 
       clearIncomingOrder();
@@ -116,8 +119,8 @@ export default function IncomingOrderScreen() {
 
     setIsRejecting(true);
     try {
-      await ordersApi.reject(incomingOrder.id, 'driver_rejected');
-      socketService.rejectOrder(incomingOrder.id, 'driver_rejected');
+      await ordersApi.reject(incomingOrder.orderId, 'driver_rejected');
+      socketService.rejectOrder(incomingOrder.orderId, 'driver_rejected');
       clearIncomingOrder();
       router.back();
     } catch (error) {
@@ -264,7 +267,7 @@ export default function IncomingOrderScreen() {
             </View>
             <View className="ml-3 flex-1">
               <Text style={{ color: colors.foreground }} className="text-base font-medium">
-                {incomingOrder.rider.name}
+                {`${incomingOrder.rider.firstName} ${incomingOrder.rider.lastName}`}
               </Text>
               <View className="flex-row items-center mt-1">
                 <Ionicons name="star" size={14} color="#f59e0b" />

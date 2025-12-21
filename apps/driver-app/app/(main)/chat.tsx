@@ -77,7 +77,7 @@ export default function ChatScreen() {
     // Send via socket using 'chat:send' event
     // Backend expects: { orderId, content }
     socketService.emit('chat:send', {
-      orderId: activeRide.id,
+      orderId: activeRide.orderId,
       content: text.trim(),
     });
 
@@ -134,7 +134,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View className="ml-3 flex-1">
           <Text style={{ color: colors.foreground }} className="text-lg font-semibold">
-            {activeRide?.rider?.name || 'Rider'}
+            {activeRide?.rider ? `${activeRide.rider.firstName} ${activeRide.rider.lastName}` : 'Rider'}
           </Text>
           <Text style={{ color: colors.mutedForeground }} className="text-sm">
             {t('chat.subtitle')}

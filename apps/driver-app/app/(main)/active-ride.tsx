@@ -70,7 +70,7 @@ export default function ActiveRideScreen() {
     if (!activeRide) return;
     setIsLoading(true);
     try {
-      await ordersApi.arrive(activeRide.id);
+      await ordersApi.arrive(activeRide.orderId);
       setStatus('arrived');
       setActiveRide({ ...activeRide, status: 'arrived' });
     } catch (error) {
@@ -84,7 +84,7 @@ export default function ActiveRideScreen() {
     if (!activeRide) return;
     setIsLoading(true);
     try {
-      await ordersApi.startRide(activeRide.id);
+      await ordersApi.startRide(activeRide.orderId);
       setStatus('started');
       setActiveRide({ ...activeRide, status: 'started' });
     } catch (error) {
@@ -98,7 +98,7 @@ export default function ActiveRideScreen() {
     if (!activeRide) return;
     setIsLoading(true);
     try {
-      await ordersApi.completeRide(activeRide.id);
+      await ordersApi.completeRide(activeRide.orderId);
       router.replace('/(main)/ride-complete');
     } catch (error) {
       console.error('Error completing ride:', error);
@@ -118,7 +118,7 @@ export default function ActiveRideScreen() {
           onPress: async () => {
             if (!activeRide) return;
             try {
-              await ordersApi.cancelRide(activeRide.id);
+              await ordersApi.cancelRide(activeRide.orderId);
               setActiveRide(null);
               router.replace('/(main)');
             } catch (error) {
@@ -131,8 +131,8 @@ export default function ActiveRideScreen() {
   };
 
   const handleCall = () => {
-    if (activeRide?.rider?.phone) {
-      Linking.openURL(`tel:${activeRide.rider.phone}`);
+    if (activeRide?.rider?.mobileNumber) {
+      Linking.openURL(`tel:${activeRide.rider.mobileNumber}`);
     }
   };
 
@@ -276,7 +276,7 @@ export default function ActiveRideScreen() {
               </View>
               <View className="ml-3">
                 <Text style={{ color: colors.foreground }} className="text-base font-medium">
-                  {activeRide.rider?.name || 'Rider'}
+                  {activeRide.rider ? `${activeRide.rider.firstName} ${activeRide.rider.lastName}` : 'Rider'}
                 </Text>
                 <View className="flex-row items-center">
                   <Ionicons name="star" size={12} color="#f59e0b" />
@@ -321,7 +321,7 @@ export default function ActiveRideScreen() {
                 {t('activeRide.fare')}
               </Text>
               <Text style={{ color: colors.success }} className="text-lg font-bold">
-                QAR {activeRide.fare?.toFixed(0) || '--'}
+                QAR {activeRide.estimatedFare?.toFixed(0) || '--'}
               </Text>
             </View>
             <View className="items-center flex-1">

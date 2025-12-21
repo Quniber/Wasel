@@ -10,6 +10,7 @@ import i18n, { initI18n } from '@/i18n';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { getColors } from '@/constants/Colors';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import '../global.css';
 
 const queryClient = new QueryClient({
@@ -47,18 +48,20 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <I18nextProvider i18n={i18n}>
-          <SafeAreaProvider>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(main)" />
-            </Stack>
-          </SafeAreaProvider>
-        </I18nextProvider>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <I18nextProvider i18n={i18n}>
+            <SafeAreaProvider>
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(main)" />
+              </Stack>
+            </SafeAreaProvider>
+          </I18nextProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }
