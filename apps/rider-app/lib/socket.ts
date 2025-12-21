@@ -2,7 +2,8 @@ import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+// Connect to centralized socket-api service
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://wasel.shafrah.qa';
 
 // Helper to get token cross-platform
 const getAuthToken = async (): Promise<string | null> => {
@@ -17,26 +18,41 @@ class SocketService {
   private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
 
   async connect() {
-    if (this.socket?.connected) return;
+    console.log('[Socket] connect() called');
+    if (this.socket?.connected) {
+      console.log('[Socket] Already connected, skipping');
+      return;
+    }
 
     const token = await getAuthToken();
+    console.log('[Socket] Token:', token ? 'exists' : 'missing');
+    console.log('[Socket] Connecting to:', SOCKET_URL);
 
     this.socket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ['websocket'],
+      path: '/socket-api/socket.io',
+      auth: { token, type: 'rider' },
+      transports: ['polling', 'websocket'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected');
+      console.log('[Socket] Connected! Socket ID:', this.socket?.id);
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Socket disconnected');
+    this.socket.on('disconnect', (reason) => {
+      console.log('[Socket] Disconnected:', reason);
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('[Socket] Connection error:', error.message);
     });
 
     this.socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      console.error('[Socket] Error:', error);
     });
 
     // Re-emit events to registered listeners
@@ -75,12 +91,17 @@ class SocketService {
   }
 
   // Join a room (e.g., for order tracking)
-  joinOrderRoom(orderId: string) {
-    this.emit('join-order', { orderId });
+  joinOrderRoom(orderId: number | string) {
+    this.emit('join:order', { orderId: Number(orderId) });
   }
 
-  leaveOrderRoom(orderId: string) {
-    this.emit('leave-order', { orderId });
+  leaveOrderRoom(orderId: number | string) {
+    this.emit('leave:order', { orderId: Number(orderId) });
+  }
+
+  // Track an order (rider-specific)
+  trackOrder(orderId: number | string) {
+    this.emit('order:track', { orderId: Number(orderId) });
   }
 }
 

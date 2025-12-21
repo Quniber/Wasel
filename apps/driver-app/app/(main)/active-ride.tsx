@@ -25,6 +25,42 @@ export default function ActiveRideScreen() {
   const [status, setStatus] = useState<RideStatus>(activeRide?.status as RideStatus || 'accepted');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Redirect if no active ride
+  useEffect(() => {
+    if (!activeRide) {
+      router.replace('/(main)');
+    }
+  }, []);
+
+  // Join order room and listen for updates
+  useEffect(() => {
+    if (!activeRide) return;
+
+    // Join the order room for real-time updates
+    socketService.joinOrderRoom(activeRide.orderId);
+
+    // Listen for order cancellation from rider
+    const unsubscribeCancelled = socketService.on('order:cancelled', (data: { orderId: number; reason?: string }) => {
+      if (data.orderId === activeRide.orderId) {
+        Alert.alert(
+          t('activeRide.rideCancelled'),
+          data.reason || t('activeRide.riderCancelledRide'),
+          [{ text: t('common.ok'), onPress: () => {
+            setActiveRide(null);
+            router.replace('/(main)');
+          }}]
+        );
+      }
+    });
+
+    return () => {
+      unsubscribeCancelled();
+      if (activeRide) {
+        socketService.leaveOrderRoom(activeRide.orderId);
+      }
+    };
+  }, [activeRide?.orderId]);
+
   // Continue location updates during ride
   useEffect(() => {
     const locationInterval = setInterval(async () => {

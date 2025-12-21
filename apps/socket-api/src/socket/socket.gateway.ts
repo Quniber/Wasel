@@ -237,6 +237,32 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // ========== Generic Order Room Events ==========
+
+  @SubscribeMessage('join:order')
+  handleJoinOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: number },
+  ) {
+    const clientInfo = this.socketToClient.get(client.id);
+    if (clientInfo) {
+      client.join(`order:${data.orderId}`);
+      this.logger.log(`${clientInfo.type} ${clientInfo.userId} joined order room ${data.orderId}`);
+    }
+  }
+
+  @SubscribeMessage('leave:order')
+  handleLeaveOrder(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: number },
+  ) {
+    const clientInfo = this.socketToClient.get(client.id);
+    if (clientInfo) {
+      client.leave(`order:${data.orderId}`);
+      this.logger.log(`${clientInfo.type} ${clientInfo.userId} left order room ${data.orderId}`);
+    }
+  }
+
   // ========== Emit Methods (called by API) ==========
 
   emitToDriver(driverId: number, event: string, data: any): boolean {

@@ -27,27 +27,73 @@ export default function RideActiveScreen() {
       return;
     }
 
+    // Join order room for real-time updates
+    socketService.joinOrderRoom(activeOrder.orderId);
+
     // Listen for driver location updates
-    const locationUnsub = socketService.on('driver-location', (data) => {
-      updateDriverLocation(data.latitude, data.longitude);
+    const locationUnsub = socketService.on('location:driver', (data) => {
+      if (data.location) {
+        updateDriverLocation(data.location.latitude, data.location.longitude);
+      } else if (data.latitude && data.longitude) {
+        updateDriverLocation(data.latitude, data.longitude);
+      }
+    });
+
+    // Also listen for driver:location event
+    const locationUnsub2 = socketService.on('driver:location', (data) => {
+      if (data.latitude && data.longitude) {
+        updateDriverLocation(data.latitude, data.longitude);
+      }
     });
 
     // Listen for order status updates
-    const statusUnsub = socketService.on('order-status', (data) => {
-      if (data.status === 'driver_arrived') {
+    const statusUnsub = socketService.on('order:status', (data) => {
+      if (data.status === 'driver_arrived' || data.status === 'arrived') {
         setStatus('driver_arrived');
-      } else if (data.status === 'trip_started') {
+      } else if (data.status === 'trip_started' || data.status === 'started') {
         setStatus('trip_started');
-      } else if (data.status === 'trip_completed') {
+      } else if (data.status === 'trip_completed' || data.status === 'completed') {
         router.replace('/(main)/ride-complete');
+      }
+    });
+
+    // Listen for driver arrived event
+    const arrivedUnsub = socketService.on('order:driver_arrived', () => {
+      setStatus('driver_arrived');
+    });
+
+    // Listen for ride started event
+    const startedUnsub = socketService.on('order:started', () => {
+      setStatus('trip_started');
+    });
+
+    // Listen for ride completed event
+    const completedUnsub = socketService.on('order:completed', () => {
+      router.replace('/(main)/ride-complete');
+    });
+
+    // Listen for ride cancelled event
+    const cancelledUnsub = socketService.on('order:cancelled', (data) => {
+      if (data.cancelledBy === 'driver') {
+        // TODO: Show alert that driver cancelled
+        resetBooking();
+        router.replace('/(main)');
       }
     });
 
     return () => {
       locationUnsub?.();
+      locationUnsub2?.();
       statusUnsub?.();
+      arrivedUnsub?.();
+      startedUnsub?.();
+      completedUnsub?.();
+      cancelledUnsub?.();
+      if (activeOrder) {
+        socketService.leaveOrderRoom(activeOrder.orderId);
+      }
     };
-  }, []);
+  }, [activeOrder?.orderId]);
 
   useEffect(() => {
     fitMapToRoute();

@@ -79,7 +79,7 @@ export default function IncomingOrderScreen() {
 
   const handleTimeout = () => {
     clearIncomingOrder();
-    router.back();
+    router.replace('/(main)');
   };
 
   const handleAccept = async () => {
@@ -122,12 +122,19 @@ export default function IncomingOrderScreen() {
       await ordersApi.reject(incomingOrder.orderId, 'driver_rejected');
       socketService.rejectOrder(incomingOrder.orderId, 'driver_rejected');
       clearIncomingOrder();
-      router.back();
+      router.replace('/(main)');
     } catch (error) {
       console.error('Error rejecting order:', error);
       setIsRejecting(false);
     }
   };
+
+  // Redirect if no incoming order
+  useEffect(() => {
+    if (!incomingOrder) {
+      router.replace('/(main)');
+    }
+  }, [incomingOrder]);
 
   if (!incomingOrder) {
     return null;
