@@ -26,6 +26,7 @@ class DriverSocketService {
 
     const token = await getAuthToken();
     console.log('[Socket] Token:', token ? 'exists' : 'missing');
+    console.log('[Socket] Token value:', token); // For testing - remove later
     console.log('[Socket] Connecting to:', SOCKET_URL);
 
     this.socket = io(SOCKET_URL, {

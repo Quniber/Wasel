@@ -19,6 +19,6 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   providers: [SocketGateway, SocketService],
-  exports: [SocketService],
+  exports: [SocketService, SocketGateway],
 })
 export class SocketModule {}

@@ -12,11 +12,15 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SocketGateway } from '../socket/socket.gateway';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private ordersService: OrdersService) {}
+  constructor(
+    private ordersService: OrdersService,
+    private socketGateway: SocketGateway,
+  ) {}
 
   // Get available orders nearby
   @Get('available')
@@ -117,4 +121,50 @@ export class OrdersController {
   ) {
     return this.ordersService.sendMessage(req.user.id, id, body.content);
   }
+
+  // Test endpoint - send a test order to the current driver
+  @Post('test/send-order')
+  sendTestOrder(@Request() req) {
+    const driverId = req.user.id;
+
+    // Check if driver is online
+    if (!this.socketGateway.isDriverOnline(driverId)) {
+      return { success: false, message: 'Driver is not online' };
+    }
+
+    // Send test order
+    const testOrder = {
+      orderId: 999,
+      pickup: {
+        address: 'Test Pickup Location, Doha',
+        latitude: 25.2854,
+        longitude: 51.5310,
+      },
+      dropoff: {
+        address: 'Test Dropoff Location, Doha',
+        latitude: 25.3000,
+        longitude: 51.5200,
+      },
+      rider: {
+        id: 1,
+        firstName: 'Test',
+        lastName: 'Customer',
+        rating: 4.8,
+      },
+      estimatedFare: 25.00,
+      distance: 5.2,
+      duration: 12,
+      paymentMethod: 'cash',
+      expiresAt: Date.now() + 15000, // 15 seconds
+    };
+
+    this.socketGateway.emitToDriver(driverId, 'order:new', testOrder);
+
+    return {
+      success: true,
+      message: 'Test order sent to driver',
+      order: testOrder
+    };
+  }
+
 }

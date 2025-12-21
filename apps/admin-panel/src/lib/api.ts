@@ -947,6 +947,7 @@ export interface CreateOrderDto {
   dropoffAddress: string;
   dropoffLatitude: number;
   dropoffLongitude: number;
+  driverId?: number;
 }
 
 export interface Service {

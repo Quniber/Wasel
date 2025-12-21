@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/toast';
-import { Settings, Bell, DollarSign, Shield, Save, FileText, Car, Palette, XCircle, ChevronRight, Search } from 'lucide-react';
+import { Settings, Bell, DollarSign, Shield, Save, FileText, Car, Palette, XCircle, ChevronRight, Search, Send } from 'lucide-react';
 
 export default function SettingsPage() {
   const toast = useToast();
@@ -51,6 +51,7 @@ export default function SettingsPage() {
     { name: 'Car Colors', href: '/settings/car-colors', icon: Palette, description: 'Manage available car colors' },
     { name: 'Cancel Reasons', href: '/settings/cancel-reasons', icon: XCircle, description: 'Configure order cancellation reasons' },
     { name: 'Search Test', href: '/settings/search-test', icon: Search, description: 'Test Google Places autocomplete' },
+    { name: 'Test Order', href: '/settings/test-order', icon: Send, description: 'Send test orders to drivers' },
   ];
 
   return (

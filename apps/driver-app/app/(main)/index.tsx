@@ -53,7 +53,7 @@ export default function HomeScreen() {
 
   // Listen for incoming orders
   useEffect(() => {
-    const unsubscribe = socketService.on('order:incoming', (order: IncomingOrder) => {
+    const unsubscribe = socketService.on('order:new', (order: IncomingOrder) => {
       setIncomingOrder(order);
       router.push('/(main)/incoming-order');
     });

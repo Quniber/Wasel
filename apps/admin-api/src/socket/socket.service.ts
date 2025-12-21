@@ -1,9 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SocketGateway } from './socket.gateway';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 @Injectable()
 export class SocketService {
-  constructor(private socketGateway: SocketGateway) {}
+  private readonly logger = new Logger('SocketService');
+  private readonly driverApiUrl: string;
+
+  constructor(
+    private socketGateway: SocketGateway,
+    private configService: ConfigService,
+  ) {
+    this.driverApiUrl = this.configService.get('DRIVER_API_URL') || 'http://localhost:3002';
+  }
 
   // Dashboard updates
   broadcastDashboardUpdate(data: {
@@ -100,8 +110,8 @@ export class SocketService {
 
   // ============ DRIVER METHODS ============
 
-  // Send order request to specific driver
-  sendOrderToDriver(driverId: number, order: {
+  // Send order request to specific driver via driver-api
+  async sendOrderToDriver(driverId: number, order: {
     orderId: number;
     customerName: string;
     customerPhoto?: string;
@@ -116,7 +126,38 @@ export class SocketService {
     estimatedFare: number;
     serviceName: string;
   }) {
+    // Also emit locally for admin dashboard
     this.socketGateway.emitToDriver(driverId, 'order:new', order);
+
+    // Call driver-api to send order to driver app
+    try {
+      const response = await axios.post(`${this.driverApiUrl}/api/orders/internal/dispatch`, {
+        driverId,
+        orderId: order.orderId,
+        pickup: {
+          address: order.pickupAddress,
+          latitude: order.pickupLatitude,
+          longitude: order.pickupLongitude,
+        },
+        dropoff: {
+          address: order.dropoffAddress,
+          latitude: order.dropoffLatitude,
+          longitude: order.dropoffLongitude,
+        },
+        customer: {
+          id: 1, // Will be passed from order
+          firstName: order.customerName.split(' ')[0] || 'Customer',
+          lastName: order.customerName.split(' ')[1] || '',
+        },
+        estimatedFare: order.estimatedFare,
+        distance: order.tripDistance,
+        duration: 0,
+        serviceName: order.serviceName,
+      });
+      this.logger.log(`Order ${order.orderId} dispatched to driver ${driverId} via driver-api: ${response.data.success}`);
+    } catch (error) {
+      this.logger.error(`Failed to dispatch order to driver-api: ${error.message}`);
+    }
   }
 
   // Notify driver that order was cancelled
