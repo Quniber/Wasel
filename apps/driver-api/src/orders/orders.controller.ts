@@ -12,14 +12,14 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { SocketGateway } from '../socket/socket.gateway';
+import { SocketService } from '../socket/socket.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
   constructor(
     private ordersService: OrdersService,
-    private socketGateway: SocketGateway,
+    private socketService: SocketService,
   ) {}
 
   // Get available orders nearby
@@ -124,11 +124,12 @@ export class OrdersController {
 
   // Test endpoint - send a test order to the current driver
   @Post('test/send-order')
-  sendTestOrder(@Request() req) {
+  async sendTestOrder(@Request() req) {
     const driverId = req.user.id;
 
-    // Check if driver is online
-    if (!this.socketGateway.isDriverOnline(driverId)) {
+    // Check if driver is online (now async via socket-api)
+    const isOnline = await this.socketService.isDriverOnline(driverId);
+    if (!isOnline) {
       return { success: false, message: 'Driver is not online' };
     }
 
@@ -158,7 +159,7 @@ export class OrdersController {
       expiresAt: Date.now() + 15000, // 15 seconds
     };
 
-    this.socketGateway.emitToDriver(driverId, 'order:new', testOrder);
+    this.socketService.sendOrderToDriver(driverId, 999, testOrder);
 
     return {
       success: true,

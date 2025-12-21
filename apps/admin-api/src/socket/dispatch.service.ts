@@ -68,8 +68,8 @@ export class DispatchService {
       .filter((d) => d.distance <= radiusKm)
       .sort((a, b) => a.distance - b.distance);
 
-    // Filter to only connected drivers
-    const connectedDriverIds = this.socketService.getConnectedDriverIds();
+    // Filter to only connected drivers (now async)
+    const connectedDriverIds = await this.socketService.getConnectedDriverIds();
     const availableDrivers = nearbyDrivers
       .filter((d) => connectedDriverIds.includes(d.id))
       .map((d) => d.id);
@@ -107,8 +107,9 @@ export class DispatchService {
       return false;
     }
 
-    // Check if driver is connected
-    if (!this.socketService.isDriverConnected(driverId)) {
+    // Check if driver is connected (now async via socket-api)
+    const isConnected = await this.socketService.isDriverConnected(driverId);
+    if (!isConnected) {
       this.logger.warn(`Driver ${driverId} is not connected, falling back to nearby drivers`);
       return this.dispatchOrder(orderId);
     }

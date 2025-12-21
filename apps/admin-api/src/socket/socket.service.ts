@@ -1,18 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SocketGateway } from './socket.gateway';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
 @Injectable()
 export class SocketService {
   private readonly logger = new Logger('SocketService');
-  private readonly driverApiUrl: string;
+  private readonly socketApiUrl: string;
 
-  constructor(
-    private socketGateway: SocketGateway,
-    private configService: ConfigService,
-  ) {
-    this.driverApiUrl = this.configService.get('DRIVER_API_URL') || 'http://localhost:3002';
+  constructor(private configService: ConfigService) {
+    this.socketApiUrl = this.configService.get('SOCKET_API_URL') || 'http://localhost:3003';
+  }
+
+  private async callSocketApi(endpoint: string, data?: any): Promise<any> {
+    try {
+      const response = await axios.post(`${this.socketApiUrl}/api/${endpoint}`, data);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Socket API call failed (${endpoint}): ${error.message}`);
+      return { success: false };
+    }
+  }
+
+  private async getFromSocketApi(endpoint: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.socketApiUrl}/api/${endpoint}`);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Socket API call failed (${endpoint}): ${error.message}`);
+      return { success: false };
+    }
   }
 
   // Dashboard updates
@@ -22,7 +38,7 @@ export class SocketService {
     todayOrders?: number;
     todayRevenue?: number;
   }) {
-    this.socketGateway.emitToDashboard('dashboard:update', data);
+    this.callSocketApi('dashboard/update', data);
   }
 
   // New order created
@@ -35,30 +51,19 @@ export class SocketService {
     serviceName: string;
     createdAt: Date;
   }) {
-    this.socketGateway.emitToDashboard('order:new', order);
-    this.socketGateway.emitToAllAdmins('order:new', order);
+    this.callSocketApi('emit/admins', { event: 'order:new', data: order });
   }
 
   // Order status changed
   notifyOrderStatusChange(orderId: number, status: string, data?: any) {
-    this.socketGateway.emitToOrder(orderId, 'order:status', {
-      orderId,
-      status,
-      ...data,
-    });
-    this.socketGateway.emitToDashboard('order:status', {
-      orderId,
-      status,
-      ...data,
-    });
+    this.callSocketApi(`orders/${orderId}/status`, { status, ...data });
   }
 
   // Driver status change (online/offline)
   notifyDriverStatusChange(driverId: number, status: 'online' | 'offline', driverName?: string) {
-    this.socketGateway.emitToDashboard('driver:status', {
-      driverId,
-      status,
-      driverName,
+    this.callSocketApi('emit/admins', {
+      event: 'driver:status',
+      data: { driverId, status, driverName },
     });
   }
 
@@ -69,7 +74,7 @@ export class SocketService {
     lastName: string;
     createdAt: Date;
   }) {
-    this.socketGateway.emitToDashboard('customer:new', customer);
+    this.callSocketApi('emit/admins', { event: 'customer:new', data: customer });
   }
 
   // New driver registered
@@ -80,7 +85,7 @@ export class SocketService {
     status: string;
     createdAt: Date;
   }) {
-    this.socketGateway.emitToDashboard('driver:new', driver);
+    this.callSocketApi('emit/admins', { event: 'driver:new', data: driver });
   }
 
   // Support request created
@@ -91,7 +96,7 @@ export class SocketService {
     driverName?: string;
     createdAt: Date;
   }) {
-    this.socketGateway.emitToAllAdmins('support:new', request);
+    this.callSocketApi('emit/admins', { event: 'support:new', data: request });
   }
 
   // Alert/notification to admins
@@ -100,17 +105,18 @@ export class SocketService {
     title: string;
     message: string;
   }) {
-    this.socketGateway.emitToAllAdmins('alert', alert);
+    this.callSocketApi('emit/admins', { event: 'alert', data: alert });
   }
 
   // Get connected admins count
-  getConnectedAdminsCount(): number {
-    return this.socketGateway.getConnectedAdminsCount();
+  async getConnectedAdminsCount(): Promise<number> {
+    const result = await this.getFromSocketApi('status');
+    return result?.stats?.admins || 0;
   }
 
   // ============ DRIVER METHODS ============
 
-  // Send order request to specific driver via driver-api
+  // Send order request to specific driver via socket-api
   async sendOrderToDriver(driverId: number, order: {
     orderId: number;
     customerName: string;
@@ -125,13 +131,10 @@ export class SocketService {
     tripDistance: number;
     estimatedFare: number;
     serviceName: string;
+    customerId?: number;
   }) {
-    // Also emit locally for admin dashboard
-    this.socketGateway.emitToDriver(driverId, 'order:new', order);
-
-    // Call driver-api to send order to driver app
     try {
-      const response = await axios.post(`${this.driverApiUrl}/api/orders/internal/dispatch`, {
+      const response = await this.callSocketApi('dispatch/order', {
         driverId,
         orderId: order.orderId,
         pickup: {
@@ -145,7 +148,7 @@ export class SocketService {
           longitude: order.dropoffLongitude,
         },
         customer: {
-          id: 1, // Will be passed from order
+          id: order.customerId || 1,
           firstName: order.customerName.split(' ')[0] || 'Customer',
           lastName: order.customerName.split(' ')[1] || '',
         },
@@ -154,37 +157,56 @@ export class SocketService {
         duration: 0,
         serviceName: order.serviceName,
       });
-      this.logger.log(`Order ${order.orderId} dispatched to driver ${driverId} via driver-api: ${response.data.success}`);
+
+      this.logger.log(`Order ${order.orderId} dispatched to driver ${driverId}: ${response.success}`);
+      return response.success;
     } catch (error) {
-      this.logger.error(`Failed to dispatch order to driver-api: ${error.message}`);
+      this.logger.error(`Failed to dispatch order: ${error.message}`);
+      return false;
     }
   }
 
   // Notify driver that order was cancelled
   notifyDriverOrderCancelled(driverId: number, orderId: number, reason?: string) {
-    this.socketGateway.emitToDriver(driverId, 'order:cancelled', {
-      orderId,
-      reason: reason || 'Order was cancelled',
+    this.callSocketApi(`emit/driver/${driverId}`, {
+      event: 'order:cancelled',
+      data: { orderId, reason: reason || 'Order was cancelled' },
+    });
+  }
+
+  // Notify rider about order update
+  notifyRiderOrderUpdate(riderId: number, orderId: number, status: string, data?: any) {
+    this.callSocketApi(`emit/rider/${riderId}`, {
+      event: 'order:status',
+      data: { orderId, status, ...data },
     });
   }
 
   // Get connected drivers count
-  getConnectedDriversCount(): number {
-    return this.socketGateway.getConnectedDriversCount();
+  async getConnectedDriversCount(): Promise<number> {
+    const result = await this.getFromSocketApi('status');
+    return result?.stats?.drivers || 0;
   }
 
   // Get list of connected driver IDs
-  getConnectedDriverIds(): number[] {
-    return this.socketGateway.getConnectedDriverIds();
+  async getConnectedDriverIds(): Promise<number[]> {
+    const result = await this.getFromSocketApi('drivers/online');
+    return result?.drivers || [];
   }
 
   // Check if driver is connected
-  isDriverConnected(driverId: number): boolean {
-    return this.socketGateway.isDriverConnected(driverId);
+  async isDriverConnected(driverId: number): Promise<boolean> {
+    const result = await this.getFromSocketApi(`drivers/${driverId}/online`);
+    return result?.online || false;
   }
 
   // Broadcast to all online drivers
   broadcastToOnlineDrivers(event: string, data: any) {
-    this.socketGateway.emitToOnlineDrivers(event, data);
+    this.callSocketApi('emit/drivers', { event, data });
+  }
+
+  // Set driver's current order (for location tracking)
+  setDriverOrder(driverId: number, orderId: number | null) {
+    this.callSocketApi(`drivers/${driverId}/order`, { orderId });
   }
 }

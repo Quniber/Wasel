@@ -1,113 +1,113 @@
-import { Injectable } from '@nestjs/common';
-import { SocketGateway } from './socket.gateway';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 @Injectable()
 export class SocketService {
-  constructor(private socketGateway: SocketGateway) {}
+  private readonly logger = new Logger('SocketService');
+  private readonly socketApiUrl: string;
 
-  // Broadcast new order to nearby drivers
-  broadcastNewOrder(
-    orderId: number,
-    serviceId: number,
-    orderData: {
-      pickupAddress: string;
-      pickupLatitude: number;
-      pickupLongitude: number;
-      dropoffAddress: string;
-      dropoffLatitude: number;
-      dropoffLongitude: number;
-      serviceName: string;
-      estimatedFare: number;
-      customerId: number;
-      customerName: string;
-    },
-  ) {
-    // Get nearby drivers for this service
-    const nearbyDrivers = this.socketGateway.getNearbyDrivers(
-      orderData.pickupLatitude,
-      orderData.pickupLongitude,
-      10, // 10km radius
-      serviceId,
-    );
+  constructor(private configService: ConfigService) {
+    this.socketApiUrl = this.configService.get('SOCKET_API_URL') || 'http://localhost:3003';
+  }
 
-    // Send order to each nearby driver
-    nearbyDrivers.forEach((driver) => {
-      const distance = this.calculateDistance(
-        orderData.pickupLatitude,
-        orderData.pickupLongitude,
-        driver.location.latitude,
-        driver.location.longitude,
-      );
+  private async callSocketApi(endpoint: string, data?: any): Promise<any> {
+    try {
+      const response = await axios.post(`${this.socketApiUrl}/api/${endpoint}`, data);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Socket API call failed (${endpoint}): ${error.message}`);
+      return { success: false };
+    }
+  }
 
-      this.socketGateway.emitToDriver(driver.driverId, 'order:new', {
-        orderId,
-        serviceId,
-        distanceToPickup: distance,
-        ...orderData,
-      });
-    });
-
-    return nearbyDrivers.length;
+  private async getFromSocketApi(endpoint: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.socketApiUrl}/api/${endpoint}`);
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Socket API call failed (${endpoint}): ${error.message}`);
+      return { success: false };
+    }
   }
 
   // Send order directly to specific driver
   sendOrderToDriver(driverId: number, orderId: number, orderData: any) {
-    this.socketGateway.emitToDriver(driverId, 'order:new', {
-      orderId,
-      ...orderData,
+    this.callSocketApi(`emit/driver/${driverId}`, {
+      event: 'order:new',
+      data: { orderId, ...orderData },
     });
   }
 
   // Notify driver order was cancelled
   notifyOrderCancelled(driverId: number, orderId: number, reason?: string) {
-    this.socketGateway.emitToDriver(driverId, 'order:cancelled', {
-      orderId,
-      cancelledBy: 'rider',
-      reason,
+    this.callSocketApi(`emit/driver/${driverId}`, {
+      event: 'order:cancelled',
+      data: { orderId, cancelledBy: 'rider', reason },
     });
   }
 
   // Notify driver of order timeout
   notifyOrderTimeout(driverId: number, orderId: number) {
-    this.socketGateway.emitToDriver(driverId, 'order:timeout', { orderId });
+    this.callSocketApi(`emit/driver/${driverId}`, {
+      event: 'order:timeout',
+      data: { orderId },
+    });
   }
 
-  // Emit to order room
+  // Emit to order room (rider, driver, admins watching this order)
   emitToOrder(orderId: number, event: string, data: any) {
-    this.socketGateway.emitToOrder(orderId, event, data);
+    this.callSocketApi(`emit/order/${orderId}`, { event, data });
   }
 
-  // Get nearby drivers
-  getNearbyDrivers(lat: number, lng: number, radiusKm: number, serviceId?: number): any[] {
-    return this.socketGateway.getNearbyDrivers(lat, lng, radiusKm, serviceId);
+  // Notify rider of order status change
+  notifyRider(riderId: number, event: string, data: any) {
+    this.callSocketApi(`emit/rider/${riderId}`, { event, data });
+  }
+
+  // Notify admins
+  notifyAdmins(event: string, data: any) {
+    this.callSocketApi('emit/admins', { event, data });
   }
 
   // Get online drivers count
-  getOnlineDriversCount(): number {
-    return this.socketGateway.getOnlineDrivers().length;
+  async getOnlineDriversCount(): Promise<number> {
+    const result = await this.getFromSocketApi('status');
+    return result?.stats?.drivers || 0;
+  }
+
+  // Get online driver IDs
+  async getOnlineDriverIds(): Promise<number[]> {
+    const result = await this.getFromSocketApi('drivers/online');
+    return result?.drivers || [];
   }
 
   // Check if driver is online
-  isDriverOnline(driverId: number): boolean {
-    return this.socketGateway.isDriverOnline(driverId);
+  async isDriverOnline(driverId: number): Promise<boolean> {
+    const result = await this.getFromSocketApi(`drivers/${driverId}/online`);
+    return result?.online || false;
   }
 
-  // Get driver location
-  getDriverLocation(driverId: number): { latitude: number; longitude: number } | undefined {
-    return this.socketGateway.getDriverLocation(driverId);
+  // Set driver's current order (for location tracking)
+  setDriverOrder(driverId: number, orderId: number | null) {
+    this.callSocketApi(`drivers/${driverId}/order`, { orderId });
   }
 
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+  // Dispatch order to driver
+  async dispatchOrder(driverId: number, orderData: {
+    orderId: number;
+    pickup: { address: string; latitude: number; longitude: number };
+    dropoff: { address: string; latitude: number; longitude: number };
+    customer: { id: number; firstName: string; lastName: string; rating?: number };
+    estimatedFare: number;
+    distance: number;
+    duration: number;
+    serviceName: string;
+  }): Promise<boolean> {
+    const result = await this.callSocketApi('dispatch/order', {
+      driverId,
+      ...orderData,
+    });
+    return result?.success || false;
   }
 }

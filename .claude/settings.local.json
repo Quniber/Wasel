@@ -20,7 +20,8 @@
       "mcp__hostinger-mcp__VPS_createFirewallRuleV1",
       "mcp__hostinger-mcp__VPS_activateFirewallV1",
       "Bash(tar:*)",
-      "mcp__hostinger-mcp__billing_getPaymentMethodListV1"
+      "mcp__hostinger-mcp__billing_getPaymentMethodListV1",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

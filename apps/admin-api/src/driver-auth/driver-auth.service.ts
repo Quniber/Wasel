@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { SocketGateway } from '../socket/socket.gateway';
+import { SocketService } from '../socket/socket.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class DriverAuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private socketGateway: SocketGateway,
+    private socketService: SocketService,
   ) {}
 
   async login(identifier: string, password: string) {
@@ -206,17 +206,8 @@ export class DriverAuthService {
     });
 
     // Emit WebSocket event to update admin dashboard in real-time
-    if (isOnline) {
-      this.socketGateway.emitToDashboard('driver:connected', {
-        driverId,
-        onlineDriversCount,
-      });
-    } else {
-      this.socketGateway.emitToDashboard('driver:disconnected', {
-        driverId,
-        onlineDriversCount,
-      });
-    }
+    this.socketService.notifyDriverStatusChange(driverId, isOnline ? 'online' : 'offline');
+    this.socketService.broadcastDashboardUpdate({ onlineDrivers: onlineDriversCount });
 
     return { isOnline };
   }

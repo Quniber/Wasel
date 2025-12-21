@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
-const DRIVER_API_SOCKET_URL = process.env.NEXT_PUBLIC_DRIVER_API_URL?.replace('/api', '') || 'https://wasel.shafrah.qa';
+// Socket API URL - centralized socket service
+const SOCKET_API_URL = process.env.NEXT_PUBLIC_SOCKET_API_URL || 'https://wasel.shafrah.qa';
 
 interface DriverLocationUpdate {
   driverId: number;
@@ -24,7 +24,6 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [driverSocket, setDriverSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineDriversCount, setOnlineDriversCount] = useState(0);
   const [driverLocations, setDriverLocations] = useState<Map<number, DriverLocationUpdate>>(new Map());
@@ -34,20 +33,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ['websocket'],
+    // Connect to centralized socket-api
+    const newSocket = io(SOCKET_API_URL, {
+      path: '/socket-api/socket.io',
+      auth: { token, type: 'admin' },
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
 
     newSocket.on('connect', () => {
-      console.log('[Socket] Connected to admin-api');
+      console.log('[Socket] Connected to socket-api');
       setIsConnected(true);
-
-      // Subscribe to dashboard updates
-      newSocket.emit('dashboard:subscribe');
     });
 
     newSocket.on('disconnect', () => {
@@ -59,25 +57,23 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       console.log('[Socket] Authenticated:', data);
     });
 
-    // Driver connection events
-    newSocket.on('driver:connected', (data: { driverId: number; onlineDriversCount: number }) => {
-      console.log('[Socket] Driver connected:', data);
-      setOnlineDriversCount(data.onlineDriversCount);
-
-      // Invalidate queries to refetch fresh data
+    // Driver status events
+    newSocket.on('driver:status', (data: { driverId: number; status: string }) => {
+      console.log('[Socket] Driver status:', data);
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['drivers-locations'] });
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
     });
 
-    newSocket.on('driver:disconnected', (data: { driverId: number; onlineDriversCount: number }) => {
-      console.log('[Socket] Driver disconnected:', data);
-      setOnlineDriversCount(data.onlineDriversCount);
-
-      // Invalidate queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    // Driver location events
+    newSocket.on('driver:location', (data: DriverLocationUpdate) => {
+      console.log('[Socket] Driver location update:', data);
+      setDriverLocations((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(data.driverId, data);
+        return newMap;
+      });
       queryClient.invalidateQueries({ queryKey: ['drivers-locations'] });
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
     });
 
     // Order status events
@@ -88,55 +84,47 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     });
 
-    newSocket.on('order:rejected', (data: { orderId: number; driverId: number; reason: string }) => {
-      console.log('[Socket] Order rejected:', data);
+    newSocket.on('order:new', (data) => {
+      console.log('[Socket] New order:', data);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    });
+
+    // Dashboard updates
+    newSocket.on('dashboard:update', (data) => {
+      console.log('[Socket] Dashboard update:', data);
+      if (data.onlineDrivers !== undefined) {
+        setOnlineDriversCount(data.onlineDrivers);
+      }
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    });
+
+    // Customer events
+    newSocket.on('customer:new', (data) => {
+      console.log('[Socket] New customer:', data);
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    });
+
+    // Driver events
+    newSocket.on('driver:new', (data) => {
+      console.log('[Socket] New driver:', data);
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    });
+
+    // Alert events
+    newSocket.on('alert', (data) => {
+      console.log('[Socket] Alert:', data);
+      // Could show a toast notification here
     });
 
     setSocket(newSocket);
 
-    // Also connect to driver-api socket for real-time driver locations
-    const driverApiSocket = io(DRIVER_API_SOCKET_URL, {
-      path: '/driver-api/socket.io',
-      auth: { token, type: 'admin' },
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-
-    driverApiSocket.on('connect', () => {
-      console.log('[DriverSocket] Connected to driver-api');
-      // Subscribe to admin dashboard updates
-      driverApiSocket.emit('admin:subscribe');
-    });
-
-    driverApiSocket.on('disconnect', () => {
-      console.log('[DriverSocket] Disconnected');
-    });
-
-    // Listen for real-time driver location updates
-    driverApiSocket.on('driver:location:update', (data: DriverLocationUpdate) => {
-      console.log('[DriverSocket] Driver location update:', data);
-      setDriverLocations((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(data.driverId, data);
-        return newMap;
-      });
-      // Also invalidate the drivers-locations query to update the list
-      queryClient.invalidateQueries({ queryKey: ['drivers-locations'] });
-    });
-
-    setDriverSocket(driverApiSocket);
-
     return () => {
-      newSocket.emit('dashboard:unsubscribe');
       newSocket.disconnect();
-      driverApiSocket.disconnect();
     };
   }, [queryClient]);
 
   useEffect(() => {
-    // Check for token and connect
     const token = localStorage.getItem('token');
     if (token) {
       const cleanup = connect();
@@ -155,10 +143,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
             socket.disconnect();
             setSocket(null);
           }
-          if (driverSocket) {
-            driverSocket.disconnect();
-            setDriverSocket(null);
-          }
           setIsConnected(false);
           setDriverLocations(new Map());
         }
@@ -167,7 +151,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [connect, socket, driverSocket]);
+  }, [connect, socket]);
 
   return (
     <SocketContext.Provider

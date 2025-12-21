@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
+// Connect to centralized socket-api service
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://wasel.shafrah.qa';
 
 // Helper to get token cross-platform
@@ -30,7 +31,7 @@ class DriverSocketService {
     console.log('[Socket] Connecting to:', SOCKET_URL);
 
     this.socket = io(SOCKET_URL, {
-      path: '/driver-api/socket.io',
+      path: '/socket-api/socket.io',
       auth: { token, type: 'driver' },
       transports: ['polling', 'websocket'],
       autoConnect: true,
