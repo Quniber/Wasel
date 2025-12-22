@@ -70,21 +70,42 @@ export default function FindingDriverScreen() {
       socketService.joinOrderRoom(order.id);
 
       // Listen for driver acceptance
-      const unsubscribe = socketService.on('order:status', (data) => {
+      const unsubscribe = socketService.on('order:status', async (data) => {
         console.log('[FindingDriver] Received order:status:', data);
-        if (data.status === 'DriverAccepted' && data.driver) {
-          setActiveOrder({
-            id: data.orderId || order.id,
-            status: 'DriverAccepted',
-            pickup,
-            dropoff,
-            service: selectedService,
-            fare: data.fare || parseFloat(order.fare) || 15,
-            driver: data.driver,
-            createdAt: order.createdAt || new Date().toISOString(),
-          });
-          router.replace('/(main)/ride-active');
-        } else if (data.status === 'no_drivers') {
+        if (data.status === 'DriverAccepted') {
+          try {
+            // Fetch full order details including driver info
+            const orderDetails = await orderApi.getOrder(order.id);
+            const fullOrder = orderDetails.data;
+            console.log('[FindingDriver] Fetched order details:', fullOrder);
+
+            setActiveOrder({
+              id: fullOrder.id?.toString() || order.id,
+              status: 'DriverAccepted',
+              pickup,
+              dropoff,
+              service: selectedService,
+              fare: data.fare || parseFloat(order.serviceCost) || 15,
+              driver: fullOrder.driver || data.driver,
+              createdAt: order.createdAt || new Date().toISOString(),
+            });
+            router.replace('/(main)/ride-active');
+          } catch (err) {
+            console.error('[FindingDriver] Error fetching order details:', err);
+            // Fallback with minimal driver info
+            setActiveOrder({
+              id: data.orderId || order.id,
+              status: 'DriverAccepted',
+              pickup,
+              dropoff,
+              service: selectedService,
+              fare: data.fare || parseFloat(order.serviceCost) || 15,
+              driver: data.driver || { id: data.driverId, firstName: 'Driver', lastName: '' },
+              createdAt: order.createdAt || new Date().toISOString(),
+            });
+            router.replace('/(main)/ride-active');
+          }
+        } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
         }
       });

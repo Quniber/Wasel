@@ -154,7 +154,20 @@ export default function RideActiveScreen() {
     );
   }
 
-  const { driver, pickup, dropoff } = activeOrder;
+  const { pickup, dropoff } = activeOrder;
+  // Ensure driver has all required fields with defaults
+  const driver = {
+    firstName: activeOrder.driver?.firstName || 'Driver',
+    lastName: activeOrder.driver?.lastName || '',
+    rating: activeOrder.driver?.rating || 5.0,
+    carModel: activeOrder.driver?.carModel || '',
+    carColor: activeOrder.driver?.carColor || '',
+    carPlate: activeOrder.driver?.carPlate || '',
+    mobileNumber: activeOrder.driver?.mobileNumber || '',
+    latitude: activeOrder.driver?.latitude || pickup?.latitude || 0,
+    longitude: activeOrder.driver?.longitude || pickup?.longitude || 0,
+    ...activeOrder.driver,
+  };
 
   const getStatusTitle = () => {
     switch (status) {
