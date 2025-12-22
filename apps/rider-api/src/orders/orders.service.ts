@@ -269,7 +269,7 @@ export class OrdersService {
       try {
         this.logger.log(`Dispatching order ${order.id} to drivers...`);
         await firstValueFrom(
-          this.httpService.post(`${this.ADMIN_API_URL}/internal/orders/${order.id}/dispatch`),
+          this.httpService.post(`${this.ADMIN_API_URL}/api/internal/orders/${order.id}/dispatch`),
         );
         this.logger.log(`Order ${order.id} dispatched successfully`);
       } catch (error) {

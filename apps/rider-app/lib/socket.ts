@@ -8,9 +8,9 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://wasel.shafrah.
 // Helper to get token cross-platform
 const getAuthToken = async (): Promise<string | null> => {
   if (Platform.OS === 'web') {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem('accessToken');
   }
-  return await SecureStore.getItemAsync('authToken');
+  return await SecureStore.getItemAsync('accessToken');
 };
 
 class SocketService {
