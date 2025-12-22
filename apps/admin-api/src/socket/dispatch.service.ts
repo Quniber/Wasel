@@ -256,6 +256,14 @@ export class DispatchService {
     if (pending.currentDriverIndex >= pending.nearbyDriverIds.length) {
       this.logger.warn(`No more drivers available for order ${orderId}`);
       this.pendingOrders.delete(orderId);
+
+      // Update order status to NotFound (no drivers available)
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'NotFound' },
+      });
+      this.logger.log(`Order ${orderId} marked as NotFound - no drivers available`);
+
       // TODO: Notify customer that no drivers are available
       return;
     }

@@ -360,11 +360,11 @@ export class OrdersService {
     // Calculate final fare (could include waiting time, tolls, etc.)
     const finalCost = order.costAfterCoupon || order.costBest;
 
-    // Update order to finished or waiting for review
+    // Update order to finished
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
-        status: OrderStatus.WaitingForReview,
+        status: OrderStatus.Finished,
         finishedAt: new Date(),
         paidAmount: finalCost,
       },

@@ -13,6 +13,7 @@ import { useDriverStore } from '@/stores/driver-store';
 import { getColors } from '@/constants/Colors';
 import { socketService, IncomingOrder } from '@/lib/socket';
 import { driverApi } from '@/lib/api';
+import ActiveRideScreen from './active-ride';
 
 export default function HomeScreen() {
   const { t } = useTranslation();
@@ -27,7 +28,8 @@ export default function HomeScreen() {
     todayStats,
     updateStats,
     setIncomingOrder,
-    incomingOrder
+    incomingOrder,
+    activeRide
   } = useDriverStore();
 
   const isDark = resolvedTheme === 'dark';
@@ -93,6 +95,11 @@ export default function HomeScreen() {
       socketService.stopLocationUpdates();
     };
   }, [isOnline]);
+
+  // If there's an active ride, show the active ride screen
+  if (activeRide) {
+    return <ActiveRideScreen />;
+  }
 
   const handleToggleOnline = async () => {
     if (!currentLocation) {

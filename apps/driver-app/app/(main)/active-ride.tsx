@@ -25,13 +25,6 @@ export default function ActiveRideScreen() {
   const [status, setStatus] = useState<RideStatus>(activeRide?.status as RideStatus || 'accepted');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if no active ride
-  useEffect(() => {
-    if (!activeRide) {
-      router.replace('/(main)');
-    }
-  }, []);
-
   // Join order room and listen for updates
   useEffect(() => {
     if (!activeRide) return;
@@ -47,7 +40,7 @@ export default function ActiveRideScreen() {
           data.reason || t('activeRide.riderCancelledRide'),
           [{ text: t('common.ok'), onPress: () => {
             setActiveRide(null);
-            router.replace('/(main)');
+            // No need to navigate - state change will show home screen
           }}]
         );
       }
@@ -156,7 +149,7 @@ export default function ActiveRideScreen() {
             try {
               await ordersApi.cancelRide(activeRide.orderId);
               setActiveRide(null);
-              router.replace('/(main)');
+              // No need to navigate - state change will show home screen
             } catch (error) {
               console.error('Error cancelling ride:', error);
             }

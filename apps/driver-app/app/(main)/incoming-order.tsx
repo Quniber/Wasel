@@ -26,10 +26,30 @@ export default function IncomingOrderScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(1)).current;
 
-  // Vibrate on mount
+  // Reset state when a new order comes in (orderId changes)
   useEffect(() => {
-    Vibration.vibrate([0, 500, 200, 500, 200, 500]);
-  }, []);
+    if (incomingOrder?.orderId) {
+      console.log('[IncomingOrder] New order received, resetting state for order:', incomingOrder.orderId);
+      setTimeLeft(TIMEOUT_SECONDS);
+      setIsAccepting(false);
+      setIsRejecting(false);
+
+      // Reset animations
+      pulseAnim.setValue(1);
+      progressAnim.setValue(1);
+
+      // Vibrate for new order
+      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+
+      // Start progress animation
+      Animated.timing(progressAnim, {
+        toValue: 0,
+        duration: TIMEOUT_SECONDS * 1000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [incomingOrder?.orderId]);
 
   // Pulse animation
   useEffect(() => {
@@ -51,17 +71,7 @@ export default function IncomingOrderScreen() {
     );
     pulse.start();
     return () => pulse.stop();
-  }, []);
-
-  // Progress animation
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: 0,
-      duration: TIMEOUT_SECONDS * 1000,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-  }, []);
+  }, [incomingOrder?.orderId]);
 
   // Countdown timer
   useEffect(() => {
@@ -85,12 +95,20 @@ export default function IncomingOrderScreen() {
   const handleAccept = async () => {
     if (!incomingOrder || isAccepting) return;
 
+    console.log('[Accept] Order ID:', incomingOrder.orderId);
+    console.log('[Accept] Full order:', JSON.stringify(incomingOrder));
+
     setIsAccepting(true);
     try {
-      await ordersApi.accept(incomingOrder.orderId);
+      console.log('[Accept] Calling API...');
+      const response = await ordersApi.accept(incomingOrder.orderId);
+      console.log('[Accept] API response:', response.data);
+
+      console.log('[Accept] Emitting socket event...');
       socketService.acceptOrder(incomingOrder.orderId);
 
       // Set as active ride
+      console.log('[Accept] Setting active ride...');
       setActiveRide({
         orderId: incomingOrder.orderId,
         status: 'accepted',
@@ -106,10 +124,15 @@ export default function IncomingOrderScreen() {
         paymentMethod: incomingOrder.paymentMethod,
       });
 
+      console.log('[Accept] Clearing incoming order...');
       clearIncomingOrder();
-      router.replace('/(main)/active-ride');
-    } catch (error) {
+
+      console.log('[Accept] Going back to home (will show active ride)...');
+      router.replace('/(main)');
+    } catch (error: any) {
       console.error('Error accepting order:', error);
+      console.error('Error response:', error?.response?.data);
+      console.error('Error status:', error?.response?.status);
       setIsAccepting(false);
     }
   };
