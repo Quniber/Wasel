@@ -127,8 +127,22 @@ export default function ActiveRideScreen() {
     if (!activeRide) return;
     setIsLoading(true);
     try {
+      const completedRide = { ...activeRide }; // Save ride data for summary screen
       await ordersApi.completeRide(activeRide.orderId);
-      router.replace('/(main)/ride-complete');
+
+      // Clear active ride state BEFORE navigating
+      setActiveRide(null);
+
+      // Navigate to completion screen (ride data passed via route or stored temporarily)
+      router.replace({
+        pathname: '/(main)/ride-complete',
+        params: {
+          orderId: completedRide.orderId,
+          fare: completedRide.estimatedFare?.toString() || '0',
+          distance: completedRide.distance?.toString() || '0',
+          paymentMethod: completedRide.paymentMethod || 'cash',
+        },
+      });
     } catch (error) {
       console.error('Error completing ride:', error);
       setIsLoading(false);

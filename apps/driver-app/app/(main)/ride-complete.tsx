@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,9 +11,24 @@ import { getColors } from '@/constants/Colors';
 export default function RideCompleteScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { activeRide, setActiveRide, updateStats, todayStats } = useDriverStore();
+  const { updateStats, todayStats } = useDriverStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
+
+  // Get ride data from route params
+  const params = useLocalSearchParams<{
+    orderId: string;
+    fare: string;
+    distance: string;
+    paymentMethod: string;
+  }>();
+
+  const rideData = {
+    orderId: params.orderId ? parseInt(params.orderId) : 0,
+    fare: params.fare ? parseFloat(params.fare) : 0,
+    distance: params.distance ? parseFloat(params.distance) : 0,
+    paymentMethod: params.paymentMethod || 'cash',
+  };
 
   const [rating, setRating] = useState(5);
   const [tip, setTip] = useState('');
@@ -23,9 +38,9 @@ export default function RideCompleteScreen() {
 
   useEffect(() => {
     // Update today's stats
-    if (activeRide) {
+    if (rideData.fare > 0) {
       updateStats({
-        earnings: todayStats.earnings + (activeRide.estimatedFare || 0),
+        earnings: todayStats.earnings + rideData.fare,
         trips: todayStats.trips + 1,
         acceptanceRate: todayStats.acceptanceRate,
       });
@@ -33,28 +48,19 @@ export default function RideCompleteScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!activeRide) {
-      router.replace('/(main)');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       // TODO: Add rating API endpoint when available
       // For now, just complete the ride flow
-      console.log('Rating:', rating, 'Tip:', parseFloat(tip) || 0);
-
-      setActiveRide(null);
+      console.log('Rating:', rating, 'Tip:', parseFloat(tip) || 0, 'OrderId:', rideData.orderId);
       router.replace('/(main)');
     } catch (error) {
       console.error('Error submitting rating:', error);
-      setActiveRide(null);
       router.replace('/(main)');
     }
   };
 
   const handleSkip = () => {
-    setActiveRide(null);
     router.replace('/(main)');
   };
 
@@ -86,23 +92,23 @@ export default function RideCompleteScreen() {
             {t('rideComplete.youEarned')}
           </Text>
           <Text style={{ color: colors.success }} className="text-4xl font-bold mt-2">
-            QAR {activeRide?.estimatedFare?.toFixed(0) || '0'}
+            QAR {rideData.fare.toFixed(0)}
           </Text>
           <View className="flex-row items-center mt-3">
             <View className="flex-row items-center mr-4">
               <Ionicons name="navigate-outline" size={16} color={colors.mutedForeground} />
               <Text style={{ color: colors.mutedForeground }} className="ml-1">
-                {activeRide?.distance?.toFixed(1) || '--'} km
+                {rideData.distance.toFixed(1)} km
               </Text>
             </View>
             <View className="flex-row items-center">
               <Ionicons
-                name={activeRide?.paymentMethod === 'cash' ? 'cash-outline' : 'card-outline'}
+                name={rideData.paymentMethod === 'cash' ? 'cash-outline' : 'card-outline'}
                 size={16}
                 color={colors.mutedForeground}
               />
               <Text style={{ color: colors.mutedForeground }} className="ml-1">
-                {activeRide?.paymentMethod === 'cash' ? t('payment.cash') : t('payment.card')}
+                {rideData.paymentMethod === 'cash' ? t('payment.cash') : t('payment.card')}
               </Text>
             </View>
           </View>
