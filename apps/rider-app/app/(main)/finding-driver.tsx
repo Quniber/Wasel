@@ -75,7 +75,7 @@ export default function FindingDriverScreen() {
         if (data.status === 'DriverAccepted') {
           try {
             // Fetch full order details including driver info
-            const orderDetails = await orderApi.getOrder(order.id);
+            const orderDetails = await orderApi.getOrderDetails(order.id);
             const fullOrder = orderDetails.data;
             console.log('[FindingDriver] Fetched order details:', fullOrder);
 
