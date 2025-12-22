@@ -14,7 +14,7 @@ interface PendingOrder {
 export class DispatchService {
   private logger = new Logger('DispatchService');
   private pendingOrders = new Map<number, PendingOrder>();
-  private readonly DRIVER_RESPONSE_TIMEOUT = 10000; // 10 seconds
+  private readonly DRIVER_RESPONSE_TIMEOUT = 15000; // 15 seconds (matches driver app timeout)
   private readonly SEARCH_RADIUS_KM = 10; // 10km radius
 
   constructor(

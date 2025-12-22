@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, PaymentMode } from 'database';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(OrdersService.name);
+  private readonly ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3002';
+
+  constructor(
+    private prisma: PrismaService,
+    private httpService: HttpService,
+  ) {}
 
   // Get available services
   async getServices() {
@@ -255,6 +263,21 @@ export class OrdersService {
         note: 'Order created by customer',
       },
     });
+
+    // Dispatch order to drivers (only for immediate orders, not scheduled)
+    if (!data.scheduledAt) {
+      try {
+        this.logger.log(`Dispatching order ${order.id} to drivers...`);
+        await firstValueFrom(
+          this.httpService.post(`${this.ADMIN_API_URL}/internal/orders/${order.id}/dispatch`),
+        );
+        this.logger.log(`Order ${order.id} dispatched successfully`);
+      } catch (error) {
+        this.logger.error(`Failed to dispatch order ${order.id}:`, error.message);
+        // Don't fail the order creation if dispatch fails - order is still valid
+        // Admin can manually dispatch or it can be retried
+      }
+    }
 
     return order;
   }

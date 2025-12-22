@@ -1,12 +1,16 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ParseIntPipe, Req } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { DispatchService } from '../socket/dispatch.service';
 import { OrderStatus } from 'database';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private ordersService: OrdersService) {}
+  constructor(
+    private ordersService: OrdersService,
+    private dispatchService: DispatchService,
+  ) {}
 
   @Get()
   findAll(
@@ -137,5 +141,17 @@ export class OrdersController {
     @Req() req: any,
   ) {
     return this.ordersService.updateSOS(sosId, req.user.id, body.status, body.note);
+  }
+}
+
+// Internal controller for inter-service communication (no JWT auth required)
+@Controller('internal/orders')
+export class InternalOrdersController {
+  constructor(private dispatchService: DispatchService) {}
+
+  @Post(':id/dispatch')
+  async triggerDispatch(@Param('id', ParseIntPipe) orderId: number) {
+    const result = await this.dispatchService.dispatchOrder(orderId);
+    return { success: result, orderId };
   }
 }
