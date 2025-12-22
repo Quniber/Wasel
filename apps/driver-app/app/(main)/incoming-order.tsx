@@ -95,8 +95,9 @@ export default function IncomingOrderScreen() {
   const handleAccept = async () => {
     if (!incomingOrder || isAccepting) return;
 
-    console.log('[Accept] Order ID:', incomingOrder.orderId);
-    console.log('[Accept] Full order:', JSON.stringify(incomingOrder));
+    const orderIdToAccept = incomingOrder.orderId;
+    console.log('[Accept] Order ID to accept:', orderIdToAccept);
+    console.log('[Accept] Full incoming order:', JSON.stringify(incomingOrder));
 
     setIsAccepting(true);
     try {

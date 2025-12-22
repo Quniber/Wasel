@@ -257,12 +257,22 @@ export class DispatchService {
       this.logger.warn(`No more drivers available for order ${orderId}`);
       this.pendingOrders.delete(orderId);
 
-      // Update order status to NotFound (no drivers available)
-      await this.prisma.order.update({
+      // Check if order was already accepted before marking as NotFound
+      const currentOrder = await this.prisma.order.findUnique({
         where: { id: orderId },
-        data: { status: 'NotFound' },
+        select: { status: true, driverId: true },
       });
-      this.logger.log(`Order ${orderId} marked as NotFound - no drivers available`);
+
+      // Only mark as NotFound if order is still in Requested status
+      if (currentOrder && currentOrder.status === 'Requested' && !currentOrder.driverId) {
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: 'NotFound' },
+        });
+        this.logger.log(`Order ${orderId} marked as NotFound - no drivers available`);
+      } else {
+        this.logger.log(`Order ${orderId} already processed (status: ${currentOrder?.status}), skipping NotFound update`);
+      }
 
       // TODO: Notify customer that no drivers are available
       return;

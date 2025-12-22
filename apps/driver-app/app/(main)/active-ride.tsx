@@ -25,6 +25,19 @@ export default function ActiveRideScreen() {
   const [status, setStatus] = useState<RideStatus>(activeRide?.status as RideStatus || 'accepted');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Log activeRide changes for debugging
+  useEffect(() => {
+    console.log('[ActiveRide] activeRide changed:', activeRide?.orderId, 'status:', activeRide?.status);
+  }, [activeRide]);
+
+  // Reset local status when activeRide changes (new order)
+  useEffect(() => {
+    if (activeRide?.status) {
+      console.log('[ActiveRide] Resetting local status to:', activeRide.status);
+      setStatus(activeRide.status as RideStatus);
+    }
+  }, [activeRide?.orderId]);
+
   // Join order room and listen for updates
   useEffect(() => {
     if (!activeRide) return;
@@ -97,13 +110,18 @@ export default function ActiveRideScreen() {
 
   const handleArrived = async () => {
     if (!activeRide) return;
+    console.log('[Arrived] Order ID:', activeRide.orderId, 'Current status:', status);
     setIsLoading(true);
     try {
-      await ordersApi.arrive(activeRide.orderId);
+      const response = await ordersApi.arrive(activeRide.orderId);
+      console.log('[Arrived] API Success! Response:', response.data);
       setStatus('arrived');
       setActiveRide({ ...activeRide, status: 'arrived' });
-    } catch (error) {
+      console.log('[Arrived] State updated to arrived');
+    } catch (error: any) {
       console.error('Error marking arrived:', error);
+      console.error('Error response:', error?.response?.data);
+      console.error('Order ID was:', activeRide.orderId);
     } finally {
       setIsLoading(false);
     }
@@ -111,13 +129,15 @@ export default function ActiveRideScreen() {
 
   const handleStartRide = async () => {
     if (!activeRide) return;
+    console.log('[StartRide] Order ID:', activeRide.orderId, 'Current status:', status);
     setIsLoading(true);
     try {
       await ordersApi.startRide(activeRide.orderId);
       setStatus('started');
       setActiveRide({ ...activeRide, status: 'started' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting ride:', error);
+      console.error('Error response:', error?.response?.data);
     } finally {
       setIsLoading(false);
     }
