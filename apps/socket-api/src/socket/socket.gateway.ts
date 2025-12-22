@@ -206,6 +206,17 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join order room
       client.join(`order:${data.orderId}`);
       this.logger.log(`Driver ${clientInfo.userId} accepted order ${data.orderId}`);
+
+      // Notify everyone in the order room (including rider)
+      this.server.to(`order:${data.orderId}`).emit('order:status', {
+        orderId: data.orderId,
+        status: 'DriverAccepted',
+        driverId: clientInfo.userId,
+        driver: {
+          id: clientInfo.userId,
+        },
+      });
+      this.logger.log(`Emitted order:status DriverAccepted for order ${data.orderId}`);
     }
   }
 

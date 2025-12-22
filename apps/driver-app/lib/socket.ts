@@ -134,7 +134,7 @@ class DriverSocketService {
 
   // Accept an incoming order
   acceptOrder(orderId: number) {
-    this.emit('driver:accept', { orderId });
+    this.emit('order:accept', { orderId });
   }
 
   // Reject an incoming order

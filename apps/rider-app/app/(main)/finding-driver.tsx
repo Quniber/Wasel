@@ -67,14 +67,15 @@ export default function FindingDriverScreen() {
       const order = response.data;
 
       // Join order room for real-time updates
-      socketService.emit('join-order', { orderId: order.id });
+      socketService.joinOrderRoom(order.id);
 
       // Listen for driver acceptance
-      const unsubscribe = socketService.on('order-status', (data) => {
-        if (data.status === 'driver_accepted' && data.driver) {
+      const unsubscribe = socketService.on('order:status', (data) => {
+        console.log('[FindingDriver] Received order:status:', data);
+        if (data.status === 'DriverAccepted' && data.driver) {
           setActiveOrder({
             id: data.orderId || order.id,
-            status: 'driver_accepted',
+            status: 'DriverAccepted',
             pickup,
             dropoff,
             service: selectedService,
