@@ -69,8 +69,10 @@ export default function HomeScreen() {
 
   // Start/stop location updates when online status changes
   useEffect(() => {
+    let dbLocationInterval: ReturnType<typeof setInterval> | null = null;
+
     if (isOnline) {
-      // Start location updates
+      // Start socket location updates (every 5 seconds for real-time)
       socketService.startLocationUpdates(async () => {
         const location = await Location.getCurrentPositionAsync({});
         const coords = {
@@ -81,13 +83,25 @@ export default function HomeScreen() {
         return coords;
       }, 5000);
 
-      // Notify server with current location
+      // Notify socket with current location
       socketService.goOnline(currentLocation || undefined);
 
-      // Send initial location update immediately
+      // Send initial location update immediately (socket + database)
       if (currentLocation) {
         socketService.updateLocation(currentLocation.latitude, currentLocation.longitude);
+        // Also save to database
+        driverApi.updateLocation(currentLocation.latitude, currentLocation.longitude).catch(console.error);
       }
+
+      // Update database location every 30 seconds (less frequent than socket)
+      dbLocationInterval = setInterval(async () => {
+        try {
+          const location = await Location.getCurrentPositionAsync({});
+          await driverApi.updateLocation(location.coords.latitude, location.coords.longitude);
+        } catch (error) {
+          console.error('Error updating database location:', error);
+        }
+      }, 30000);
     } else {
       socketService.stopLocationUpdates();
       socketService.goOffline();
@@ -95,6 +109,9 @@ export default function HomeScreen() {
 
     return () => {
       socketService.stopLocationUpdates();
+      if (dbLocationInterval) {
+        clearInterval(dbLocationInterval);
+      }
     };
   }, [isOnline]);
 
