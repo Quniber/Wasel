@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,13 +30,40 @@ export default function PhoneScreen() {
     try {
       // Format phone number (add country code if needed)
       const formattedPhone = phone.startsWith('+') ? phone : `+974${phone}`;
-      await authApi.loginWithPhone(formattedPhone);
+
+      // Try login first (for existing users)
+      const response = await authApi.loginWithPhone(formattedPhone);
+
+      // If dev mode, show OTP in alert
+      if (response.data.devOtp) {
+        Alert.alert('Dev OTP', `Your OTP is: ${response.data.devOtp}`);
+      }
+
       router.push({
         pathname: '/(auth)/otp',
-        params: { phone: formattedPhone },
+        params: { phone: formattedPhone, mode: 'login' },
       });
     } catch (err: any) {
-      setError(err.response?.data?.message || t('errors.generic'));
+      // If user not found, try registration
+      if (err.response?.status === 404) {
+        try {
+          const formattedPhone = phone.startsWith('+') ? phone : `+974${phone}`;
+          const regResponse = await authApi.registerWithPhone(formattedPhone);
+
+          if (regResponse.data.devOtp) {
+            Alert.alert('Dev OTP', `Your OTP is: ${regResponse.data.devOtp}`);
+          }
+
+          router.push({
+            pathname: '/(auth)/otp',
+            params: { phone: formattedPhone, mode: 'register' },
+          });
+        } catch (regErr: any) {
+          setError(regErr.response?.data?.message || t('errors.generic'));
+        }
+      } else {
+        setError(err.response?.data?.message || t('errors.generic'));
+      }
     } finally {
       setIsLoading(false);
     }

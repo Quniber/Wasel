@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { authApi } from '@/lib/api';
 
 export default function OtpScreen() {
   const { t } = useTranslation();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, mode } = useLocalSearchParams<{ phone: string; mode: string }>();
   const { resolvedTheme } = useThemeStore();
   const { setSession } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
@@ -59,16 +59,34 @@ export default function OtpScreen() {
     setError('');
 
     try {
-      const response = await authApi.verifyOtpLogin({ mobileNumber: phone!, otp: code });
-      const { accessToken, refreshToken, expiresIn, user } = response.data;
-
-      await setSession({ accessToken, refreshToken, expiresIn }, user);
-
-      // Check if profile is complete
-      if (!user.firstName || !user.lastName) {
-        router.replace('/(auth)/profile-setup');
+      if (mode === 'register') {
+        // For new users, go to profile setup with OTP
+        router.push({
+          pathname: '/(auth)/profile-setup',
+          params: { phone, otp: code },
+        });
+        return;
       } else {
-        router.replace('/(main)');
+        // For existing users, verify OTP and login
+        const response = await authApi.verifyOtpLogin({ mobileNumber: phone!, otp: code });
+        const { accessToken, refreshToken, expiresIn, driver } = response.data;
+
+        await setSession({ accessToken, refreshToken, expiresIn }, {
+          id: driver.id.toString(),
+          firstName: driver.firstName || '',
+          lastName: driver.lastName || '',
+          email: driver.email || '',
+          mobileNumber: driver.mobileNumber,
+          status: driver.status,
+          rating: driver.rating,
+        });
+
+        // Check if profile is complete
+        if (!driver.firstName || !driver.lastName) {
+          router.replace('/(auth)/profile-setup');
+        } else {
+          router.replace('/(main)');
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || t('errors.invalidOtp'));
@@ -83,8 +101,13 @@ export default function OtpScreen() {
     if (resendTimer > 0) return;
 
     try {
-      await authApi.resendOtp(phone!);
+      const response = await authApi.resendOtp(phone!);
       setResendTimer(60);
+
+      // Show OTP in dev mode
+      if (response.data.devOtp) {
+        Alert.alert('Dev OTP', `Your new OTP is: ${response.data.devOtp}`);
+      }
     } catch (err) {
       setError(t('errors.generic'));
     }

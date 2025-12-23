@@ -33,9 +33,17 @@ export default function EmailLoginScreen() {
 
     try {
       const response = await authApi.loginWithEmail({ email, password });
-      const { accessToken, refreshToken, expiresIn, user } = response.data;
+      const { accessToken, refreshToken, expiresIn, driver } = response.data;
 
-      await setSession({ accessToken, refreshToken, expiresIn }, user);
+      await setSession({ accessToken, refreshToken, expiresIn }, {
+        id: driver.id.toString(),
+        firstName: driver.firstName || '',
+        lastName: driver.lastName || '',
+        email: driver.email || '',
+        mobileNumber: driver.mobileNumber,
+        status: driver.status,
+        rating: driver.rating,
+      });
       router.replace('/(main)');
     } catch (err: any) {
       setError(err.response?.data?.message || t('errors.invalidCredentials'));
