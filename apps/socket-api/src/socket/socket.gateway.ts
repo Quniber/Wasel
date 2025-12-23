@@ -274,6 +274,29 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // ========== Chat Events ==========
+
+  @SubscribeMessage('chat:send')
+  handleChatSend(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: number; content: string },
+  ) {
+    const clientInfo = this.socketToClient.get(client.id);
+    if (clientInfo && data.orderId && data.content) {
+      const message = {
+        orderId: data.orderId,
+        senderId: clientInfo.userId,
+        senderType: clientInfo.type as 'driver' | 'rider',
+        content: data.content,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Broadcast to everyone in the order room
+      this.server.to(`order:${data.orderId}`).emit('chat:message', message);
+      this.logger.log(`Chat message from ${clientInfo.type} ${clientInfo.userId} in order ${data.orderId}`);
+    }
+  }
+
   // ========== Emit Methods (called by API) ==========
 
   emitToDriver(driverId: number, event: string, data: any): boolean {

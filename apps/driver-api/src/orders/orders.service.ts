@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SocketService } from '../socket/socket.service';
 import { OrderStatus, DriverStatus } from 'database';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private socketService: SocketService,
+  ) {}
 
   // Get available orders nearby (Requested status, no driver assigned)
   async getAvailableOrders(driverId: number) {
@@ -296,6 +300,12 @@ export class OrdersService {
       },
     });
 
+    // Notify rider via socket
+    this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'Arrived',
+    });
+
     return {
       id: updatedOrder.id,
       status: updatedOrder.status,
@@ -334,6 +344,12 @@ export class OrdersService {
         },
         service: true,
       },
+    });
+
+    // Notify rider via socket
+    this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'Started',
     });
 
     return {
@@ -384,6 +400,13 @@ export class OrdersService {
     await this.prisma.driver.update({
       where: { id: driverId },
       data: { status: DriverStatus.online },
+    });
+
+    // Notify rider via socket
+    this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'Finished',
+      paidAmount: updatedOrder.paidAmount,
     });
 
     return {

@@ -57,6 +57,7 @@ class SocketService {
 
     // Re-emit events to registered listeners
     this.socket.onAny((event, ...args) => {
+      console.log('[Socket] Received event:', event, args);
       const callbacks = this.listeners.get(event);
       if (callbacks) {
         callbacks.forEach((callback) => callback(...args));
@@ -86,12 +87,16 @@ class SocketService {
   // Emit events
   emit(event: string, data?: any) {
     if (this.socket?.connected) {
+      console.log('[Socket] Emitting event:', event, data);
       this.socket.emit(event, data);
+    } else {
+      console.warn('[Socket] Cannot emit - not connected. Event:', event);
     }
   }
 
   // Join a room (e.g., for order tracking)
   joinOrderRoom(orderId: number | string) {
+    console.log('[Socket] Joining order room:', orderId, 'Socket connected:', this.socket?.connected);
     this.emit('join:order', { orderId: Number(orderId) });
   }
 

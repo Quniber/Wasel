@@ -65,6 +65,11 @@ export default function FindingDriverScreen() {
       });
 
       const order = response.data;
+      console.log('[FindingDriver] Order created:', order.id);
+
+      // Ensure socket is connected before joining room
+      await socketService.connect();
+      console.log('[FindingDriver] Socket connected, joining order room:', order.id);
 
       // Join order room for real-time updates
       socketService.joinOrderRoom(order.id);

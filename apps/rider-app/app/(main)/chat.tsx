@@ -34,16 +34,25 @@ export default function ChatScreen() {
   ];
 
   useEffect(() => {
-    // Listen for incoming messages
-    const unsubscribe = socketService.on('chat-message', (data) => {
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: data.text,
-        senderId: data.senderId,
-        timestamp: new Date(data.timestamp),
-        isDriver: data.isDriver,
-      };
-      setMessages((prev) => [...prev, newMessage]);
+    // Listen for incoming messages (matches driver app event name)
+    const unsubscribe = socketService.on('chat:message', (data: {
+      orderId: number;
+      senderId: number;
+      senderType: 'driver' | 'rider';
+      content: string;
+      timestamp: string;
+    }) => {
+      // Only show messages from the driver (we already added our own messages locally)
+      if (data.senderType === 'driver') {
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: data.content,
+          senderId: data.senderId.toString(),
+          timestamp: new Date(data.timestamp),
+          isDriver: true,
+        };
+        setMessages((prev) => [...prev, newMessage]);
+      }
     });
 
     return () => {
@@ -65,10 +74,10 @@ export default function ChatScreen() {
     setMessages((prev) => [...prev, newMessage]);
     setMessage('');
 
-    // Send via socket
-    socketService.emit('send-message', {
+    // Send via socket (matches driver app event name)
+    socketService.emit('chat:send', {
       orderId: activeOrder?.id,
-      text: text.trim(),
+      content: text.trim(),
     });
 
     // Scroll to bottom

@@ -27,8 +27,13 @@ export default function RideActiveScreen() {
       return;
     }
 
-    // Join order room for real-time updates
-    socketService.joinOrderRoom(activeOrder.orderId);
+    // Ensure socket is connected and join order room
+    const setupSocket = async () => {
+      await socketService.connect();
+      socketService.joinOrderRoom(activeOrder.orderId);
+      console.log('[RideActive] Joined order room:', activeOrder.orderId);
+    };
+    setupSocket();
 
     // Listen for driver location updates
     const locationUnsub = socketService.on('location:driver', (data) => {
@@ -48,11 +53,13 @@ export default function RideActiveScreen() {
 
     // Listen for order status updates
     const statusUnsub = socketService.on('order:status', (data) => {
-      if (data.status === 'driver_arrived' || data.status === 'arrived') {
+      console.log('[RideActive] Received order:status:', data);
+      const status = data.status?.toLowerCase();
+      if (status === 'driver_arrived' || status === 'arrived') {
         setStatus('driver_arrived');
-      } else if (data.status === 'trip_started' || data.status === 'started') {
+      } else if (status === 'trip_started' || status === 'started') {
         setStatus('trip_started');
-      } else if (data.status === 'trip_completed' || data.status === 'completed') {
+      } else if (status === 'trip_completed' || status === 'completed' || status === 'finished') {
         router.replace('/(main)/ride-complete');
       }
     });
