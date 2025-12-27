@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Location {
   latitude: number;
@@ -76,6 +78,10 @@ interface DriverState {
   balance: number;
   setBalance: (balance: number) => void;
 
+  // Hydration state
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+
   // Reset all driver state (on logout)
   reset: () => void;
 }
@@ -87,48 +93,67 @@ const initialStats: DailyStats = {
   acceptanceRate: 100,
 };
 
-export const useDriverStore = create<DriverState>((set, get) => ({
-  // Online status
-  isOnline: false,
-  setOnline: (isOnline) => set({ isOnline }),
+export const useDriverStore = create<DriverState>()(
+  persist(
+    (set, get) => ({
+      // Online status
+      isOnline: false,
+      setOnline: (isOnline) => set({ isOnline }),
 
-  // Current location
-  currentLocation: null,
-  setCurrentLocation: (currentLocation) => set({ currentLocation }),
+      // Current location
+      currentLocation: null,
+      setCurrentLocation: (currentLocation) => set({ currentLocation }),
 
-  // Active ride
-  activeRide: null,
-  setActiveRide: (activeRide) => set({ activeRide }),
-  updateRideStatus: (status) => {
-    const { activeRide } = get();
-    if (activeRide) {
-      set({ activeRide: { ...activeRide, status } });
+      // Active ride
+      activeRide: null,
+      setActiveRide: (activeRide) => set({ activeRide }),
+
+      // Hydration state
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+      updateRideStatus: (status) => {
+        const { activeRide } = get();
+        if (activeRide) {
+          set({ activeRide: { ...activeRide, status } });
+        }
+      },
+
+      // Incoming order request
+      incomingOrder: null,
+      setIncomingOrder: (incomingOrder) => set({ incomingOrder }),
+      clearIncomingOrder: () => set({ incomingOrder: null }),
+
+      // Daily stats
+      todayStats: initialStats,
+      updateStats: (stats) => {
+        const { todayStats } = get();
+        set({ todayStats: { ...todayStats, ...stats } });
+      },
+
+      // Balance
+      balance: 0,
+      setBalance: (balance) => set({ balance }),
+
+      // Reset all driver state
+      reset: () => set({
+        isOnline: false,
+        currentLocation: null,
+        activeRide: null,
+        incomingOrder: null,
+        todayStats: initialStats,
+        balance: 0,
+      }),
+    }),
+    {
+      name: 'driver-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        activeRide: state.activeRide,
+        isOnline: state.isOnline,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
-  },
-
-  // Incoming order request
-  incomingOrder: null,
-  setIncomingOrder: (incomingOrder) => set({ incomingOrder }),
-  clearIncomingOrder: () => set({ incomingOrder: null }),
-
-  // Daily stats
-  todayStats: initialStats,
-  updateStats: (stats) => {
-    const { todayStats } = get();
-    set({ todayStats: { ...todayStats, ...stats } });
-  },
-
-  // Balance
-  balance: 0,
-  setBalance: (balance) => set({ balance }),
-
-  // Reset all driver state
-  reset: () => set({
-    isOnline: false,
-    currentLocation: null,
-    activeRide: null,
-    incomingOrder: null,
-    todayStats: initialStats,
-    balance: 0,
-  }),
-}));
+  )
+);

@@ -29,7 +29,9 @@ export default function HomeScreen() {
     updateStats,
     setIncomingOrder,
     incomingOrder,
-    activeRide
+    activeRide,
+    setActiveRide,
+    _hasHydrated
   } = useDriverStore();
 
   const isDark = resolvedTheme === 'dark';
@@ -52,6 +54,27 @@ export default function HomeScreen() {
       });
     })();
   }, []);
+
+  // Verify persisted active ride with server on app load
+  useEffect(() => {
+    if (!_hasHydrated || !activeRide) return;
+
+    // Check if the persisted ride is still valid
+    (async () => {
+      try {
+        const response = await driverApi.getCurrentOrder();
+        if (!response.data) {
+          // No active order on server, clear local state
+          console.log('[Home] No active order on server, clearing local state');
+          setActiveRide(null);
+        }
+      } catch (error) {
+        console.error('[Home] Error verifying active ride:', error);
+        // If we can't verify, clear the local state to be safe
+        setActiveRide(null);
+      }
+    })();
+  }, [_hasHydrated]);
 
   // Listen for incoming orders
   useEffect(() => {

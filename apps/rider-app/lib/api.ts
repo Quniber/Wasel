@@ -210,6 +210,9 @@ export const authApi = {
 export const orderApi = {
   getServices: () => api.get('/orders/services'),
 
+  // Get current active order
+  getCurrentOrder: () => api.get('/orders/current'),
+
   // Get directions from backend (proxy to Google Directions API)
   getDirections: (data: {
     originLat: number;

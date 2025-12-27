@@ -76,7 +76,7 @@ export default function ChatScreen() {
 
     // Send via socket (matches driver app event name)
     socketService.emit('chat:send', {
-      orderId: activeOrder?.id,
+      orderId: activeOrder?.id ? Number(activeOrder.id) : undefined,
       content: text.trim(),
     });
 

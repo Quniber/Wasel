@@ -13,12 +13,13 @@ import { DrawerActions } from '@react-navigation/native';
 import { changeLanguage } from '@/i18n';
 import { socketService } from '@/lib/socket';
 import { getColors } from '@/constants/Colors';
+import { orderApi } from '@/lib/api';
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const { resolvedTheme, mode, setMode } = useThemeStore();
-  const { pickup, setPickup } = useBookingStore();
+  const { pickup, setPickup, activeOrder, setActiveOrder, _hasHydrated } = useBookingStore();
   const { user, logout } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
@@ -34,6 +35,32 @@ export default function HomeScreen() {
   useEffect(() => {
     getCurrentLocation();
   }, []);
+
+  // Check for active order on app load and verify with server
+  useEffect(() => {
+    if (!_hasHydrated) return;
+
+    (async () => {
+      try {
+        const response = await orderApi.getCurrentOrder();
+        if (response.data) {
+          // There's an active order on server, navigate to ride-active
+          console.log('[Home] Found active order:', response.data.id);
+          router.replace('/(main)/ride-active');
+        } else if (activeOrder) {
+          // Local state has order but server doesn't, clear local
+          console.log('[Home] No active order on server, clearing local state');
+          setActiveOrder(null);
+        }
+      } catch (error) {
+        console.error('[Home] Error checking active order:', error);
+        // Clear local state if we can't verify
+        if (activeOrder) {
+          setActiveOrder(null);
+        }
+      }
+    })();
+  }, [_hasHydrated]);
 
   const getCurrentLocation = async () => {
     try {

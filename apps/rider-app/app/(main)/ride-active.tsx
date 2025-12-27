@@ -14,7 +14,7 @@ type RideStatus = 'driver_on_way' | 'driver_arrived' | 'trip_started';
 export default function RideActiveScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { activeOrder, updateDriverLocation, updateOrderStatus, resetBooking } = useBookingStore();
+  const { activeOrder, updateDriverLocation, updateOrderStatus, resetBooking, _hasHydrated } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
 
   const mapRef = useRef<MapView>(null);
@@ -22,6 +22,9 @@ export default function RideActiveScreen() {
   const [eta, setEta] = useState(5);
 
   useEffect(() => {
+    // Wait for store to hydrate before checking activeOrder
+    if (!_hasHydrated) return;
+
     if (!activeOrder) {
       router.replace('/(main)');
       return;
@@ -72,7 +75,7 @@ export default function RideActiveScreen() {
         socketService.leaveOrderRoom(activeOrder.id);
       }
     };
-  }, [activeOrder?.id]);
+  }, [activeOrder?.id, _hasHydrated]);
 
   useEffect(() => {
     fitMapToRoute();
@@ -125,7 +128,8 @@ export default function RideActiveScreen() {
     router.replace('/(main)');
   };
 
-  if (!activeOrder || !activeOrder.driver) {
+  // Show loading while hydrating or if no active order
+  if (!_hasHydrated || !activeOrder || !activeOrder.driver) {
     return (
       <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
         <Text className="text-muted-foreground">{t('common.loading')}</Text>

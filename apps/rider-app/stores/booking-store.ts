@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Location {
   latitude: number;
@@ -78,6 +80,10 @@ interface BookingState {
   // Active order
   activeOrder: ActiveOrder | null;
 
+  // Hydration state
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+
   // Actions
   setPickup: (location: Location | null) => void;
   setDropoff: (location: Location | null) => void;
@@ -92,64 +98,80 @@ interface BookingState {
   resetBooking: () => void;
 }
 
-export const useBookingStore = create<BookingState>((set, get) => ({
-  pickup: null,
-  dropoff: null,
-  services: [],
-  selectedService: null,
-  fareEstimates: [],
-  couponCode: null,
-  couponDiscount: 0,
-  isScheduled: false,
-  scheduledDate: null,
-  activeOrder: null,
+export const useBookingStore = create<BookingState>()(
+  persist(
+    (set, get) => ({
+      pickup: null,
+      dropoff: null,
+      services: [],
+      selectedService: null,
+      fareEstimates: [],
+      couponCode: null,
+      couponDiscount: 0,
+      isScheduled: false,
+      scheduledDate: null,
+      activeOrder: null,
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
 
-  setPickup: (pickup) => set({ pickup }),
-  setDropoff: (dropoff) => set({ dropoff }),
-  setServices: (services) => set({ services }),
-  setSelectedService: (selectedService) => set({ selectedService }),
-  setFareEstimates: (fareEstimates) => set({ fareEstimates }),
-  setCoupon: (couponCode, couponDiscount) => set({ couponCode, couponDiscount }),
-  setScheduled: (isScheduled, scheduledDate) => set({ isScheduled, scheduledDate }),
-  setActiveOrder: (activeOrder) => set({ activeOrder }),
+      setPickup: (pickup) => set({ pickup }),
+      setDropoff: (dropoff) => set({ dropoff }),
+      setServices: (services) => set({ services }),
+      setSelectedService: (selectedService) => set({ selectedService }),
+      setFareEstimates: (fareEstimates) => set({ fareEstimates }),
+      setCoupon: (couponCode, couponDiscount) => set({ couponCode, couponDiscount }),
+      setScheduled: (isScheduled, scheduledDate) => set({ isScheduled, scheduledDate }),
+      setActiveOrder: (activeOrder) => set({ activeOrder }),
 
-  updateDriverLocation: (latitude, longitude) => {
-    const { activeOrder } = get();
-    if (activeOrder?.driver) {
-      set({
-        activeOrder: {
-          ...activeOrder,
-          driver: {
-            ...activeOrder.driver,
-            latitude,
-            longitude,
-          },
-        },
-      });
+      updateDriverLocation: (latitude, longitude) => {
+        const { activeOrder } = get();
+        if (activeOrder?.driver) {
+          set({
+            activeOrder: {
+              ...activeOrder,
+              driver: {
+                ...activeOrder.driver,
+                latitude,
+                longitude,
+              },
+            },
+          });
+        }
+      },
+
+      updateOrderStatus: (status) => {
+        const { activeOrder } = get();
+        if (activeOrder) {
+          set({
+            activeOrder: {
+              ...activeOrder,
+              status,
+            },
+          });
+        }
+      },
+
+      resetBooking: () => set({
+        pickup: null,
+        dropoff: null,
+        selectedService: null,
+        fareEstimates: [],
+        couponCode: null,
+        couponDiscount: 0,
+        isScheduled: false,
+        scheduledDate: null,
+        activeOrder: null,
+      }),
+    }),
+    {
+      name: 'booking-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        activeOrder: state.activeOrder,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
-  },
-
-  updateOrderStatus: (status) => {
-    const { activeOrder } = get();
-    if (activeOrder) {
-      set({
-        activeOrder: {
-          ...activeOrder,
-          status,
-        },
-      });
-    }
-  },
-
-  resetBooking: () => set({
-    pickup: null,
-    dropoff: null,
-    selectedService: null,
-    fareEstimates: [],
-    couponCode: null,
-    couponDiscount: 0,
-    isScheduled: false,
-    scheduledDate: null,
-    activeOrder: null,
-  }),
-}));
+  )
+);
