@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { PrismaService } from '../prisma/prisma.service';
+import { SocketService } from '../socket/socket.service';
 import { OrderStatus, PaymentMode } from 'database';
 import { firstValueFrom } from 'rxjs';
 
@@ -12,6 +13,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private httpService: HttpService,
+    private socketService: SocketService,
   ) {}
 
   // Get available services
@@ -453,7 +455,7 @@ export class OrdersService {
       }
     }
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
         status: OrderStatus.RiderCanceled,
@@ -472,6 +474,16 @@ export class OrdersService {
         },
       },
     });
+
+    // Notify driver via socket
+    if (order.driverId) {
+      this.socketService.notifyDriver(order.driverId, 'order:cancelled', {
+        orderId,
+        cancelledBy: 'rider',
+      });
+    }
+
+    return updatedOrder;
   }
 
   // Get cancel reasons

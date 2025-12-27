@@ -30,22 +30,13 @@ export default function RideActiveScreen() {
     // Ensure socket is connected and join order room
     const setupSocket = async () => {
       await socketService.connect();
-      socketService.joinOrderRoom(activeOrder.orderId);
-      console.log('[RideActive] Joined order room:', activeOrder.orderId);
+      socketService.joinOrderRoom(activeOrder.id);
+      console.log('[RideActive] Joined order room:', activeOrder.id);
     };
     setupSocket();
 
     // Listen for driver location updates
-    const locationUnsub = socketService.on('location:driver', (data) => {
-      if (data.location) {
-        updateDriverLocation(data.location.latitude, data.location.longitude);
-      } else if (data.latitude && data.longitude) {
-        updateDriverLocation(data.latitude, data.longitude);
-      }
-    });
-
-    // Also listen for driver:location event
-    const locationUnsub2 = socketService.on('driver:location', (data) => {
+    const locationUnsub = socketService.on('driver:location', (data) => {
       if (data.latitude && data.longitude) {
         updateDriverLocation(data.latitude, data.longitude);
       }
@@ -64,21 +55,6 @@ export default function RideActiveScreen() {
       }
     });
 
-    // Listen for driver arrived event
-    const arrivedUnsub = socketService.on('order:driver_arrived', () => {
-      setStatus('driver_arrived');
-    });
-
-    // Listen for ride started event
-    const startedUnsub = socketService.on('order:started', () => {
-      setStatus('trip_started');
-    });
-
-    // Listen for ride completed event
-    const completedUnsub = socketService.on('order:completed', () => {
-      router.replace('/(main)/ride-complete');
-    });
-
     // Listen for ride cancelled event
     const cancelledUnsub = socketService.on('order:cancelled', (data) => {
       if (data.cancelledBy === 'driver') {
@@ -90,17 +66,13 @@ export default function RideActiveScreen() {
 
     return () => {
       locationUnsub?.();
-      locationUnsub2?.();
       statusUnsub?.();
-      arrivedUnsub?.();
-      startedUnsub?.();
-      completedUnsub?.();
       cancelledUnsub?.();
       if (activeOrder) {
-        socketService.leaveOrderRoom(activeOrder.orderId);
+        socketService.leaveOrderRoom(activeOrder.id);
       }
     };
-  }, [activeOrder?.orderId]);
+  }, [activeOrder?.id]);
 
   useEffect(() => {
     fitMapToRoute();

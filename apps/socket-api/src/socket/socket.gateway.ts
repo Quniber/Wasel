@@ -13,7 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 
 interface ConnectedClient {
   socketId: string;
-  oderId?: number;
+  orderId?: number;
   type: 'admin' | 'driver' | 'rider';
   userId: number;
   socket: Socket;
@@ -177,9 +177,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (clientInfo?.type === 'driver') {
       // Get the driver's current order if any
       const driver = this.drivers.get(clientInfo.userId);
-      if (driver?.oderId) {
+      if (driver?.orderId) {
         // Send location update to the rider of this order
-        this.emitToOrder(driver.oderId, 'driver:location', {
+        this.emitToOrder(driver.orderId, 'driver:location', {
           driverId: clientInfo.userId,
           ...data,
         });
@@ -201,7 +201,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (clientInfo?.type === 'driver') {
       const driver = this.drivers.get(clientInfo.userId);
       if (driver) {
-        driver.oderId = data.orderId;
+        driver.orderId = data.orderId;
       }
       // Join order room
       client.join(`order:${data.orderId}`);
@@ -384,7 +384,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   setDriverOrder(driverId: number, orderId: number | null) {
     const driver = this.drivers.get(driverId);
     if (driver) {
-      driver.oderId = orderId || undefined;
+      driver.orderId = orderId || undefined;
       if (orderId) {
         driver.socket.join(`order:${orderId}`);
       }

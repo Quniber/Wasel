@@ -454,6 +454,12 @@ export class OrdersService {
       data: { status: DriverStatus.online },
     });
 
+    // Notify rider via socket
+    this.socketService.emitToOrder(orderId, 'order:cancelled', {
+      orderId,
+      cancelledBy: 'driver',
+    });
+
     return { message: 'Order canceled successfully' };
   }
 
