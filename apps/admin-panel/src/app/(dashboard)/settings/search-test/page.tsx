@@ -40,7 +40,7 @@ export default function SearchTestPage() {
   const [biasLng, setBiasLng] = useState('51.5310');
   const [biasRadius, setBiasRadius] = useState('50000');
 
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const autocompleteServiceRef = useRef<any>(null);
   const placesServiceRef = useRef<any>(null);
 

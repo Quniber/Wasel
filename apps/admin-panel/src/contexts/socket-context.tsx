@@ -84,6 +84,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     });
 
+    // Order cancelled events
+    newSocket.on('order:cancelled', (data: { orderId: number; cancelledBy: string }) => {
+      console.log('[Socket] Order cancelled:', data);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    });
+
     newSocket.on('order:new', (data) => {
       console.log('[Socket] New order:', data);
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });

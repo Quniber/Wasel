@@ -483,6 +483,13 @@ export class OrdersService {
       });
     }
 
+    // Notify admins
+    this.socketService.notifyAdmins('order:cancelled', {
+      orderId,
+      cancelledBy: 'rider',
+      customerId,
+    });
+
     return updatedOrder;
   }
 

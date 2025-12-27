@@ -460,6 +460,13 @@ export class OrdersService {
       cancelledBy: 'driver',
     });
 
+    // Notify admins
+    this.socketService.notifyAdmins('order:cancelled', {
+      orderId,
+      cancelledBy: 'driver',
+      driverId,
+    });
+
     return { message: 'Order canceled successfully' };
   }
 
