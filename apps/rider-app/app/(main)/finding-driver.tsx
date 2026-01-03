@@ -143,7 +143,20 @@ export default function FindingDriverScreen() {
   };
 
   const handleCancel = async () => {
-    // Cancel the order
+    const { activeOrder } = useBookingStore.getState();
+
+    // Cancel the order in the database if we have an order ID
+    if (activeOrder?.id) {
+      try {
+        console.log('[FindingDriver] Cancelling order:', activeOrder.id);
+        await orderApi.cancelOrder(activeOrder.id);
+        socketService.leaveOrderRoom(Number(activeOrder.id));
+      } catch (error) {
+        console.error('[FindingDriver] Error cancelling order:', error);
+      }
+    }
+
+    // Reset local state
     resetBooking();
     router.replace('/(main)');
   };
