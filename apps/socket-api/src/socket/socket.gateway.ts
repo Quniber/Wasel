@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { RoomManager, DriverTracker, type LocationUpdate } from 'socket';
 
 interface ConnectedClient {
   socketId: string;
@@ -31,6 +32,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private logger = new Logger('SocketGateway');
+  private roomManager: RoomManager;
 
   // Store connected clients by type
   private admins = new Map<number, ConnectedClient>();
@@ -41,6 +43,12 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private socketToClient = new Map<string, { type: string; userId: number }>();
 
   constructor(private jwtService: JwtService) {}
+
+  // Initialize RoomManager after server is ready
+  afterInit(server: Server) {
+    this.roomManager = new RoomManager(server);
+    this.logger.log('Socket Gateway initialized with RoomManager');
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -93,6 +101,13 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         case 'driver':
           this.drivers.set(userId, connectedClient);
           client.join('drivers');
+          // Register driver with DriverTracker (with default location)
+          DriverTracker.setOnline(
+            userId,
+            client.id,
+            { latitude: 0, longitude: 0 }, // Will be updated when driver sends location
+            [] // Service IDs will be updated when driver goes online
+          );
           this.logger.log(`Driver ${userId} connected (socket: ${client.id})`);
           break;
         case 'rider':
@@ -126,6 +141,8 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
           break;
         case 'driver':
           this.drivers.delete(userId);
+          // Remove from DriverTracker
+          DriverTracker.setOffline(userId);
           this.logger.log(`Driver ${userId} disconnected`);
           // Notify admins about driver going offline
           this.emitToAdmins('driver:status', { driverId: userId, status: 'offline' });
@@ -145,16 +162,28 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('driver:online')
   handleDriverOnline(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { services?: number[] },
+    @MessageBody() data: { services?: number[]; location?: LocationUpdate },
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo?.type === 'driver') {
-      this.logger.log(`Driver ${clientInfo.userId} is now online with services: ${data?.services?.join(', ') || 'all'}`);
+      // Update DriverTracker with services and location
+      const location = data.location || { latitude: 0, longitude: 0 };
+      const services = data.services || [];
+
+      DriverTracker.setOnline(
+        clientInfo.userId,
+        client.id,
+        location,
+        services
+      );
+
+      this.logger.log(`Driver ${clientInfo.userId} is now online with services: ${services.join(', ') || 'all'}`);
       // Notify admins
       this.emitToAdmins('driver:status', {
         driverId: clientInfo.userId,
         status: 'online',
-        services: data?.services,
+        services: services,
+        location: location,
       });
     }
   }
@@ -163,6 +192,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDriverOffline(@ConnectedSocket() client: Socket) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo?.type === 'driver') {
+      DriverTracker.setOffline(clientInfo.userId);
       this.logger.log(`Driver ${clientInfo.userId} is now offline`);
       this.emitToAdmins('driver:status', { driverId: clientInfo.userId, status: 'offline' });
     }
@@ -175,6 +205,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo?.type === 'driver') {
+      // Update DriverTracker with new location
+      DriverTracker.updateLocation(clientInfo.userId, data);
+
       // Get the driver's current order if any
       const driver = this.drivers.get(clientInfo.userId);
       if (driver?.orderId) {
@@ -193,7 +226,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('order:accept')
-  handleOrderAccept(
+  async handleOrderAccept(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
@@ -203,12 +236,12 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (driver) {
         driver.orderId = data.orderId;
       }
-      // Join order room
-      client.join(`order:${data.orderId}`);
+      // Join order room using RoomManager
+      await this.roomManager.joinOrderRoom(client, data.orderId);
       this.logger.log(`Driver ${clientInfo.userId} accepted order ${data.orderId}`);
 
-      // Notify everyone in the order room (including rider)
-      this.server.to(`order:${data.orderId}`).emit('order:status', {
+      // Notify everyone in the order room (including rider) using emitToOrder
+      this.emitToOrder(data.orderId, 'order:status', {
         orderId: data.orderId,
         status: 'DriverAccepted',
         driverId: clientInfo.userId,
@@ -216,20 +249,19 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
           id: clientInfo.userId,
         },
       });
-      this.logger.log(`Emitted order:status DriverAccepted for order ${data.orderId}`);
     }
   }
 
   // ========== Rider Events ==========
 
   @SubscribeMessage('order:track')
-  handleOrderTrack(
+  async handleOrderTrack(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo?.type === 'rider') {
-      client.join(`order:${data.orderId}`);
+      await this.roomManager.joinOrderRoom(client, data.orderId);
       this.logger.log(`Rider ${clientInfo.userId} tracking order ${data.orderId}`);
     }
   }
@@ -237,13 +269,13 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========== Admin Events ==========
 
   @SubscribeMessage('admin:watch-order')
-  handleAdminWatchOrder(
+  async handleAdminWatchOrder(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo?.type === 'admin') {
-      client.join(`order:${data.orderId}`);
+      await this.roomManager.joinOrderRoom(client, data.orderId);
       this.logger.log(`Admin ${clientInfo.userId} watching order ${data.orderId}`);
     }
   }
@@ -251,25 +283,25 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========== Generic Order Room Events ==========
 
   @SubscribeMessage('join:order')
-  handleJoinOrder(
+  async handleJoinOrder(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo) {
-      client.join(`order:${data.orderId}`);
+      await this.roomManager.joinOrderRoom(client, data.orderId);
       this.logger.log(`${clientInfo.type} ${clientInfo.userId} joined order room ${data.orderId}`);
     }
   }
 
   @SubscribeMessage('leave:order')
-  handleLeaveOrder(
+  async handleLeaveOrder(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: number },
   ) {
     const clientInfo = this.socketToClient.get(client.id);
     if (clientInfo) {
-      client.leave(`order:${data.orderId}`);
+      await this.roomManager.leaveOrderRoom(client, data.orderId);
       this.logger.log(`${clientInfo.type} ${clientInfo.userId} left order room ${data.orderId}`);
     }
   }
@@ -291,9 +323,8 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         timestamp: new Date().toISOString(),
       };
 
-      // Broadcast to everyone in the order room
-      this.server.to(`order:${data.orderId}`).emit('chat:message', message);
-      this.logger.log(`Chat message from ${clientInfo.type} ${clientInfo.userId} in order ${data.orderId}`);
+      // Broadcast to everyone in the order room using emitToOrder
+      this.emitToOrder(data.orderId, 'chat:message', message);
     }
   }
 
@@ -343,7 +374,9 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitToOrder(orderId: number, event: string, data: any) {
-    this.server.to(`order:${orderId}`).emit(event, data);
+    // Use RoomManager for consistent room naming and emit
+    this.roomManager.emitToOrder(orderId, event, data);
+    this.logger.log(`Emitted ${event} to order room ${orderId}`);
   }
 
   emitToAll(event: string, data: any) {
@@ -353,7 +386,8 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========== Status Methods ==========
 
   isDriverOnline(driverId: number): boolean {
-    return this.drivers.has(driverId);
+    // Use DriverTracker for accurate online status
+    return DriverTracker.isOnline(driverId);
   }
 
   isRiderOnline(riderId: number): boolean {
@@ -361,7 +395,8 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   getOnlineDriverIds(): number[] {
-    return Array.from(this.drivers.keys());
+    // Use DriverTracker for accurate list of online drivers
+    return DriverTracker.getAllOnline().map(d => d.driverId);
   }
 
   getOnlineRiderIds(): number[] {
@@ -375,18 +410,20 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   getStats() {
     return {
       admins: this.admins.size,
-      drivers: this.drivers.size,
+      drivers: DriverTracker.getAllOnline().length,
       riders: this.riders.size,
     };
   }
 
   // Set order for driver (for location tracking)
-  setDriverOrder(driverId: number, orderId: number | null) {
+  async setDriverOrder(driverId: number, orderId: number | null) {
     const driver = this.drivers.get(driverId);
     if (driver) {
       driver.orderId = orderId || undefined;
       if (orderId) {
-        driver.socket.join(`order:${orderId}`);
+        // Use RoomManager to join order room
+        await this.roomManager.joinOrderRoom(driver.socket, orderId);
+        this.logger.log(`Driver ${driverId} assigned to order ${orderId}`);
       }
     }
   }
