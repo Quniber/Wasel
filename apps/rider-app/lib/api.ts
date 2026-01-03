@@ -260,7 +260,7 @@ export const orderApi = {
   getOrderDetails: (orderId: string) => api.get(`/orders/${orderId}`),
 
   cancelOrder: (orderId: string, reasonId?: string, note?: string) =>
-    api.post(`/orders/${orderId}/cancel`, { reasonId, note }),
+    api.patch(`/orders/${orderId}/cancel`, { reasonId, note }),
 
   rateDriver: (orderId: string, score: number, review?: string) =>
     api.post(`/orders/${orderId}/feedback`, { score, review }),
