@@ -475,6 +475,14 @@ export class OrdersService {
       },
     });
 
+    // Set driver back to online (if assigned)
+    if (order.driverId) {
+      await this.prisma.driver.update({
+        where: { id: order.driverId },
+        data: { status: 'online' as any },
+      });
+    }
+
     // Broadcast to order room (notifies everyone: rider, driver, admins watching)
     this.socketService.emitToOrder(orderId, 'order:cancelled', {
       orderId,
