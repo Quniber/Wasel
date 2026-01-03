@@ -502,4 +502,35 @@ export class DriversService {
       throw error;
     }
   }
+
+  async resetStuckDrivers() {
+    // Find all drivers stuck on cancelled/expired orders
+    const stuckDrivers = await this.prisma.$queryRaw<Array<{ id: number; firstName: string; status: string; orderId: number }>>`
+      SELECT d.id, d.firstName, d.status, o.id as orderId
+      FROM Driver d
+      INNER JOIN \`Order\` o ON o.driverId = d.id
+      WHERE o.status IN ('RiderCanceled', 'DriverCanceled', 'Expired')
+      AND d.status != 'online'
+    `;
+
+    if (stuckDrivers.length === 0) {
+      return { message: 'No stuck drivers found', count: 0 };
+    }
+
+    // Reset them all to online
+    const result = await this.prisma.$executeRaw`
+      UPDATE Driver d
+      INNER JOIN \`Order\` o ON o.driverId = d.id
+      SET d.status = 'online'
+      WHERE o.status IN ('RiderCanceled', 'DriverCanceled', 'Expired')
+      AND d.status != 'online'
+    `;
+
+    return {
+      message: `Reset ${stuckDrivers.length} stuck driver(s) to online`,
+      count: stuckDrivers.length,
+      drivers: stuckDrivers,
+      updated: result,
+    };
+  }
 }

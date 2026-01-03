@@ -240,4 +240,10 @@ export class DriversController {
       body.expiryDate ? new Date(body.expiryDate) : undefined,
     );
   }
+
+  // Fix stuck drivers (maintenance endpoint)
+  @Post('reset-stuck')
+  resetStuckDrivers() {
+    return this.driversService.resetStuckDrivers();
+  }
 }
