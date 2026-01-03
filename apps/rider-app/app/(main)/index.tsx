@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Platform, ActivityIndicator, Modal, ScrollView, Switch } from 'react-native';
-import { router, useNavigation } from 'expo-router';
+import { router, useNavigation, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import * as Location from 'expo-location';
+import { useCallback } from 'react';
 import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -35,6 +36,17 @@ export default function HomeScreen() {
   useEffect(() => {
     getCurrentLocation();
   }, []);
+
+  // Refetch current location when screen comes into focus (e.g., after canceling a ride)
+  useFocusEffect(
+    useCallback(() => {
+      // Only refetch if pickup is not set (e.g., after resetBooking was called)
+      if (!pickup && _hasHydrated) {
+        console.log('[Home] Screen focused with no pickup, refetching location');
+        getCurrentLocation();
+      }
+    }, [pickup, _hasHydrated])
+  );
 
   // Check for active order on app load and verify with server
   useEffect(() => {
