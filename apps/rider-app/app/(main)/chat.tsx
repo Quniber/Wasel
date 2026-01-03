@@ -25,6 +25,8 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isInRoom, setIsInRoom] = useState(false);
 
   const quickReplies = [
     { key: 'onMyWay', label: t('chat.quickReplies.onMyWay') },
@@ -32,6 +34,34 @@ export default function ChatScreen() {
     { key: 'outside', label: t('chat.quickReplies.outside') },
     { key: 'callMe', label: t('chat.quickReplies.callMe') },
   ];
+
+  // Ensure socket is connected and in order room
+  useEffect(() => {
+    if (!activeOrder?.id) return;
+
+    const setupChat = async () => {
+      console.log('[Chat] Setting up chat for order:', activeOrder.id);
+
+      // Ensure socket is connected
+      await socketService.connect();
+      console.log('[Chat] Socket connected');
+      setIsConnected(true);
+
+      // Join order room
+      socketService.joinOrderRoom(activeOrder.id);
+      console.log('[Chat] Joined order room:', activeOrder.id);
+      setIsInRoom(true);
+    };
+
+    setupChat();
+
+    return () => {
+      if (activeOrder?.id) {
+        console.log('[Chat] Leaving order room:', activeOrder.id);
+        // Don't leave room here - let ride-active manage it
+      }
+    };
+  }, [activeOrder?.id]);
 
   useEffect(() => {
     // Listen for incoming messages (matches driver app event name)
@@ -42,6 +72,8 @@ export default function ChatScreen() {
       content: string;
       timestamp: string;
     }) => {
+      console.log('[Chat] Received message:', data);
+
       const newMessage: ChatMessage = {
         id: `${data.senderId}-${data.timestamp}`,
         text: data.content,
@@ -66,13 +98,26 @@ export default function ChatScreen() {
   const sendMessage = (text: string) => {
     if (!text.trim()) return;
 
+    // Validate socket connection and room membership
+    if (!isConnected || !isInRoom) {
+      console.warn('[Chat] Cannot send message: socket not connected or not in room');
+      return;
+    }
+
+    if (!activeOrder?.id) {
+      console.warn('[Chat] Cannot send message: no active order');
+      return;
+    }
+
     const messageText = text.trim();
     setMessage('');
+
+    console.log('[Chat] Sending message:', { orderId: activeOrder.id, content: messageText });
 
     // Send via socket (matches driver app event name)
     // Message will come back via 'chat:message' event and be displayed
     socketService.emit('chat:send', {
-      orderId: activeOrder?.id ? Number(activeOrder.id) : undefined,
+      orderId: Number(activeOrder.id),
       content: messageText,
     });
 
@@ -115,7 +160,7 @@ export default function ChatScreen() {
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`} edges={['top']}>
       {/* Header */}
       <View className={`flex-row items-center px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
+        <TouchableOpacity onPress={() => router.replace('/(main)/ride-active')} className="w-10 h-10 items-center justify-center">
           <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
         </TouchableOpacity>
         <View className="flex-row items-center flex-1 ml-2">

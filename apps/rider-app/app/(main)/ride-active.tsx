@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Platform, Linking, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Linking, Image, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,10 +115,27 @@ export default function RideActiveScreen() {
     // Listen for ride cancelled event
     const cancelledUnsub = socketService.on('order:cancelled', (data) => {
       console.log('[RideActive] Order cancelled by:', data.cancelledBy);
-      // Reset booking and go home regardless of who cancelled
-      resetBooking();
-      router.replace('/(main)');
-      // TODO: Show alert with cancellation reason
+
+      // Show alert to user explaining the cancellation
+      const cancelledBy = data.cancelledBy === 'driver' ? t('common.driver') : t('common.rider');
+      Alert.alert(
+        t('ride.cancelled.title'),
+        t('ride.cancelled.message', { who: cancelledBy }),
+        [
+          {
+            text: t('common.ok'),
+            onPress: () => {
+              // Reset booking and go home after user acknowledges
+              resetBooking();
+              if (activeOrder) {
+                socketService.leaveOrderRoom(activeOrder.id);
+              }
+              router.replace('/(main)');
+            }
+          }
+        ],
+        { cancelable: false }
+      );
     });
 
     return () => {

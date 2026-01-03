@@ -19,7 +19,9 @@
     "next": "Next",
     "submit": "Submit",
     "search": "Search",
-    "close": "Close"
+    "close": "Close",
+    "driver": "Driver",
+    "rider": "Rider"
   },
   "auth": {
     "welcome": {
@@ -122,7 +124,9 @@
     "completeRide": "Complete Ride",
     "cancelTitle": "Cancel Ride?",
     "cancelMessage": "Are you sure you want to cancel this ride?",
-    "noActiveRide": "No active ride"
+    "noActiveRide": "No active ride",
+    "rideCancelled": "Ride Cancelled",
+    "riderCancelledRide": "The rider has cancelled this ride"
   },
   "rideComplete": {
     "title": "Ride Complete!",

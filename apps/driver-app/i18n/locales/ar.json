@@ -19,7 +19,9 @@
     "next": "التالي",
     "submit": "إرسال",
     "search": "بحث",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "driver": "السائق",
+    "rider": "الراكب"
   },
   "auth": {
     "welcome": {
@@ -142,7 +144,9 @@
       "wrongLocation": "موقع الإقلاع خاطئ",
       "emergency": "حالة طوارئ",
       "other": "سبب آخر"
-    }
+    },
+    "rideCancelled": "تم إلغاء الرحلة",
+    "riderCancelledRide": "قام الراكب بإلغاء هذه الرحلة"
   },
   "earnings": {
     "title": "الأرباح",

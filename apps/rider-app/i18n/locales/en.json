@@ -19,7 +19,9 @@
     "next": "Next",
     "submit": "Submit",
     "search": "Search",
-    "close": "Close"
+    "close": "Close",
+    "driver": "Driver",
+    "rider": "Rider"
   },
   "auth": {
     "welcome": {
@@ -157,6 +159,10 @@
       "title": "Cancel Ride",
       "confirm": "Are you sure you want to cancel?",
       "fee": "Cancellation fee may apply"
+    },
+    "cancelled": {
+      "title": "Ride Cancelled",
+      "message": "This ride has been cancelled by {{who}}"
     },
     "call": "Call",
     "chat": "Chat"

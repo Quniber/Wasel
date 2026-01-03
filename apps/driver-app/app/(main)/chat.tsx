@@ -25,6 +25,8 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [isInRoom, setIsInRoom] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const quickMessages = [
@@ -33,6 +35,34 @@ export default function ChatScreen() {
     t('chat.waitingOutside'),
     t('chat.trafficDelay'),
   ];
+
+  // Ensure socket is connected and in order room
+  useEffect(() => {
+    if (!activeRide?.orderId) return;
+
+    const setupChat = async () => {
+      console.log('[Chat] Setting up chat for order:', activeRide.orderId);
+
+      // Ensure socket is connected
+      await socketService.connect();
+      console.log('[Chat] Socket connected');
+      setIsConnected(true);
+
+      // Join order room
+      socketService.joinOrderRoom(activeRide.orderId);
+      console.log('[Chat] Joined order room:', activeRide.orderId);
+      setIsInRoom(true);
+    };
+
+    setupChat();
+
+    return () => {
+      if (activeRide?.orderId) {
+        console.log('[Chat] Leaving order room:', activeRide.orderId);
+        // Don't leave room here - let active-ride manage it
+      }
+    };
+  }, [activeRide?.orderId]);
 
   useEffect(() => {
     // Listen for incoming messages from backend
@@ -44,6 +74,8 @@ export default function ChatScreen() {
       content: string;
       timestamp: string;
     }) => {
+      console.log('[Chat] Received message:', data);
+
       // Only show messages from the rider (we already added our own messages locally)
       if (data.senderType === 'rider') {
         const newMessage: Message = {
@@ -62,23 +94,38 @@ export default function ChatScreen() {
   }, []);
 
   const sendMessage = (text: string) => {
-    if (!text.trim() || !activeRide) return;
+    if (!text.trim()) return;
+
+    // Validate socket connection and room membership
+    if (!isConnected || !isInRoom) {
+      console.warn('[Chat] Cannot send message: socket not connected or not in room');
+      return;
+    }
+
+    if (!activeRide?.orderId) {
+      console.warn('[Chat] Cannot send message: no active ride');
+      return;
+    }
+
+    const messageText = text.trim();
+    setInputText('');
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      text: text.trim(),
+      text: messageText,
       sender: 'driver',
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
+
+    console.log('[Chat] Sending message:', { orderId: activeRide.orderId, content: messageText });
 
     // Send via socket using 'chat:send' event
     // Backend expects: { orderId, content }
     socketService.emit('chat:send', {
       orderId: activeRide.orderId,
-      content: text.trim(),
+      content: messageText,
     });
 
     // Scroll to bottom
@@ -126,7 +173,7 @@ export default function ChatScreen() {
         style={{ borderColor: colors.border }}
       >
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace('/(main)/active-ride')}
           className="w-10 h-10 rounded-full items-center justify-center"
           style={{ backgroundColor: colors.secondary }}
         >
