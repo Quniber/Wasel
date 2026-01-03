@@ -193,10 +193,42 @@ export default function RideActiveScreen() {
     router.push('/(main)/chat');
   };
 
-  const handleCancel = () => {
-    // TODO: Show confirmation dialog and cancel via API
-    resetBooking();
-    router.replace('/(main)');
+  const handleCancel = async () => {
+    if (!activeOrder?.id) return;
+
+    // Show confirmation dialog
+    Alert.alert(
+      t('ride.cancel.title'),
+      t('ride.cancel.confirm'),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('common.ok'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('[RideActive] Rider cancelling order:', activeOrder.id);
+
+              // Cancel order via API - this will notify driver via socket
+              await orderApi.cancelOrder(activeOrder.id);
+
+              // Leave socket room
+              socketService.leaveOrderRoom(Number(activeOrder.id));
+
+              // Reset local state
+              resetBooking();
+              router.replace('/(main)');
+            } catch (error) {
+              console.error('[RideActive] Error cancelling order:', error);
+              Alert.alert(t('common.error'), t('errors.generic'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Show loading while hydrating, fetching order details, or if no active order

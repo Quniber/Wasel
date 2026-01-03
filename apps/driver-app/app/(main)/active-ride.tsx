@@ -46,15 +46,27 @@ export default function ActiveRideScreen() {
     socketService.joinOrderRoom(activeRide.orderId);
 
     // Listen for order cancellation from rider
-    const unsubscribeCancelled = socketService.on('order:cancelled', (data: { orderId: number; reason?: string }) => {
+    const unsubscribeCancelled = socketService.on('order:cancelled', (data: { orderId: number; reason?: string; cancelledBy?: string }) => {
       if (data.orderId === activeRide.orderId) {
+        console.log('[ActiveRide] Order cancelled by:', data.cancelledBy);
+
         Alert.alert(
           t('activeRide.rideCancelled'),
           data.reason || t('activeRide.riderCancelledRide'),
-          [{ text: t('common.ok'), onPress: () => {
-            setActiveRide(null);
-            // No need to navigate - state change will show home screen
-          }}]
+          [{
+            text: t('common.ok'),
+            onPress: () => {
+              // Leave socket room
+              socketService.leaveOrderRoom(activeRide.orderId);
+
+              // Clear active ride
+              setActiveRide(null);
+
+              // Navigate back to home
+              router.replace('/(main)');
+            }
+          }],
+          { cancelable: false }
         );
       }
     });
