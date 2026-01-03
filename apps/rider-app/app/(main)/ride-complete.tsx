@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, useEffect } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,8 +22,15 @@ export default function RideCompleteScreen() {
     router.replace('/(main)');
   };
 
+  // Handle missing activeOrder in useEffect, not during render
+  useEffect(() => {
+    if (!activeOrder) {
+      resetBooking();
+      router.replace('/(main)');
+    }
+  }, [activeOrder]);
+
   if (!activeOrder) {
-    handleDone();
     return null;
   }
 
