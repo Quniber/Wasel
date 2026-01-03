@@ -88,6 +88,12 @@ export class DriversController {
     }
   }
 
+  // Fix stuck drivers (maintenance endpoint) - MUST be before :id routes
+  @Post('reset-stuck')
+  resetStuckDrivers() {
+    return this.driversService.resetStuckDrivers();
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.driversService.findOne(id);
@@ -239,11 +245,5 @@ export class DriversController {
       body.mimeType,
       body.expiryDate ? new Date(body.expiryDate) : undefined,
     );
-  }
-
-  // Fix stuck drivers (maintenance endpoint)
-  @Post('reset-stuck')
-  resetStuckDrivers() {
-    return this.driversService.resetStuckDrivers();
   }
 }
