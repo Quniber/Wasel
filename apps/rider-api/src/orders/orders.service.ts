@@ -475,15 +475,14 @@ export class OrdersService {
       },
     });
 
-    // Notify driver via socket
-    if (order.driverId) {
-      this.socketService.notifyDriver(order.driverId, 'order:cancelled', {
-        orderId,
-        cancelledBy: 'rider',
-      });
-    }
+    // Broadcast to order room (notifies everyone: rider, driver, admins watching)
+    this.socketService.emitToOrder(orderId, 'order:cancelled', {
+      orderId,
+      cancelledBy: 'rider',
+      customerId,
+    });
 
-    // Notify admins
+    // Also notify admins dashboard
     this.socketService.notifyAdmins('order:cancelled', {
       orderId,
       cancelledBy: 'rider',

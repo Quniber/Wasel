@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Platform, Linking, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Linking, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,21 +8,26 @@ import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOO
 import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
+import { orderApi } from '@/lib/api';
+import { getColors } from '@/constants/Colors';
 
 type RideStatus = 'driver_on_way' | 'driver_arrived' | 'trip_started';
 
 export default function RideActiveScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { activeOrder, updateDriverLocation, updateOrderStatus, resetBooking, _hasHydrated } = useBookingStore();
+  const { activeOrder, setActiveOrder, updateDriverLocation, updateOrderStatus, resetBooking, _hasHydrated } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
 
   const mapRef = useRef<MapView>(null);
   const [status, setStatus] = useState<RideStatus>('driver_on_way');
   const [eta, setEta] = useState(5);
+  const [isLoading, setIsLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
 
+  // Fetch order details from server if driver info is missing
   useEffect(() => {
-    // Wait for store to hydrate before checking activeOrder
     if (!_hasHydrated) return;
 
     if (!activeOrder) {
@@ -30,11 +35,60 @@ export default function RideActiveScreen() {
       return;
     }
 
+    const fetchOrderDetails = async () => {
+      // If we have driver info, we're good
+      if (activeOrder.driver) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch full order details from server
+      try {
+        console.log('[RideActive] Fetching order details for:', activeOrder.id);
+        const response = await orderApi.getOrderDetails(String(activeOrder.id));
+        if (response.data) {
+          const order = response.data;
+          // Update the active order with full details including driver
+          setActiveOrder({
+            ...activeOrder,
+            driver: order.driver ? {
+              id: order.driver.id,
+              firstName: order.driver.firstName,
+              lastName: order.driver.lastName,
+              mobileNumber: order.driver.mobileNumber,
+              rating: order.driver.rating || 5.0,
+              carModel: order.driver.carModel || '',
+              carColor: order.driver.carColor || '',
+              carPlate: order.driver.carPlate || '',
+              latitude: order.driver.latitude || activeOrder.pickup.latitude,
+              longitude: order.driver.longitude || activeOrder.pickup.longitude,
+            } : null,
+          });
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('[RideActive] Error fetching order details:', error);
+        // If we can't fetch order, go back to home
+        resetBooking();
+        router.replace('/(main)');
+      }
+    };
+
+    fetchOrderDetails();
+  }, [activeOrder?.id, _hasHydrated]);
+
+  // Setup socket connection and listeners
+  useEffect(() => {
+    if (!_hasHydrated || !activeOrder) return;
+
     // Ensure socket is connected and join order room
     const setupSocket = async () => {
       await socketService.connect();
+      // Wait a moment for socket to fully connect
+      await new Promise(resolve => setTimeout(resolve, 500));
       socketService.joinOrderRoom(activeOrder.id);
       console.log('[RideActive] Joined order room:', activeOrder.id);
+      setSocketConnected(true);
     };
     setupSocket();
 
@@ -60,11 +114,11 @@ export default function RideActiveScreen() {
 
     // Listen for ride cancelled event
     const cancelledUnsub = socketService.on('order:cancelled', (data) => {
-      if (data.cancelledBy === 'driver') {
-        // TODO: Show alert that driver cancelled
-        resetBooking();
-        router.replace('/(main)');
-      }
+      console.log('[RideActive] Order cancelled by:', data.cancelledBy);
+      // Reset booking and go home regardless of who cancelled
+      resetBooking();
+      router.replace('/(main)');
+      // TODO: Show alert with cancellation reason
     });
 
     return () => {
@@ -79,7 +133,7 @@ export default function RideActiveScreen() {
 
   useEffect(() => {
     fitMapToRoute();
-  }, [status, activeOrder?.driver]);
+  }, [status, activeOrder?.driver?.latitude, activeOrder?.driver?.longitude]);
 
   const fitMapToRoute = () => {
     if (!activeOrder || !mapRef.current) return;
@@ -128,11 +182,17 @@ export default function RideActiveScreen() {
     router.replace('/(main)');
   };
 
-  // Show loading while hydrating or if no active order
-  if (!_hasHydrated || !activeOrder || !activeOrder.driver) {
+  // Show loading while hydrating, fetching order details, or if no active order
+  if (!_hasHydrated || isLoading || !activeOrder || !activeOrder.driver) {
     return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <Text className="text-muted-foreground">{t('common.loading')}</Text>
+      <SafeAreaView
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: colors.background }}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.mutedForeground }} className="mt-4">
+          {t('common.loading')}
+        </Text>
       </SafeAreaView>
     );
   }

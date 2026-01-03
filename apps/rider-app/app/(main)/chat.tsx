@@ -42,17 +42,20 @@ export default function ChatScreen() {
       content: string;
       timestamp: string;
     }) => {
-      // Only show messages from the driver (we already added our own messages locally)
-      if (data.senderType === 'driver') {
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: data.content,
-          senderId: data.senderId.toString(),
-          timestamp: new Date(data.timestamp),
-          isDriver: true,
-        };
-        setMessages((prev) => [...prev, newMessage]);
-      }
+      const newMessage: ChatMessage = {
+        id: `${data.senderId}-${data.timestamp}`,
+        text: data.content,
+        senderId: data.senderId.toString(),
+        timestamp: new Date(data.timestamp),
+        isDriver: data.senderType === 'driver',
+      };
+
+      // Check if message already exists (avoid duplicates)
+      setMessages((prev) => {
+        const exists = prev.some(msg => msg.id === newMessage.id);
+        if (exists) return prev;
+        return [...prev, newMessage];
+      });
     });
 
     return () => {
@@ -63,27 +66,20 @@ export default function ChatScreen() {
   const sendMessage = (text: string) => {
     if (!text.trim()) return;
 
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: text.trim(),
-      senderId: 'rider',
-      timestamp: new Date(),
-      isDriver: false,
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const messageText = text.trim();
     setMessage('');
 
     // Send via socket (matches driver app event name)
+    // Message will come back via 'chat:message' event and be displayed
     socketService.emit('chat:send', {
       orderId: activeOrder?.id ? Number(activeOrder.id) : undefined,
-      content: text.trim(),
+      content: messageText,
     });
 
-    // Scroll to bottom
+    // Scroll to bottom after a brief delay for the message to arrive
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    }, 200);
   };
 
   const handleQuickReply = (text: string) => {
