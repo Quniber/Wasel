@@ -129,18 +129,11 @@ export const sessionManager = {
     ]);
   },
 
-  // Logout - call API to revoke session then clear local storage
+  // Logout - clear local storage
   async logout(): Promise<void> {
-    try {
-      const { refreshToken } = await this.getTokens();
-      if (refreshToken) {
-        await api.post('/sessions/logout', { refreshToken });
-      }
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      await this.clearSession();
-    }
+    // Note: Session revocation endpoint not yet implemented in driver-api
+    // For now, just clear local storage
+    await this.clearSession();
   },
 
   // Store user data
@@ -201,14 +194,10 @@ export const sessionManager = {
 
   // Logout from all devices
   async logoutEverywhere(): Promise<boolean> {
-    try {
-      await api.post('/sessions/revoke-all');
-      await this.clearSession();
-      return true;
-    } catch (error) {
-      console.error('Failed to logout everywhere:', error);
-      return false;
-    }
+    // Note: Session revocation endpoint not yet implemented in driver-api
+    // For now, just clear local storage
+    await this.clearSession();
+    return true;
   },
 };
 
