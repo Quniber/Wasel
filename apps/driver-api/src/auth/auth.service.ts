@@ -297,6 +297,10 @@ export class AuthService {
         status: driver.status,
         rating: driver.rating,
         reviewCount: driver.reviewCount,
+        carModelId: driver.carModelId,
+        carColorId: driver.carColorId,
+        carPlate: driver.carPlate,
+        carProductionYear: driver.carProductionYear,
       },
     };
   }
