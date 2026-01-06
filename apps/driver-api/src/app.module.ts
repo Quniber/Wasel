@@ -8,6 +8,7 @@ import { EarningsModule } from './earnings/earnings.module';
 import { ServicesModule } from './services/services.module';
 import { PaymentModule } from './payment/payment.module';
 import { SocketModule } from './socket/socket.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SocketModule } from './socket/socket.module';
     ServicesModule,
     PaymentModule,
     SocketModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

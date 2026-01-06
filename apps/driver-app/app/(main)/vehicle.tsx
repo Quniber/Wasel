@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { getColors } from '@/constants/Colors';
-import { authApi } from '@/lib/api';
+import { authApi, vehicleApi } from '@/lib/api';
 
 interface Vehicle {
   id: string;
@@ -16,6 +16,23 @@ interface Vehicle {
   color: string;
   plateNumber: string;
   type: string;
+  carModelId?: number;
+  carColorId?: number;
+}
+
+interface CarModel {
+  id: number;
+  brand: string;
+  model: string;
+  year?: number;
+  isActive: boolean;
+}
+
+interface CarColor {
+  id: number;
+  name: string;
+  hexCode?: string;
+  isActive: boolean;
 }
 
 export default function VehicleScreen() {
@@ -29,13 +46,32 @@ export default function VehicleScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Car models and colors
+  const [carModels, setCarModels] = useState<CarModel[]>([]);
+  const [carColors, setCarColors] = useState<CarColor[]>([]);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
   // Edit form state
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  const [selectedColorId, setSelectedColorId] = useState<number | null>(null);
   const [year, setYear] = useState('');
-  const [color, setColor] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
   const [vehicleType, setVehicleType] = useState('sedan');
+
+  // Helper to get selected model display text
+  const getSelectedModelText = () => {
+    if (!selectedModelId) return '';
+    const model = carModels.find(m => m.id === selectedModelId);
+    return model ? `${model.brand} ${model.model}` : '';
+  };
+
+  // Helper to get selected color display text
+  const getSelectedColorText = () => {
+    if (!selectedColorId) return '';
+    const color = carColors.find(c => c.id === selectedColorId);
+    return color ? color.name : '';
+  };
 
   const vehicleTypes = [
     { value: 'sedan', label: t('vehicle.sedan'), icon: 'car-outline' as const },
@@ -45,7 +81,21 @@ export default function VehicleScreen() {
 
   useEffect(() => {
     fetchVehicle();
+    fetchCarModelsAndColors();
   }, []);
+
+  const fetchCarModelsAndColors = async () => {
+    try {
+      const [modelsRes, colorsRes] = await Promise.all([
+        vehicleApi.getCarModels(),
+        vehicleApi.getCarColors(),
+      ]);
+      setCarModels(modelsRes.data || []);
+      setCarColors(colorsRes.data || []);
+    } catch (error) {
+      console.error('Error fetching car data:', error);
+    }
+  };
 
   const fetchVehicle = async () => {
     setIsLoading(true);
@@ -61,13 +111,14 @@ export default function VehicleScreen() {
         color: profile.carColor?.nameEn || '',
         plateNumber: profile.carPlate || '',
         type: 'sedan', // Default type
+        carModelId: profile.carModelId,
+        carColorId: profile.carColorId,
       };
       setVehicle(vehicleData);
       // Populate form
-      setMake(vehicleData.make || '');
-      setModel(vehicleData.model || '');
+      setSelectedModelId(profile.carModelId || null);
+      setSelectedColorId(profile.carColorId || null);
       setYear(vehicleData.year?.toString() || '');
-      setColor(vehicleData.color || '');
       setPlateNumber(vehicleData.plateNumber || '');
       setVehicleType(vehicleData.type || 'sedan');
     } catch (error) {
@@ -78,17 +129,19 @@ export default function VehicleScreen() {
   };
 
   const handleSave = async () => {
-    if (!plateNumber || !year) {
+    if (!plateNumber || !year || !selectedModelId || !selectedColorId) {
       Alert.alert(t('errors.validationError'), t('errors.fillAllFields'));
       return;
     }
 
     setIsSaving(true);
     try {
-      // Update via profile API - only carPlate and carProductionYear are directly editable
+      // Update via profile API
       await authApi.updateProfile({
         carPlate: plateNumber,
         carProductionYear: parseInt(year),
+        carModelId: selectedModelId,
+        carColorId: selectedColorId,
       });
       await fetchVehicle();
       setIsEditing(false);
@@ -102,10 +155,9 @@ export default function VehicleScreen() {
 
   const cancelEdit = () => {
     if (vehicle) {
-      setMake(vehicle.make || '');
-      setModel(vehicle.model || '');
+      setSelectedModelId(vehicle.carModelId || null);
+      setSelectedColorId(vehicle.carColorId || null);
       setYear(vehicle.year?.toString() || '');
-      setColor(vehicle.color || '');
       setPlateNumber(vehicle.plateNumber || '');
       setVehicleType(vehicle.type || 'sedan');
     }
@@ -205,45 +257,28 @@ export default function VehicleScreen() {
           </View>
 
           {/* Form Fields */}
-          <View className="flex-row gap-3 mb-4">
-            <View className="flex-1">
-              <Text style={{ color: colors.foreground }} className="mb-2 font-medium">
-                {t('vehicle.make')}
+          <View className="mb-4">
+            <Text style={{ color: colors.foreground }} className="mb-2 font-medium">
+              {t('vehicle.model')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => isEditing && setShowModelPicker(true)}
+              disabled={!isEditing}
+              style={{
+                backgroundColor: isEditing ? colors.secondary : colors.muted,
+                borderColor: colors.border,
+                borderWidth: 1,
+              }}
+              className="px-4 py-3 rounded-xl flex-row items-center justify-between"
+            >
+              <Text
+                style={{ color: getSelectedModelText() ? colors.foreground : colors.mutedForeground }}
+                className="text-base"
+              >
+                {getSelectedModelText() || 'Select car model'}
               </Text>
-              <TextInput
-                style={{
-                  backgroundColor: isEditing ? colors.secondary : colors.muted,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  color: colors.foreground,
-                }}
-                className="px-4 py-3 rounded-xl text-base"
-                value={make}
-                onChangeText={setMake}
-                editable={isEditing}
-                placeholder="Toyota"
-                placeholderTextColor={colors.mutedForeground}
-              />
-            </View>
-            <View className="flex-1">
-              <Text style={{ color: colors.foreground }} className="mb-2 font-medium">
-                {t('vehicle.model')}
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: isEditing ? colors.secondary : colors.muted,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  color: colors.foreground,
-                }}
-                className="px-4 py-3 rounded-xl text-base"
-                value={model}
-                onChangeText={setModel}
-                editable={isEditing}
-                placeholder="Camry"
-                placeholderTextColor={colors.mutedForeground}
-              />
-            </View>
+              {isEditing && <Ionicons name="chevron-down" size={20} color={colors.mutedForeground} />}
+            </TouchableOpacity>
           </View>
 
           <View className="flex-row gap-3 mb-4">
@@ -272,20 +307,24 @@ export default function VehicleScreen() {
               <Text style={{ color: colors.foreground }} className="mb-2 font-medium">
                 {t('vehicle.color')}
               </Text>
-              <TextInput
+              <TouchableOpacity
+                onPress={() => isEditing && setShowColorPicker(true)}
+                disabled={!isEditing}
                 style={{
                   backgroundColor: isEditing ? colors.secondary : colors.muted,
                   borderColor: colors.border,
                   borderWidth: 1,
-                  color: colors.foreground,
                 }}
-                className="px-4 py-3 rounded-xl text-base"
-                value={color}
-                onChangeText={setColor}
-                editable={isEditing}
-                placeholder="White"
-                placeholderTextColor={colors.mutedForeground}
-              />
+                className="px-4 py-3 rounded-xl flex-row items-center justify-between"
+              >
+                <Text
+                  style={{ color: getSelectedColorText() ? colors.foreground : colors.mutedForeground }}
+                  className="text-base"
+                >
+                  {getSelectedColorText() || 'Select color'}
+                </Text>
+                {isEditing && <Ionicons name="chevron-down" size={20} color={colors.mutedForeground} />}
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -327,6 +366,115 @@ export default function VehicleScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* Car Model Picker Modal */}
+      <Modal
+        visible={showModelPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowModelPicker(false)}
+      >
+        <View className="flex-1 bg-black/50">
+          <View className="flex-1" />
+          <View
+            className="rounded-t-3xl"
+            style={{ backgroundColor: colors.background, maxHeight: '70%' }}
+          >
+            <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
+              <View className="flex-row items-center justify-between">
+                <Text style={{ color: colors.foreground }} className="text-xl font-bold">
+                  Select Car Model
+                </Text>
+                <TouchableOpacity onPress={() => setShowModelPicker(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <ScrollView className="px-4">
+              {carModels.filter(m => m.isActive).map((model) => (
+                <TouchableOpacity
+                  key={model.id}
+                  onPress={() => {
+                    setSelectedModelId(model.id);
+                    setShowModelPicker(false);
+                  }}
+                  className="py-4 border-b flex-row items-center justify-between"
+                  style={{ borderColor: colors.border }}
+                >
+                  <View>
+                    <Text style={{ color: colors.foreground }} className="text-base font-medium">
+                      {model.brand} {model.model}
+                    </Text>
+                    {model.year && (
+                      <Text style={{ color: colors.mutedForeground }} className="text-sm">
+                        {model.year}
+                      </Text>
+                    )}
+                  </View>
+                  {selectedModelId === model.id && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Car Color Picker Modal */}
+      <Modal
+        visible={showColorPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowColorPicker(false)}
+      >
+        <View className="flex-1 bg-black/50">
+          <View className="flex-1" />
+          <View
+            className="rounded-t-3xl"
+            style={{ backgroundColor: colors.background, maxHeight: '70%' }}
+          >
+            <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
+              <View className="flex-row items-center justify-between">
+                <Text style={{ color: colors.foreground }} className="text-xl font-bold">
+                  Select Car Color
+                </Text>
+                <TouchableOpacity onPress={() => setShowColorPicker(false)}>
+                  <Ionicons name="close" size={24} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <ScrollView className="px-4">
+              {carColors.filter(c => c.isActive).map((color) => (
+                <TouchableOpacity
+                  key={color.id}
+                  onPress={() => {
+                    setSelectedColorId(color.id);
+                    setShowColorPicker(false);
+                  }}
+                  className="py-4 border-b flex-row items-center justify-between"
+                  style={{ borderColor: colors.border }}
+                >
+                  <View className="flex-row items-center">
+                    {color.hexCode && (
+                      <View
+                        className="w-8 h-8 rounded-full mr-3"
+                        style={{ backgroundColor: color.hexCode, borderColor: colors.border, borderWidth: 1 }}
+                      />
+                    )}
+                    <Text style={{ color: colors.foreground }} className="text-base font-medium">
+                      {color.name}
+                    </Text>
+                  </View>
+                  {selectedColorId === color.id && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

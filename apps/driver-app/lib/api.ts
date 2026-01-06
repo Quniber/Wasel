@@ -370,4 +370,13 @@ export const notificationApi = {
   markAllAsRead: () => api.patch('/notifications/read-all'),
 };
 
+// Vehicle APIs - get car models and colors (public endpoints)
+export const vehicleApi = {
+  // Get available car models
+  getCarModels: () => api.get('/settings/car-models'),
+
+  // Get available car colors
+  getCarColors: () => api.get('/settings/car-colors'),
+};
+
 export default api;
