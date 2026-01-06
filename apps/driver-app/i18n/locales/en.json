@@ -67,6 +67,10 @@
       "signIn": "Sign In",
       "usePhone": "Use Phone Instead"
     },
+    "register": {
+      "enterName": "Enter Your Name",
+      "nameRequired": "Please enter your first name to continue"
+    },
     "profile": {
       "setupTitle": "Complete Your Profile",
       "setupSubtitle": "Help riders know who you are",
@@ -426,6 +430,7 @@
     "network": "Network error. Please check your connection.",
     "invalidCredentials": "Invalid email or password",
     "invalidOtp": "Invalid verification code",
+    "nameRequired": "Name is required",
     "locationPermission": "Location permission required",
     "locationRequired": "Please enable location to go online",
     "permissionRequired": "Permission Required",

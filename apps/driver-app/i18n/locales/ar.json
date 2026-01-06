@@ -67,6 +67,10 @@
       "signIn": "تسجيل الدخول",
       "usePhone": "استخدم الهاتف بدلاً من ذلك"
     },
+    "register": {
+      "enterName": "أدخل اسمك",
+      "nameRequired": "الرجاء إدخال اسمك الأول للمتابعة"
+    },
     "profile": {
       "setupTitle": "أكمل ملفك الشخصي",
       "setupSubtitle": "ساعد الركاب على معرفتك",
@@ -315,6 +319,7 @@
     "network": "خطأ في الشبكة. يرجى التحقق من الاتصال.",
     "invalidCredentials": "بريد إلكتروني أو كلمة مرور غير صحيحة",
     "invalidOtp": "رمز التحقق غير صحيح",
+    "nameRequired": "الاسم مطلوب",
     "locationPermission": "إذن الموقع مطلوب",
     "locationRequired": "يرجى تفعيل الموقع للاتصال"
   }
