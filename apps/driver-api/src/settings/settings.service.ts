@@ -8,12 +8,9 @@ export class SettingsService {
   async getCarModels() {
     return this.prisma.carModel.findMany({
       where: { isActive: true },
-      include: {
-        brand: true,
-      },
       orderBy: [
-        { brand: { name: 'asc' } },
-        { name: 'asc' },
+        { brand: 'asc' },
+        { model: 'asc' },
       ],
     });
   }
