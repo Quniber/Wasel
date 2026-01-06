@@ -60,11 +60,64 @@ export default function OtpScreen() {
 
     try {
       if (mode === 'register') {
-        // For new users, go to profile setup with OTP
-        router.push({
-          pathname: '/(auth)/profile-setup',
-          params: { phone, otp: code },
-        });
+        // For new users, prompt for name then verify OTP and register
+        Alert.prompt(
+          t('auth.register.enterName'),
+          t('auth.register.nameRequired'),
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+              onPress: () => {
+                setIsLoading(false);
+                setOtp(['', '', '', '', '', '']);
+                inputRefs.current[0]?.focus();
+              }
+            },
+            {
+              text: t('common.continue'),
+              onPress: async (firstName) => {
+                if (!firstName || firstName.trim().length === 0) {
+                  setError(t('errors.nameRequired'));
+                  setIsLoading(false);
+                  return;
+                }
+
+                try {
+                  // Verify OTP and create account with name
+                  const response = await authApi.verifyOtpAndRegister({
+                    mobileNumber: phone!,
+                    otp: code,
+                    firstName: firstName.trim(),
+                    lastName: '', // Can be filled later
+                  });
+
+                  const { accessToken, refreshToken, expiresIn, driver } = response.data;
+
+                  await setSession({ accessToken, refreshToken, expiresIn }, {
+                    id: driver.id.toString(),
+                    firstName: driver.firstName || '',
+                    lastName: driver.lastName || '',
+                    email: driver.email || '',
+                    mobileNumber: driver.mobileNumber,
+                    status: driver.status,
+                    rating: driver.rating,
+                  });
+
+                  // Go to profile setup to add vehicle info
+                  router.replace('/(auth)/profile-setup');
+                } catch (err: any) {
+                  setError(err.response?.data?.message || t('errors.invalidOtp'));
+                  setOtp(['', '', '', '', '', '']);
+                  inputRefs.current[0]?.focus();
+                } finally {
+                  setIsLoading(false);
+                }
+              }
+            }
+          ],
+          'plain-text'
+        );
         return;
       } else {
         // For existing users, verify OTP and login
