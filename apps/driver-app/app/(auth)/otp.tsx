@@ -134,8 +134,11 @@ export default function OtpScreen() {
           rating: driver.rating,
         });
 
-        // Check if profile is complete
-        if (!driver.firstName || !driver.lastName) {
+        // Check if vehicle info is complete (not just name)
+        const hasVehicleInfo = driver.carModelId && driver.carColorId && driver.carPlate;
+
+        if (!hasVehicleInfo) {
+          // Only redirect to profile setup if vehicle info is missing
           router.replace('/(auth)/profile-setup');
         } else {
           router.replace('/(main)');
