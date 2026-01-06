@@ -517,12 +517,13 @@ export class OrdersService {
       });
     }
 
-    // Broadcast to order room (notifies everyone: rider, driver, admins watching)
-    this.socketService.emitToOrder(orderId, 'order:cancelled', {
-      orderId,
-      cancelledBy: 'rider',
+    // Notify about cancellation
+    this.socketService.notifyOrderCancelled(
       customerId,
-    });
+      orderId,
+      'rider',
+      note
+    );
 
     // Also notify admins dashboard
     this.socketService.notifyAdmins('order:cancelled', {
