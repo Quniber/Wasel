@@ -77,11 +77,7 @@ export default function RootLayout() {
   }, []);
 
   if (!isI18nReady) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
+    return null; // Keep native splash screen visible
   }
 
   return (
