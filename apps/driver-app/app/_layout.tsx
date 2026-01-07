@@ -39,11 +39,7 @@ export default function RootLayout() {
   }, []);
 
   if (!isI18nReady || isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return null; // Keep native splash screen visible
   }
 
   return (
