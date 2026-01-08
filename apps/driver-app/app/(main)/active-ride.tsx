@@ -239,6 +239,9 @@ export default function ActiveRideScreen() {
   const destination = status === 'started' ? activeRide.dropoff : activeRide.pickup;
   const statusButton = getStatusButton();
 
+  // Ensure destination has valid coordinates
+  const hasValidDestination = destination?.latitude && destination?.longitude;
+
   return (
     <View className="flex-1">
       {/* Map */}
@@ -259,7 +262,7 @@ export default function ActiveRideScreen() {
         showsMyLocationButton={false}
       >
         {/* Destination Marker */}
-        {destination && (
+        {hasValidDestination && (
           <MapMarker coordinate={{ latitude: destination.latitude, longitude: destination.longitude }}>
             <View
               className="w-10 h-10 rounded-full items-center justify-center"

@@ -37,6 +37,7 @@ export default function HomeScreen() {
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
   const mapRef = useRef<any>(null);
+  const [isVerifyingRide, setIsVerifyingRide] = useState(true);
 
   // Request location permissions and get current location
   useEffect(() => {
@@ -57,21 +58,32 @@ export default function HomeScreen() {
 
   // Verify persisted active ride with server on app load
   useEffect(() => {
-    if (!_hasHydrated || !activeRide) return;
+    if (!_hasHydrated) return;
+
+    // If no active ride, nothing to verify
+    if (!activeRide) {
+      setIsVerifyingRide(false);
+      return;
+    }
 
     // Check if the persisted ride is still valid
     (async () => {
       try {
+        console.log('[Home] Verifying persisted ride:', activeRide.orderId);
         const response = await driverApi.getCurrentOrder();
         if (!response.data) {
           // No active order on server, clear local state
           console.log('[Home] No active order on server, clearing local state');
           setActiveRide(null);
+        } else {
+          console.log('[Home] Active ride verified:', response.data.id);
         }
       } catch (error) {
         console.error('[Home] Error verifying active ride:', error);
         // If we can't verify, clear the local state to be safe
         setActiveRide(null);
+      } finally {
+        setIsVerifyingRide(false);
       }
     })();
   }, [_hasHydrated]);
@@ -138,7 +150,16 @@ export default function HomeScreen() {
     };
   }, [isOnline]);
 
-  // If there's an active ride, show the active ride screen
+  // Show loading while verifying persisted ride
+  if (isVerifyingRide) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.foreground }}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
+
+  // If there's a verified active ride, show the active ride screen
   if (activeRide) {
     return <ActiveRideScreen />;
   }
