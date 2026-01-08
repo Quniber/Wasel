@@ -38,7 +38,7 @@ export interface Driver {
   lastName: string;
   mobileNumber: string;
   rating: number;
-  reviewCount: number;
+  reviewCount?: number;
   avatar?: string;
   carModel: string;
   carColor: string;

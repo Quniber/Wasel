@@ -159,6 +159,7 @@ export class OrdersService {
         tipAmount: order.tipAmount,
         currency: order.currency,
         paymentMode: order.paymentMode,
+        distanceMeters: order.distanceMeters,
         customer: order.customer,
         service: {
           id: order.service.id,
@@ -226,6 +227,52 @@ export class OrdersService {
           },
         },
         service: true,
+      },
+    });
+
+    // Fetch full driver info for socket notification
+    const driver = await this.prisma.driver.findUnique({
+      where: { id: driverId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        mobileNumber: true,
+        carPlate: true,
+        rating: true,
+        reviewCount: true,
+        latitude: true,
+        longitude: true,
+        carModel: {
+          select: {
+            brand: true,
+            model: true,
+          },
+        },
+        carColor: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Notify rider via socket with full driver info
+    this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'DriverAccepted',
+      driver: {
+        id: driver.id,
+        firstName: driver.firstName,
+        lastName: driver.lastName,
+        mobileNumber: driver.mobileNumber,
+        rating: driver.rating || 5.0,
+        reviewCount: driver.reviewCount || 0,
+        carModel: driver.carModel ? `${driver.carModel.brand} ${driver.carModel.model}` : '',
+        carColor: driver.carColor?.name || '',
+        carPlate: driver.carPlate || '',
+        latitude: driver.latitude,
+        longitude: driver.longitude,
       },
     });
 

@@ -49,19 +49,27 @@ export default function RideActiveScreen() {
         if (response.data) {
           const order = response.data;
           // Update the active order with full details including driver
+          const driverData = order.driver;
           setActiveOrder({
             ...activeOrder,
-            driver: order.driver ? {
-              id: order.driver.id,
-              firstName: order.driver.firstName,
-              lastName: order.driver.lastName,
-              mobileNumber: order.driver.mobileNumber,
-              rating: order.driver.rating || 5.0,
-              carModel: order.driver.carModel ? `${order.driver.carModel.brand} ${order.driver.carModel.model}` : '',
-              carColor: order.driver.carColor?.name || '',
-              carPlate: order.driver.carPlate || '',
-              latitude: order.driver.latitude || activeOrder.pickup.latitude,
-              longitude: order.driver.longitude || activeOrder.pickup.longitude,
+            driver: driverData ? {
+              id: String(driverData.id || ''),
+              firstName: driverData.firstName || 'Driver',
+              lastName: driverData.lastName || '',
+              mobileNumber: driverData.mobileNumber || '',
+              rating: driverData.rating || 5.0,
+              reviewCount: driverData.reviewCount || 0,
+              carModel: typeof driverData.carModel === 'string'
+                ? driverData.carModel
+                : driverData.carModel
+                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+                  : '',
+              carColor: typeof driverData.carColor === 'string'
+                ? driverData.carColor
+                : driverData.carColor?.name || '',
+              carPlate: driverData.carPlate || '',
+              latitude: driverData.latitude || activeOrder.pickup.latitude,
+              longitude: driverData.longitude || activeOrder.pickup.longitude,
             } : null,
           });
         }
@@ -247,18 +255,19 @@ export default function RideActiveScreen() {
   }
 
   const { pickup, dropoff } = activeOrder;
-  // Ensure driver has all required fields with defaults
+  // Ensure driver has all required fields with defaults (spread first, then override with fallbacks)
+  const rawDriver = activeOrder.driver || {};
   const driver = {
-    firstName: activeOrder.driver?.firstName || 'Driver',
-    lastName: activeOrder.driver?.lastName || '',
-    rating: activeOrder.driver?.rating || 5.0,
-    carModel: activeOrder.driver?.carModel || '',
-    carColor: activeOrder.driver?.carColor || '',
-    carPlate: activeOrder.driver?.carPlate || '',
-    mobileNumber: activeOrder.driver?.mobileNumber || '',
-    latitude: activeOrder.driver?.latitude || pickup?.latitude || 0,
-    longitude: activeOrder.driver?.longitude || pickup?.longitude || 0,
-    ...activeOrder.driver,
+    ...rawDriver,
+    firstName: rawDriver.firstName || 'Driver',
+    lastName: rawDriver.lastName || '',
+    rating: rawDriver.rating || 5.0,
+    carModel: rawDriver.carModel || '',
+    carColor: rawDriver.carColor || '',
+    carPlate: rawDriver.carPlate || '',
+    mobileNumber: rawDriver.mobileNumber || '',
+    latitude: rawDriver.latitude || pickup?.latitude || 0,
+    longitude: rawDriver.longitude || pickup?.longitude || 0,
   };
 
   const getStatusTitle = () => {
@@ -345,7 +354,7 @@ export default function RideActiveScreen() {
             <View className="flex-row items-center">
               <View className="w-14 h-14 rounded-full bg-primary items-center justify-center">
                 <Text className="text-white text-xl font-bold">
-                  {driver.firstName[0]}{driver.lastName[0]}
+                  {driver.firstName?.[0] || ''}{driver.lastName?.[0] || ''}
                 </Text>
               </View>
               <View className="flex-1 ml-3">

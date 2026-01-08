@@ -78,34 +78,73 @@ export default function FindingDriverScreen() {
       const unsubscribe = socketService.on('order:status', async (data) => {
         console.log('[FindingDriver] Received order:status:', data);
         if (data.status === 'DriverAccepted') {
+          // Build driver object with proper fallbacks
+          const buildDriverObject = (driverData: any) => {
+            if (!driverData) return null;
+            return {
+              id: String(driverData.id || ''),
+              firstName: driverData.firstName || 'Driver',
+              lastName: driverData.lastName || '',
+              mobileNumber: driverData.mobileNumber || '',
+              rating: driverData.rating || 5.0,
+              reviewCount: driverData.reviewCount || 0,
+              carModel: typeof driverData.carModel === 'string'
+                ? driverData.carModel
+                : driverData.carModel
+                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+                  : '',
+              carColor: typeof driverData.carColor === 'string'
+                ? driverData.carColor
+                : driverData.carColor?.name || '',
+              carPlate: driverData.carPlate || '',
+              latitude: driverData.latitude || pickup.latitude,
+              longitude: driverData.longitude || pickup.longitude,
+            };
+          };
+
           try {
             // Fetch full order details including driver info
             const orderDetails = await orderApi.getOrderDetails(order.id);
             const fullOrder = orderDetails.data;
             console.log('[FindingDriver] Fetched order details:', fullOrder);
 
+            // Use fetched driver data, or socket data as fallback
+            const driverData = fullOrder.driver || data.driver;
+
             setActiveOrder({
-              id: fullOrder.id?.toString() || order.id,
+              id: fullOrder.id?.toString() || order.id.toString(),
               status: 'DriverAccepted',
               pickup,
               dropoff,
               service: selectedService,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
-              driver: fullOrder.driver || data.driver,
+              driver: buildDriverObject(driverData),
               createdAt: order.createdAt || new Date().toISOString(),
             });
             router.replace('/(main)/ride-active');
           } catch (err) {
             console.error('[FindingDriver] Error fetching order details:', err);
-            // Fallback with minimal driver info
+            // Fallback with socket driver data
             setActiveOrder({
-              id: data.orderId || order.id,
+              id: data.orderId?.toString() || order.id.toString(),
               status: 'DriverAccepted',
               pickup,
               dropoff,
               service: selectedService,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
-              driver: data.driver || { id: data.driverId, firstName: 'Driver', lastName: '' },
+              driver: buildDriverObject(data.driver) || {
+                id: String(data.driverId || ''),
+                firstName: 'Driver',
+                lastName: '',
+                mobileNumber: '',
+                rating: 5.0,
+                reviewCount: 0,
+                carModel: '',
+                carColor: '',
+                carPlate: '',
+                latitude: pickup.latitude,
+                longitude: pickup.longitude,
+              },
               createdAt: order.createdAt || new Date().toISOString(),
             });
             router.replace('/(main)/ride-active');
