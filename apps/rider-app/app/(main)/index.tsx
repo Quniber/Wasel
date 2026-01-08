@@ -56,8 +56,67 @@ export default function HomeScreen() {
       try {
         const response = await orderApi.getCurrentOrder();
         if (response.data) {
-          // There's an active order on server, navigate to ride-active
-          console.log('[Home] Found active order:', response.data.id);
+          const order = response.data;
+          console.log('[Home] Found active order:', order.id);
+
+          // Build proper driver object if driver exists
+          const driverData = order.driver;
+          const driver = driverData ? {
+            id: String(driverData.id || ''),
+            firstName: driverData.firstName || 'Driver',
+            lastName: driverData.lastName || '',
+            mobileNumber: driverData.mobileNumber || '',
+            rating: driverData.rating || 5.0,
+            reviewCount: driverData.reviewCount || 0,
+            carModel: typeof driverData.carModel === 'string'
+              ? driverData.carModel
+              : driverData.carModel
+                ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+                : '',
+            carColor: typeof driverData.carColor === 'string'
+              ? driverData.carColor
+              : driverData.carColor?.name || '',
+            carPlate: driverData.carPlate || '',
+            latitude: driverData.latitude || order.pickupLatitude || 0,
+            longitude: driverData.longitude || order.pickupLongitude || 0,
+          } : undefined;
+
+          // Update local state with proper data before navigating
+          setActiveOrder({
+            id: String(order.id),
+            status: order.status,
+            pickup: {
+              latitude: order.pickupLatitude,
+              longitude: order.pickupLongitude,
+              address: order.pickupAddress || '',
+            },
+            dropoff: {
+              latitude: order.dropoffLatitude,
+              longitude: order.dropoffLongitude,
+              address: order.dropoffAddress || '',
+            },
+            service: order.service ? {
+              id: String(order.service.id),
+              name: order.service.name || '',
+              baseFare: 0,
+              perKilometer: 0,
+              perMinute: 0,
+              minimumFare: 0,
+              personCapacity: order.service.personCapacity || 4,
+            } : {
+              id: '',
+              name: 'Ride',
+              baseFare: 0,
+              perKilometer: 0,
+              perMinute: 0,
+              minimumFare: 0,
+              personCapacity: 4,
+            },
+            fare: order.costAfterCoupon || order.serviceCost || 0,
+            driver,
+            createdAt: order.createdAt || new Date().toISOString(),
+          });
+
           router.replace('/(main)/ride-active');
         } else if (activeOrder) {
           // Local state has order but server doesn't, clear local
