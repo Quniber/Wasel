@@ -37,7 +37,7 @@ export class SkipCashController {
     @Request() req: any,
     @Body() dto: CreatePrePaymentDto,
   ) {
-    const customerId = req.user.sub;
+    const customerId = req.user.id;
 
     // Get customer details
     const customer = await this.prisma.customer.findUnique({
@@ -97,7 +97,7 @@ export class SkipCashController {
     @Request() req: any,
     @Param('orderId', ParseIntPipe) orderId: number,
   ) {
-    const customerId = req.user.sub;
+    const customerId = req.user.id;
 
     // Find the order
     const order = await this.prisma.order.findUnique({
