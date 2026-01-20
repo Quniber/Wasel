@@ -37,11 +37,20 @@ export class SkipCashController {
     @Request() req: any,
     @Body() dto: CreatePrePaymentDto,
   ) {
-    const customerId = req.user.id;
+    this.logger.log(`createPrePayment - req.user: ${JSON.stringify(req.user)}`);
+
+    // Try id first, then sub (depending on JWT payload structure)
+    const customerId = req.user.id || req.user.sub;
+
+    if (!customerId) {
+      throw new BadRequestException('Customer ID not found in token');
+    }
+
+    this.logger.log(`createPrePayment - customerId: ${customerId}`);
 
     // Get customer details
     const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
+      where: { id: Number(customerId) },
       select: { id: true, firstName: true, lastName: true, email: true, mobileNumber: true },
     });
 

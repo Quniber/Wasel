@@ -19,9 +19,10 @@ import { SkipCashModule } from './skipcash/skipcash.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
-        join(__dirname, '..', '..', '..', '.env'), // /var/www/wasel/.env (from dist)
-        join(__dirname, '..', '..', '.env'),       // fallback
-        '.env',                                     // local fallback
+        '/var/www/wasel/.env',                      // Server absolute path
+        join(__dirname, '..', '..', '..', '..', '.env'), // From dist/src to root
+        join(__dirname, '..', '..', '..', '.env'), // Fallback
+        '.env',                                     // Local fallback
       ],
     }),
     PrismaModule,

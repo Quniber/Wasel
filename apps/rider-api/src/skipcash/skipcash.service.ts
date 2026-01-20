@@ -77,6 +77,13 @@ export class SkipCashService {
     this.secretKey = this.configService.get<string>('SKIPCASH_SECRET_KEY', '');
     this.webhookUrl = this.configService.get<string>('SKIPCASH_WEBHOOK_URL', '');
     this.returnUrl = this.configService.get<string>('SKIPCASH_RETURN_URL', '');
+
+    // Debug logging to verify .env loading
+    this.logger.log(`SkipCash Environment: ${environment}`);
+    this.logger.log(`SkipCash KeyId: ${this.keyId ? this.keyId.substring(0, 8) + '...' : 'NOT SET'}`);
+    this.logger.log(`SkipCash SecretKey: ${this.secretKey ? this.secretKey.substring(0, 8) + '... (length: ' + this.secretKey.length + ')' : 'NOT SET'}`);
+    this.logger.log(`SkipCash WebhookUrl: ${this.webhookUrl || 'NOT SET'}`);
+    this.logger.log(`SkipCash ReturnUrl: ${this.returnUrl || 'NOT SET'}`);
   }
 
   /**
@@ -227,6 +234,26 @@ export class SkipCashService {
 
     const signature = this.generateSignature(params);
 
+    // Debug: Log the request details
+    this.logger.debug(`SkipCash Request - URL: ${this.baseUrl}/api/v1/payments`);
+    this.logger.debug(`SkipCash Request - Signature: ${signature}`);
+
+    const requestBody = {
+      Uid: params.Uid,
+      KeyId: params.KeyId,
+      Amount: params.Amount,
+      FirstName: params.FirstName,
+      LastName: params.LastName,
+      Phone: params.Phone,
+      Email: params.Email,
+      TransactionId: params.TransactionId,
+      Custom1: params.Custom1,
+      WebhookUrl: this.webhookUrl,
+      ReturnUrl: `${this.returnUrl}?type=prepay`,
+    };
+
+    this.logger.debug(`SkipCash Request Body: ${JSON.stringify(requestBody)}`);
+
     try {
       const response = await fetch(`${this.baseUrl}/api/v1/payments`, {
         method: 'POST',
@@ -234,22 +261,11 @@ export class SkipCashService {
           'Content-Type': 'application/json',
           'Authorization': signature,
         },
-        body: JSON.stringify({
-          Uid: params.Uid,
-          KeyId: params.KeyId,
-          Amount: params.Amount,
-          FirstName: params.FirstName,
-          LastName: params.LastName,
-          Phone: params.Phone,
-          Email: params.Email,
-          TransactionId: params.TransactionId,
-          Custom1: params.Custom1,
-          WebhookUrl: this.webhookUrl,
-          ReturnUrl: `${this.returnUrl}?type=prepay`,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
+      this.logger.debug(`SkipCash Response: ${JSON.stringify(data)}`);
 
       if (data.returnCode === 200 && data.resultObj) {
         this.logger.log(`SkipCash pre-payment created: ${data.resultObj.id}`);
