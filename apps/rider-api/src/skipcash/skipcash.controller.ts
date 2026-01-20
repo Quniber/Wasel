@@ -205,17 +205,36 @@ export class SkipCashController {
         try {
           const bookingDetails = JSON.parse(decodeURIComponent(bookingDetailsJson));
 
+          // Build addresses JSON array (required field)
+          const addresses = JSON.stringify([
+            {
+              type: 'pickup',
+              address: bookingDetails.pickupAddress,
+              latitude: bookingDetails.pickupLatitude,
+              longitude: bookingDetails.pickupLongitude,
+            },
+            {
+              type: 'dropoff',
+              address: bookingDetails.dropoffAddress,
+              latitude: bookingDetails.dropoffLatitude,
+              longitude: bookingDetails.dropoffLongitude,
+            },
+          ]);
+
           // Create the order now that payment is complete
           const order = await this.prisma.order.create({
             data: {
               customerId: parseInt(customerId),
               serviceId: bookingDetails.serviceId,
+              addresses,
+              points: '[]',
               pickupAddress: bookingDetails.pickupAddress,
               pickupLatitude: bookingDetails.pickupLatitude,
               pickupLongitude: bookingDetails.pickupLongitude,
               dropoffAddress: bookingDetails.dropoffAddress,
               dropoffLatitude: bookingDetails.dropoffLatitude,
               dropoffLongitude: bookingDetails.dropoffLongitude,
+              serviceCost: bookingDetails.amount,
               costBest: bookingDetails.amount,
               currency: 'QAR',
               paymentMode: 'payment_gateway',
