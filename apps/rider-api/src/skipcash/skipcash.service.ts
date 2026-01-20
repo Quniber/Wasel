@@ -81,25 +81,25 @@ export class SkipCashService {
 
   /**
    * Generate HMAC-SHA256 signature for SkipCash API
-   * IMPORTANT: ALL non-empty request fields must be included in exact order
+   * IMPORTANT: Field order must match exactly: Uid, KeyId, Amount, FirstName, LastName, Phone, Email, TransactionId, Custom1
+   * WebhookUrl and ReturnUrl are NOT included in signature
    */
   private generateSignature(params: Record<string, string>): string {
-    // Build signature string from ALL params in the EXACT order they appear in request body
+    // Build signature string - order matches SkipCash documentation
     // Only include non-empty fields
     const signatureFields: string[] = [];
 
-    // Order must match the request body order exactly - include ALL fields
+    // Exact order from SkipCash PHP SDK
     if (params.Uid) signatureFields.push(`Uid=${params.Uid}`);
     if (params.KeyId) signatureFields.push(`KeyId=${params.KeyId}`);
     if (params.Amount) signatureFields.push(`Amount=${params.Amount}`);
     if (params.FirstName) signatureFields.push(`FirstName=${params.FirstName}`);
     if (params.LastName) signatureFields.push(`LastName=${params.LastName}`);
-    if (params.Email) signatureFields.push(`Email=${params.Email}`);
     if (params.Phone) signatureFields.push(`Phone=${params.Phone}`);
+    if (params.Email) signatureFields.push(`Email=${params.Email}`);
     if (params.TransactionId) signatureFields.push(`TransactionId=${params.TransactionId}`);
     if (params.Custom1) signatureFields.push(`Custom1=${params.Custom1}`);
-    if (params.WebhookUrl) signatureFields.push(`WebhookUrl=${params.WebhookUrl}`);
-    if (params.ReturnUrl) signatureFields.push(`ReturnUrl=${params.ReturnUrl}`);
+    // WebhookUrl and ReturnUrl are NOT signed
 
     const combinedData = signatureFields.join(',');
 
@@ -135,12 +135,10 @@ export class SkipCashService {
       Amount: request.amount.toFixed(2),
       FirstName: request.firstName,
       LastName: request.lastName,
-      Email: request.email,
       Phone: request.phone || '',
+      Email: request.email,
       TransactionId: request.transactionId,
       Custom1: JSON.stringify({ orderId: request.orderId, customerId: request.customerId }),
-      WebhookUrl: this.webhookUrl,
-      ReturnUrl: this.returnUrl,
     };
 
     const signature = this.generateSignature(params);
@@ -158,12 +156,12 @@ export class SkipCashService {
           Amount: params.Amount,
           FirstName: params.FirstName,
           LastName: params.LastName,
-          Email: params.Email,
           Phone: params.Phone,
+          Email: params.Email,
           TransactionId: params.TransactionId,
           Custom1: params.Custom1,
-          WebhookUrl: params.WebhookUrl,
-          ReturnUrl: params.ReturnUrl,
+          WebhookUrl: this.webhookUrl,
+          ReturnUrl: this.returnUrl,
         }),
       });
 
@@ -211,23 +209,20 @@ export class SkipCashService {
     }
 
     const uid = this.generateUid();
-    const returnUrlWithType = `${this.returnUrl}?type=prepay`;
     const params: Record<string, string> = {
       Uid: uid,
       KeyId: this.keyId,
       Amount: request.amount.toFixed(2),
       FirstName: request.firstName,
       LastName: request.lastName,
-      Email: request.email,
       Phone: request.phone || '',
+      Email: request.email,
       TransactionId: request.transactionId,
       Custom1: JSON.stringify({
         type: 'prepay',
         customerId: request.customerId,
         bookingDetails: request.bookingDetails,
       }),
-      WebhookUrl: this.webhookUrl,
-      ReturnUrl: returnUrlWithType,
     };
 
     const signature = this.generateSignature(params);
@@ -245,12 +240,12 @@ export class SkipCashService {
           Amount: params.Amount,
           FirstName: params.FirstName,
           LastName: params.LastName,
-          Email: params.Email,
           Phone: params.Phone,
+          Email: params.Email,
           TransactionId: params.TransactionId,
           Custom1: params.Custom1,
-          WebhookUrl: params.WebhookUrl,
-          ReturnUrl: params.ReturnUrl,
+          WebhookUrl: this.webhookUrl,
+          ReturnUrl: `${this.returnUrl}?type=prepay`,
         }),
       });
 
