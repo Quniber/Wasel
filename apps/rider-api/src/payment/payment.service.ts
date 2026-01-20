@@ -415,6 +415,205 @@ export class PaymentService {
   }
 
   // =====================
+  // Post-Ride Payment Retry
+  // =====================
+
+  async processPostRidePayment(customerId: number, orderId: number) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        customerId: true,
+        driverId: true,
+        status: true,
+        paymentMode: true,
+        costAfterCoupon: true,
+        costBest: true,
+        tipAmount: true,
+        currency: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.customerId !== customerId) {
+      throw new BadRequestException('Order does not belong to this customer');
+    }
+
+    if (order.status !== 'WaitingForPostPay') {
+      throw new BadRequestException('Order is not awaiting payment');
+    }
+
+    const amount = Number(order.costAfterCoupon || order.costBest);
+    const tipAmount = Number(order.tipAmount || 0);
+    const totalAmount = amount + tipAmount;
+
+    // Process payment based on the order's payment mode
+    let paymentResult: any;
+
+    if (order.paymentMode === 'wallet') {
+      // Check wallet balance
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { walletBalance: true },
+      });
+
+      if (!customer || Number(customer.walletBalance) < totalAmount) {
+        throw new BadRequestException('Insufficient wallet balance');
+      }
+
+      // Deduct from wallet
+      await this.prisma.$transaction([
+        this.prisma.customer.update({
+          where: { id: customerId },
+          data: { walletBalance: { decrement: totalAmount } },
+        }),
+        this.prisma.customerTransaction.create({
+          data: {
+            customerId,
+            orderId,
+            type: TransactionType.debit,
+            action: TransactionAction.ride_payment,
+            amount: totalAmount,
+            description: `Wallet payment for order #${orderId}`,
+          },
+        }),
+      ]);
+
+      paymentResult = {
+        success: true,
+        paymentMethod: PaymentMethod.WALLET,
+        amount: totalAmount,
+      };
+    } else if (order.paymentMode === 'saved_payment_method' || order.paymentMode === 'payment_gateway') {
+      // Card payment requires SkipCash payment link
+      // Get customer details for SkipCash
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { firstName: true, lastName: true, email: true, mobileNumber: true },
+      });
+
+      if (!customer) {
+        throw new BadRequestException('Customer not found');
+      }
+
+      // Return payment link info - rider app should redirect to SkipCash
+      // The actual payment completion will be handled via webhook
+      return {
+        success: false,
+        requiresRedirect: true,
+        paymentMethod: PaymentMethod.CARD,
+        amount: totalAmount,
+        message: 'Card payment requires redirect to payment gateway. Use /skipcash/create-payment endpoint.',
+      };
+    } else {
+      throw new BadRequestException('Cash orders cannot be paid online');
+    }
+
+    // Update order status to Finished and record payment
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'Finished',
+        finishedAt: new Date(),
+        paidAmount: totalAmount,
+      },
+    });
+
+    // Create order activity for audit
+    await this.prisma.orderActivity.create({
+      data: {
+        orderId,
+        status: 'Finished',
+        note: `Post-ride payment completed via ${order.paymentMode}`,
+      },
+    });
+
+    // Credit driver earnings (if driver exists)
+    if (order.driverId) {
+      await this.creditDriverEarnings(order.driverId, orderId, amount, tipAmount);
+    }
+
+    return {
+      ...paymentResult,
+      orderId,
+      orderStatus: 'Finished',
+    };
+  }
+
+  private async creditDriverEarnings(driverId: number, orderId: number, amount: number, tipAmount: number) {
+    // Get platform commission rate from settings
+    const commissionSetting = await this.prisma.setting.findFirst({
+      where: { key: 'platform_commission_rate' },
+    });
+    const platformCommissionRate = commissionSetting
+      ? parseFloat(commissionSetting.value)
+      : 20;
+
+    // Check if driver has a fleet
+    const driver = await this.prisma.driver.findUnique({
+      where: { id: driverId },
+      include: { fleet: true },
+    });
+
+    const fleetCommissionRate = driver?.fleet?.commissionSharePercent
+      ? Number(driver.fleet.commissionSharePercent)
+      : 0;
+
+    // Calculate commissions
+    const platformCommission = (amount * platformCommissionRate) / 100;
+    const afterPlatform = amount - platformCommission;
+    const fleetCommission = (afterPlatform * fleetCommissionRate) / 100;
+    const driverEarnings = amount - platformCommission - fleetCommission;
+
+    // Credit driver earnings
+    await this.prisma.driverTransaction.create({
+      data: {
+        driverId,
+        orderId,
+        amount: driverEarnings,
+        currency: 'QAR',
+        type: TransactionType.credit,
+        action: TransactionAction.ride_earning,
+        description: `Earnings for order #${orderId}`,
+      },
+    });
+
+    await this.prisma.driver.update({
+      where: { id: driverId },
+      data: { walletBalance: { increment: driverEarnings } },
+    });
+
+    // Credit tip separately
+    if (tipAmount > 0) {
+      await this.prisma.driverTransaction.create({
+        data: {
+          driverId,
+          orderId,
+          amount: tipAmount,
+          currency: 'QAR',
+          type: TransactionType.credit,
+          action: TransactionAction.tip,
+          description: `Tip for order #${orderId}`,
+        },
+      });
+
+      await this.prisma.driver.update({
+        where: { id: driverId },
+        data: { walletBalance: { increment: tipAmount } },
+      });
+    }
+
+    // Update order with provider share
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { providerShare: platformCommission + fleetCommission },
+    });
+  }
+
+  // =====================
   // Refunds
   // =====================
 

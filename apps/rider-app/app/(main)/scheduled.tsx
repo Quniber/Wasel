@@ -127,7 +127,7 @@ export default function ScheduledRidesScreen() {
       <View className={`flex-row justify-between mt-3 pt-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
         <Text className="text-muted-foreground">{item.service}</Text>
         <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          ~${item.estimatedFare.toFixed(2)}
+          ~QAR {item.estimatedFare.toFixed(2)}
         </Text>
       </View>
 

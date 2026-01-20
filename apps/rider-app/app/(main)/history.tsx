@@ -95,7 +95,7 @@ export default function HistoryScreen() {
       <View className="flex-row justify-between mt-3 pt-3 border-t border-border dark:border-border-dark">
         <Text className="text-muted-foreground">{item.service}</Text>
         <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          ${item.fare.toFixed(2)}
+          QAR {item.fare.toFixed(2)}
         </Text>
       </View>
     </TouchableOpacity>

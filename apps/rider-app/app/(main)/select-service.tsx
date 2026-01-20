@@ -249,7 +249,7 @@ export default function SelectServiceScreen() {
                     </Text>
                   </View>
                   <Text className={`text-xl font-bold ${isSelected ? 'text-primary' : (isDark ? 'text-foreground-dark' : 'text-foreground')}`}>
-                    ${fare?.totalFare.toFixed(2) || '...'}
+                    QAR {fare?.totalFare.toFixed(2) || '...'}
                   </Text>
                 </View>
               </TouchableOpacity>

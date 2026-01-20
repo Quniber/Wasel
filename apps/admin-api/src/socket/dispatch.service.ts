@@ -143,7 +143,7 @@ export class DispatchService {
       dropoffLatitude: order.dropoffLatitude || 0,
       dropoffLongitude: order.dropoffLongitude || 0,
       tripDistance,
-      estimatedFare: Number(order.serviceCost) || 0,
+      estimatedFare: Number(order.costAfterCoupon) || Number(order.serviceCost) || 0,
       serviceName: order.service?.name || 'Ride',
     });
 
@@ -218,7 +218,7 @@ export class DispatchService {
       dropoffLatitude: order.dropoffLatitude || 0,
       dropoffLongitude: order.dropoffLongitude || 0,
       tripDistance,
-      estimatedFare: Number(order.serviceCost) || 0,
+      estimatedFare: Number(order.costAfterCoupon) || Number(order.serviceCost) || 0,
       serviceName: order.service?.name || 'Ride',
     });
 
@@ -359,7 +359,7 @@ export class DispatchService {
             dropoffLatitude: order.dropoffLatitude || 0,
             dropoffLongitude: order.dropoffLongitude || 0,
             tripDistance,
-            estimatedFare: Number(order.serviceCost) || 0,
+            estimatedFare: Number(order.costAfterCoupon) || Number(order.serviceCost) || 0,
             serviceName: order.service?.name || 'Ride',
           });
         }

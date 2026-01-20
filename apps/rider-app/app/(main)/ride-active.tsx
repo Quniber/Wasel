@@ -120,6 +120,43 @@ export default function RideActiveScreen() {
       }
     });
 
+    // Listen for ride completed event (separate from order:status)
+    const completedUnsub = socketService.on('order:completed', (data) => {
+      console.log('[RideActive] Order completed:', data);
+      router.replace('/(main)/ride-complete');
+    });
+
+    // Listen for payment required event (when payment fails and needs retry)
+    const paymentRequiredUnsub = socketService.on('order:payment_required', (data) => {
+      console.log('[RideActive] Payment required:', data);
+      if (data.payUrl) {
+        // Navigate to payment screen with WebView
+        router.push({
+          pathname: '/(main)/payment',
+          params: {
+            payUrl: data.payUrl,
+            orderId: String(data.orderId || activeOrder?.id),
+            amount: String(data.amount || ''),
+          },
+        });
+      } else {
+        // No payUrl - show alert to user
+        Alert.alert(
+          t('payment.required.title', { defaultValue: 'Payment Required' }),
+          t('payment.required.message', { defaultValue: 'Please complete payment to finish your ride.' }),
+          [
+            {
+              text: t('common.ok'),
+              onPress: () => {
+                // Navigate to ride complete where they can retry
+                router.replace('/(main)/ride-complete');
+              }
+            }
+          ]
+        );
+      }
+    });
+
     // Listen for ride cancelled event
     const cancelledUnsub = socketService.on('order:cancelled', (data) => {
       console.log('[RideActive] Order cancelled by:', data.cancelledBy);
@@ -149,6 +186,8 @@ export default function RideActiveScreen() {
     return () => {
       locationUnsub?.();
       statusUnsub?.();
+      completedUnsub?.();
+      paymentRequiredUnsub?.();
       cancelledUnsub?.();
       if (activeOrder) {
         socketService.leaveOrderRoom(activeOrder.id);

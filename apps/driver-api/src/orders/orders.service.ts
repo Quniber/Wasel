@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocketService } from '../socket/socket.service';
-import { OrderStatus, DriverStatus } from 'database';
+import { PaymentService } from '../payment/payment.service';
+import { OrderStatus, DriverStatus, PaymentMode } from 'database';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private socketService: SocketService,
+    private paymentService: PaymentService,
   ) {}
 
   // Get available orders nearby (Requested status, no driver assigned)
@@ -410,6 +414,19 @@ export class OrdersService {
   async completeRide(driverId: number, orderId: number) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, driverId },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            mobileNumber: true,
+            walletBalance: true,
+          },
+        },
+        service: true,
+      },
     });
 
     if (!order) {
@@ -420,49 +437,120 @@ export class OrdersService {
       throw new BadRequestException('Cannot complete ride from current status');
     }
 
-    // Calculate final fare (could include waiting time, tolls, etc.)
-    const finalCost = order.costAfterCoupon || order.costBest;
+    // Calculate final fare
+    const orderAmount = Number(order.costAfterCoupon || order.costBest);
+    const tipAmount = Number(order.tipAmount || 0);
+    const totalAmount = orderAmount + tipAmount;
+    const paymentMode = order.paymentMode as PaymentMode;
 
-    // Update order to finished
+    this.logger.log(`Completing ride #${orderId}: amount=${orderAmount}, tip=${tipAmount}, mode=${paymentMode}`);
+
+    // Process payment using centralized PaymentService
+    const paymentResult = await this.paymentService.processCompleteOrderPayment({
+      orderId,
+      customerId: order.customer.id,
+      driverId,
+      orderAmount,
+      tipAmount,
+      totalAmount,
+      paymentMode,
+      currency: 'QAR',
+      customerName: `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() || 'Customer',
+      customerEmail: order.customer.email || undefined,
+      customerPhone: order.customer.mobileNumber || undefined,
+    });
+
+    // Determine final status based on payment result
+    let finalStatus: OrderStatus;
+    let payUrl: string | undefined;
+
+    if (paymentResult.success) {
+      finalStatus = OrderStatus.Finished;
+    } else if (paymentResult.requiresCustomerAction) {
+      finalStatus = OrderStatus.WaitingForPostPay;
+      payUrl = paymentResult.payUrl;
+    } else {
+      finalStatus = OrderStatus.WaitingForPostPay;
+    }
+
+    // Update order status (if not already updated by payment service)
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
-        status: OrderStatus.Finished,
-        finishedAt: new Date(),
-        paidAmount: finalCost,
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        service: true,
+        status: finalStatus,
+        finishedAt: paymentResult.success ? new Date() : null,
       },
     });
 
-    // Set driver back to online
+    // Create order activity record for audit trail
+    await this.prisma.orderActivity.create({
+      data: {
+        orderId,
+        status: finalStatus,
+        note: paymentResult.success
+          ? `Payment completed via ${paymentMode} (ref: ${paymentResult.paymentId})`
+          : `Payment pending: ${paymentResult.error || 'Awaiting customer action'}`,
+      },
+    });
+
+    // Set driver back to online (regardless of payment status)
     await this.prisma.driver.update({
       where: { id: driverId },
       data: { status: DriverStatus.online },
     });
 
-    // Notify rider via socket
-    this.socketService.emitToOrder(orderId, 'order:status', {
-      orderId,
-      status: 'Finished',
-      paidAmount: updatedOrder.paidAmount,
-    });
+    if (paymentResult.success) {
+      // Notify rider via socket - payment successful
+      this.socketService.emitToOrder(orderId, 'order:completed', {
+        orderId,
+        status: 'Finished',
+        fare: orderAmount,
+        tip: tipAmount,
+        total: totalAmount,
+        paymentMethod: paymentMode,
+        paymentId: paymentResult.paymentId,
+        commission: paymentResult.commission,
+      });
+      this.socketService.emitToOrder(orderId, 'order:status', {
+        orderId,
+        status: 'Finished',
+        paidAmount: totalAmount,
+      });
 
-    return {
-      id: updatedOrder.id,
-      status: updatedOrder.status,
-      paidAmount: updatedOrder.paidAmount,
-      tipAmount: updatedOrder.tipAmount,
-      finishedAt: updatedOrder.finishedAt,
-    };
+      return {
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        paidAmount: totalAmount,
+        tipAmount,
+        finishedAt: updatedOrder.finishedAt,
+        paymentId: paymentResult.paymentId,
+        commission: paymentResult.commission,
+      };
+    } else {
+      // Notify rider via socket - payment required
+      this.socketService.emitToOrder(orderId, 'order:payment_required', {
+        orderId,
+        status: 'WaitingForPostPay',
+        amount: totalAmount,
+        error: paymentResult.error,
+        payUrl: payUrl,
+      });
+      this.socketService.emitToOrder(orderId, 'order:status', {
+        orderId,
+        status: 'WaitingForPostPay',
+      });
+
+      return {
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        paidAmount: null,
+        tipAmount,
+        finishedAt: null,
+        paymentPending: true,
+        paymentError: paymentResult.error,
+        payUrl: payUrl,
+      };
+    }
   }
 
   // Cancel the order (by driver)

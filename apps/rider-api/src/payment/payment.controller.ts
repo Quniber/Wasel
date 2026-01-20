@@ -107,4 +107,12 @@ export class PaymentController {
       body.paymentMethodId,
     );
   }
+
+  @Post('orders/:orderId/retry')
+  async retryOrderPayment(
+    @Request() req: any,
+    @Param('orderId', ParseIntPipe) orderId: number,
+  ) {
+    return this.paymentService.processPostRidePayment(req.user.sub, orderId);
+  }
 }

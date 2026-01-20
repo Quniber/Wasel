@@ -200,9 +200,9 @@ model CustomerTransaction {
   type          TransactionType
   action        TransactionAction
   amount        Decimal           @db.Decimal(10, 2)
-  currency      String            @default("USD") @db.Char(3)
+  currency      String            @default("QAR") @db.Char(3)
   description   String?
-  reference     String?
+  reference     String?           // External reference (e.g., SkipCash payment ID)
   createdAt     DateTime          @default(now())
 
   @@index([customerId])
@@ -427,9 +427,9 @@ model DriverTransaction {
   type          TransactionType
   action        TransactionAction
   amount        Decimal           @db.Decimal(10, 2)
-  currency      String            @default("USD") @db.Char(3)
+  currency      String            @default("QAR") @db.Char(3)
   description   String?
-  reference     String?
+  reference     String?           // External reference (e.g., SkipCash payment ID)
   createdAt     DateTime          @default(now())
 
   @@index([driverId])
@@ -705,7 +705,7 @@ model Order {
   dropOffEta          DateTime?
 
   // Fare breakdown
-  currency            String         @default("USD") @db.Char(3)
+  currency            String         @default("QAR") @db.Char(3)
   serviceCost         Decimal        @default(0) @db.Decimal(10, 2)
   waitCost            Decimal        @default(0) @db.Decimal(10, 2)
   optionsCost         Decimal        @default(0) @db.Decimal(10, 2)
@@ -722,6 +722,7 @@ model Order {
   paymentGateway      PaymentGateway? @relation(fields: [paymentGatewayId], references: [id])
   savedPaymentMethodId Int?
   savedPaymentMethod  SavedPaymentMethod? @relation(fields: [savedPaymentMethodId], references: [id])
+  paymentGatewayRef   String?        @db.VarChar(100) // External payment reference (e.g., SkipCash payment ID)
 
   // Cancel
   cancelReasonId      Int?

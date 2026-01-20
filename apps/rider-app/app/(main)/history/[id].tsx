@@ -290,19 +290,19 @@ export default function RideDetailsScreen() {
           <View className="flex-row justify-between py-2">
             <Text className="text-muted-foreground">{ride.service}</Text>
             <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              ${ride.fare.tripFare.toFixed(2)}
+              QAR {ride.fare.tripFare.toFixed(2)}
             </Text>
           </View>
           <View className={`flex-row justify-between py-2 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
             <Text className="text-muted-foreground">{t('history.details.serviceFee')}</Text>
             <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              ${ride.fare.serviceFee.toFixed(2)}
+              QAR {ride.fare.serviceFee.toFixed(2)}
             </Text>
           </View>
           {ride.fare.discount > 0 && (
             <View className={`flex-row justify-between py-2 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
               <Text className="text-primary">{t('history.details.discount')}</Text>
-              <Text className="text-primary">-${ride.fare.discount.toFixed(2)}</Text>
+              <Text className="text-primary">-QAR {ride.fare.discount.toFixed(2)}</Text>
             </View>
           )}
           <View className={`flex-row justify-between pt-3 mt-2 border-t-2 ${isDark ? 'border-border-dark' : 'border-border'}`}>
@@ -310,7 +310,7 @@ export default function RideDetailsScreen() {
               {t('history.details.total')}
             </Text>
             <Text className={`font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              ${ride.fare.total.toFixed(2)}
+              QAR {ride.fare.total.toFixed(2)}
             </Text>
           </View>
           <View className="flex-row items-center mt-3">

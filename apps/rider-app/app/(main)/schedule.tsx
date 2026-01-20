@@ -123,7 +123,7 @@ export default function ScheduleScreen() {
               <View className={`flex-row justify-between mt-4 pt-4 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
                 <Text className="text-muted-foreground">{selectedService.name}</Text>
                 <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  ~${fareEstimate.toFixed(2)}
+                  ~QAR {fareEstimate.toFixed(2)}
                 </Text>
               </View>
             )}

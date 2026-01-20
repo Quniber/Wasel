@@ -11,6 +11,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { SocketModule } from './socket/socket.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SessionsModule } from './sessions/sessions.module';
+import { SkipCashModule } from './skipcash/skipcash.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SessionsModule } from './sessions/sessions.module';
     SocketModule,
     NotificationsModule,
     SessionsModule,
+    SkipCashModule,
   ],
 })
 export class AppModule {}

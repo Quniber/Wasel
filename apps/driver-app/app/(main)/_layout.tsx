@@ -130,10 +130,18 @@ export default function MainLayout() {
           width: 280,
         },
         drawerActiveTintColor: colors.primary,
-        drawerInactiveTintColor: colors.mutedForeground,
+        drawerInactiveTintColor: colors.foreground,
+        drawerActiveBackgroundColor: colors.primary + '15',
+        drawerItemStyle: {
+          borderRadius: 12,
+          marginHorizontal: 12,
+          marginVertical: 2,
+          paddingHorizontal: 8,
+        },
         drawerLabelStyle: {
-          marginLeft: -16,
-          fontSize: 15,
+          marginLeft: 8,
+          fontSize: 16,
+          fontWeight: '600',
         },
       }}
     >
@@ -141,56 +149,56 @@ export default function MainLayout() {
         name="index"
         options={{
           drawerLabel: t('drawer.home'),
-          drawerIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="earnings"
         options={{
           drawerLabel: t('drawer.earnings'),
-          drawerIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="wallet-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="history"
         options={{
           drawerLabel: t('drawer.history'),
-          drawerIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="time-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="documents"
         options={{
           drawerLabel: t('drawer.documents'),
-          drawerIcon: ({ color, size }) => <Ionicons name="document-text-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="document-text-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="vehicle"
         options={{
           drawerLabel: t('drawer.vehicle'),
-          drawerIcon: ({ color, size }) => <Ionicons name="car-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="car-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="withdrawals"
         options={{
           drawerLabel: t('drawer.withdrawals'),
-          drawerIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="cash-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="support"
         options={{
           drawerLabel: t('drawer.support'),
-          drawerIcon: ({ color, size }) => <Ionicons name="help-circle-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="help-circle-outline" size={24} color={color} />,
         }}
       />
       <Drawer.Screen
         name="settings"
         options={{
           drawerLabel: t('drawer.settings'),
-          drawerIcon: ({ color, size }) => <Ionicons name="settings-outline" size={size} color={color} />,
+          drawerIcon: ({ color }) => <Ionicons name="settings-outline" size={24} color={color} />,
         }}
       />
       {/* Hidden screens */}

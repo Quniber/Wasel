@@ -297,7 +297,7 @@ export default function FindingDriverScreen() {
               {/* Trip Summary */}
               <View className={`w-full p-4 rounded-xl mt-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
                 <Text className="text-primary font-semibold">
-                  {selectedService?.name} • ${(selectedService as any)?.fare || '15.50'}
+                  {selectedService?.name} • QAR {(selectedService as any)?.fare || '15.50'}
                 </Text>
                 <View className="flex-row items-center mt-2">
                   <View className="w-2 h-2 rounded-full bg-primary" />

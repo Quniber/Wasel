@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image, Modal, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,11 +11,21 @@ import { documentsApi } from '@/lib/api';
 
 interface Document {
   id?: number;
-  type: string;
+  type?: string;
+  documentType?: {
+    id: number;
+    name: string;
+  };
   documentTypeId?: number;
+  media?: {
+    id: number;
+    address: string;
+  } | null;
   status: 'pending' | 'approved' | 'rejected' | 'required';
   expiryDate?: string;
-  rejectionReason?: string;
+  rejectionNote?: string;
+  verifiedAt?: string;
+  createdAt?: string;
 }
 
 const DOCUMENT_TYPES = [
@@ -35,6 +45,7 @@ export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -44,7 +55,24 @@ export default function DocumentsScreen() {
     setIsLoading(true);
     try {
       const response = await documentsApi.getMyDocuments();
-      setDocuments(response.data);
+      const uploadedDocs = response.data || [];
+
+      // Create a map of uploaded documents by document type name
+      const docMap = new Map<string, Document>();
+      uploadedDocs.forEach((doc: Document) => {
+        const typeName = doc.documentType?.name?.toLowerCase().replace(/\s+/g, '_');
+        if (typeName) {
+          docMap.set(typeName, doc);
+        }
+      });
+
+      // Merge with required document types
+      const mergedDocs = DOCUMENT_TYPES.map((docType) => {
+        const uploaded = docMap.get(docType.key);
+        return uploaded || { type: docType.key, status: 'required' as const };
+      });
+
+      setDocuments(mergedDocs);
     } catch (error) {
       console.error('Error fetching documents:', error);
       // Set default required documents
@@ -112,7 +140,23 @@ export default function DocumentsScreen() {
   };
 
   const getDocumentStatus = (type: string): Document => {
-    return documents.find((d) => d.type === type) || { type, status: 'required' };
+    return documents.find((d) => d.type === type || d.documentType?.name?.toLowerCase().replace(/\s+/g, '_') === type) || { type, status: 'required' };
+  };
+
+  const handleViewDocument = (doc: Document) => {
+    if (doc.media?.address) {
+      setViewingDocument(doc.media.address);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: Document) => {
+    if (doc.media?.address) {
+      try {
+        await Linking.openURL(doc.media.address);
+      } catch (error) {
+        Alert.alert('Error', 'Could not open document');
+      }
+    }
   };
 
   const approvedCount = documents.filter((d) => d.status === 'approved').length;
@@ -121,17 +165,21 @@ export default function DocumentsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b" style={{ borderColor: colors.border }}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full items-center justify-center"
-          style={{ backgroundColor: colors.secondary }}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={{ color: colors.foreground }} className="text-xl font-bold ml-4">
-          {t('documents.title')}
-        </Text>
+      <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="w-11 h-11 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: colors.secondary }}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <View className="flex-1">
+            <Text style={{ color: colors.foreground }} className="text-2xl font-bold">
+              {t('documents.title')}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {isLoading ? (
@@ -174,52 +222,82 @@ export default function DocumentsScreen() {
             const doc = getDocumentStatus(docType.key);
             const statusInfo = getStatusInfo(doc.status);
             const isUploading = uploadingType === docType.key;
+            const hasUploadedDoc = doc.media?.address;
 
             return (
-              <TouchableOpacity
+              <View
                 key={docType.key}
-                onPress={() => doc.status !== 'approved' && handleUpload(docType.key)}
-                disabled={isUploading}
-                className="flex-row items-center p-4 rounded-xl mb-3"
+                className="p-4 rounded-xl mb-3"
                 style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }}
               >
-                <View
-                  className="w-12 h-12 rounded-full items-center justify-center mr-4"
-                  style={{ backgroundColor: statusInfo.color + '20' }}
-                >
-                  <Ionicons name={docType.icon} size={24} color={statusInfo.color} />
-                </View>
-
-                <View className="flex-1">
-                  <Text style={{ color: colors.foreground }} className="text-base font-medium">
-                    {t(docType.label)}
-                  </Text>
-                  <View className="flex-row items-center mt-1">
-                    <Ionicons name={statusInfo.icon} size={14} color={statusInfo.color} />
-                    <Text style={{ color: statusInfo.color }} className="text-sm ml-1">
-                      {statusInfo.label}
-                    </Text>
+                <View className="flex-row items-center">
+                  <View
+                    className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                    style={{ backgroundColor: statusInfo.color + '20' }}
+                  >
+                    <Ionicons name={docType.icon} size={24} color={statusInfo.color} />
                   </View>
-                  {doc.rejectionReason && (
-                    <Text style={{ color: colors.destructive }} className="text-xs mt-1">
-                      {doc.rejectionReason}
+
+                  <View className="flex-1">
+                    <Text style={{ color: colors.foreground }} className="text-base font-medium">
+                      {t(docType.label)}
                     </Text>
-                  )}
-                  {doc.expiryDate && doc.status === 'approved' && (
-                    <Text style={{ color: colors.mutedForeground }} className="text-xs mt-1">
-                      {t('documents.expires')}: {new Date(doc.expiryDate).toLocaleDateString()}
-                    </Text>
+                    <View className="flex-row items-center mt-1">
+                      <Ionicons name={statusInfo.icon} size={14} color={statusInfo.color} />
+                      <Text style={{ color: statusInfo.color }} className="text-sm ml-1">
+                        {statusInfo.label}
+                      </Text>
+                    </View>
+                    {doc.rejectionNote && (
+                      <Text style={{ color: colors.destructive }} className="text-xs mt-1">
+                        {doc.rejectionNote}
+                      </Text>
+                    )}
+                    {doc.expiryDate && doc.status === 'approved' && (
+                      <Text style={{ color: colors.mutedForeground }} className="text-xs mt-1">
+                        {t('documents.expires')}: {new Date(doc.expiryDate).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </View>
+
+                  {isUploading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : doc.status !== 'approved' ? (
+                    <TouchableOpacity onPress={() => handleUpload(docType.key)}>
+                      <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
+                    </TouchableOpacity>
+                  ) : (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                   )}
                 </View>
 
-                {isUploading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : doc.status !== 'approved' ? (
-                  <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
-                ) : (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                {/* Document Preview */}
+                {hasUploadedDoc && (
+                  <View className="mt-3 pt-3 border-t" style={{ borderColor: colors.border }}>
+                    <TouchableOpacity
+                      onPress={() => handleViewDocument(doc)}
+                      className="flex-row items-center"
+                    >
+                      <View className="w-16 h-16 rounded-lg overflow-hidden mr-3" style={{ backgroundColor: colors.secondary }}>
+                        <Image
+                          source={{ uri: doc.media?.address }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text style={{ color: colors.foreground }} className="text-sm font-medium">
+                          View Document
+                        </Text>
+                        <Text style={{ color: colors.mutedForeground }} className="text-xs mt-1">
+                          Tap to view full size
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  </View>
                 )}
-              </TouchableOpacity>
+              </View>
             );
           })}
 
@@ -237,6 +315,51 @@ export default function DocumentsScreen() {
           </View>
         </ScrollView>
       )}
+
+      {/* Document Viewer Modal */}
+      <Modal
+        visible={viewingDocument !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setViewingDocument(null)}
+      >
+        <View className="flex-1 bg-black">
+          <SafeAreaView style={{ flex: 1 }}>
+            {/* Header */}
+            <View className="flex-row items-center justify-between px-4 py-3" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+              <TouchableOpacity
+                onPress={() => setViewingDocument(null)}
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+              >
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <Text className="text-white text-base font-medium">Document Preview</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const doc = documents.find(d => d.media?.address === viewingDocument);
+                  if (doc) handleDownloadDocument(doc);
+                }}
+                className="w-10 h-10 rounded-full items-center justify-center"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+              >
+                <Ionicons name="download-outline" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Image Viewer */}
+            <View className="flex-1 items-center justify-center">
+              {viewingDocument && (
+                <Image
+                  source={{ uri: viewingDocument }}
+                  className="w-full h-full"
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

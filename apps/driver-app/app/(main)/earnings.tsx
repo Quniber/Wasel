@@ -70,17 +70,21 @@ export default function EarningsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b" style={{ borderColor: colors.border }}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full items-center justify-center"
-          style={{ backgroundColor: colors.secondary }}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={{ color: colors.foreground }} className="text-xl font-bold ml-4">
-          {t('earnings.title')}
-        </Text>
+      <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="w-11 h-11 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: colors.secondary }}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <View className="flex-1">
+            <Text style={{ color: colors.foreground }} className="text-2xl font-bold">
+              {t('earnings.title')}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView className="flex-1">

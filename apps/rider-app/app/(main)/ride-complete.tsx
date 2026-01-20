@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Platform, useEffect } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,12 +7,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
+import { api, orderApi } from '@/lib/api';
+import { getColors } from '@/constants/Colors';
 
 export default function RideCompleteScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const { activeOrder, resetBooking } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
+
+  const [isPaymentPending, setIsPaymentPending] = useState(false);
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
 
   const handleRate = () => {
     router.push('/(main)/rate-driver');
@@ -22,6 +30,26 @@ export default function RideCompleteScreen() {
     router.replace('/(main)');
   };
 
+  // Check order status from server
+  useEffect(() => {
+    const checkOrderStatus = async () => {
+      if (!activeOrder?.id) return;
+
+      try {
+        const response = await orderApi.getOrderDetails(String(activeOrder.id));
+        if (response.data) {
+          const status = response.data.status;
+          setOrderStatus(status);
+          setIsPaymentPending(status === 'WaitingForPostPay');
+        }
+      } catch (error) {
+        console.error('[RideComplete] Error checking order status:', error);
+      }
+    };
+
+    checkOrderStatus();
+  }, [activeOrder?.id]);
+
   // Handle missing activeOrder in useEffect, not during render
   useEffect(() => {
     if (!activeOrder) {
@@ -29,6 +57,41 @@ export default function RideCompleteScreen() {
       router.replace('/(main)');
     }
   }, [activeOrder]);
+
+  const handlePayNow = async () => {
+    if (!activeOrder?.id) return;
+
+    setIsLoadingPayment(true);
+    try {
+      // Call API to create payment link
+      const response = await api.post(`/skipcash/orders/${activeOrder.id}/pay`);
+
+      if (response.data.success && response.data.payUrl) {
+        // Navigate to payment WebView
+        router.push({
+          pathname: '/(main)/payment',
+          params: {
+            payUrl: response.data.payUrl,
+            orderId: String(activeOrder.id),
+            amount: String(response.data.amount || activeOrder.fare),
+          },
+        });
+      } else {
+        Alert.alert(
+          t('payment.error.title', { defaultValue: 'Payment Error' }),
+          response.data.error || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
+        );
+      }
+    } catch (error: any) {
+      console.error('[RideComplete] Error creating payment:', error);
+      Alert.alert(
+        t('payment.error.title', { defaultValue: 'Payment Error' }),
+        error.response?.data?.message || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
+      );
+    } finally {
+      setIsLoadingPayment(false);
+    }
+  };
 
   if (!activeOrder) {
     return null;
@@ -105,7 +168,7 @@ export default function RideCompleteScreen() {
             {t('ride.completed.total')}
           </Text>
           <Text className={`text-lg font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            ${fare.toFixed(2)}
+            QAR {fare.toFixed(2)}
           </Text>
         </View>
 
@@ -117,25 +180,74 @@ export default function RideCompleteScreen() {
         </View>
       </View>
 
+      {/* Payment Pending Banner */}
+      {isPaymentPending && (
+        <View className="mx-4 mt-4 p-4 rounded-xl bg-amber-500/20 border border-amber-500">
+          <View className="flex-row items-center">
+            <Ionicons name="alert-circle" size={24} color="#F59E0B" />
+            <View className="ml-3 flex-1">
+              <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {t('payment.pending.title', { defaultValue: 'Payment Pending' })}
+              </Text>
+              <Text className="text-muted-foreground text-sm">
+                {t('payment.pending.message', { defaultValue: 'Please complete your payment to finish the ride.' })}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Actions */}
       <View className="flex-1 justify-end px-4 pb-4">
-        <TouchableOpacity
-          onPress={handleRate}
-          className="bg-primary py-4 rounded-xl items-center mb-3"
-        >
-          <Text className="text-white text-lg font-semibold">
-            {t('ride.completed.rateTrip')}
-          </Text>
-        </TouchableOpacity>
+        {isPaymentPending ? (
+          <>
+            <TouchableOpacity
+              onPress={handlePayNow}
+              disabled={isLoadingPayment}
+              className="bg-primary py-4 rounded-xl items-center mb-3 flex-row justify-center"
+            >
+              {isLoadingPayment ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="card" size={20} color="#FFFFFF" />
+                  <Text className="text-white text-lg font-semibold ml-2">
+                    {t('payment.payNow', { defaultValue: 'Pay Now' })} - QAR {fare.toFixed(2)}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleDone}
-          className="py-3 items-center"
-        >
-          <Text className="text-muted-foreground">
-            {t('common.skip')}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDone}
+              className="py-3 items-center"
+            >
+              <Text className="text-muted-foreground">
+                {t('payment.payLater', { defaultValue: 'Pay Later' })}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              onPress={handleRate}
+              className="bg-primary py-4 rounded-xl items-center mb-3"
+            >
+              <Text className="text-white text-lg font-semibold">
+                {t('ride.completed.rateTrip')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleDone}
+              className="py-3 items-center"
+            >
+              <Text className="text-muted-foreground">
+                {t('common.skip')}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </SafeAreaView>
   );

@@ -57,7 +57,14 @@ export default function HomeScreen() {
         const response = await orderApi.getCurrentOrder();
         if (response.data) {
           const order = response.data;
-          console.log('[Home] Found active order:', order.id);
+          console.log('[Home] Found active order:', order.id, 'status:', order.status);
+
+          // Skip completed/cancelled orders
+          if (['Finished', 'Cancelled', 'Expired'].includes(order.status)) {
+            console.log('[Home] Order is completed, clearing state');
+            setActiveOrder(null);
+            return;
+          }
 
           // Build proper driver object if driver exists
           const driverData = order.driver;

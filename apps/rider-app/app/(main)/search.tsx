@@ -144,8 +144,12 @@ export default function SearchScreen() {
     setIsSearching(true);
 
     try {
+      // Location bias for Qatar (Doha center) with 50km radius
+      const locationBias = '25.2854,51.5310';
+      const radius = '50000'; // 50km radius
+
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}&language=${language}&types=establishment|geocode`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}&language=${language}&location=${locationBias}&radius=${radius}&components=country:qa`
       );
       const data = await response.json();
 
