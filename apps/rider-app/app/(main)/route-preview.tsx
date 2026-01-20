@@ -90,7 +90,7 @@ export default function RoutePreviewScreen() {
     switch (method) {
       case 'cash': return t('booking.payment.cash', { defaultValue: 'Cash' });
       case 'wallet': return t('booking.payment.wallet', { defaultValue: 'Wallet' });
-      case 'card': return t('booking.payment.card', { defaultValue: 'Card' });
+      case 'card': return t('booking.payment.card', { defaultValue: 'Card / Apple Pay' });
     }
   };
 
@@ -98,7 +98,7 @@ export default function RoutePreviewScreen() {
     switch (method) {
       case 'cash': return 'cash-outline';
       case 'wallet': return 'wallet-outline';
-      case 'card': return 'card-outline';
+      case 'card': return 'logo-apple';
     }
   };
 
@@ -615,7 +615,7 @@ export default function RoutePreviewScreen() {
                       <Text className="text-muted-foreground text-sm">
                         {method === 'cash' && t('booking.payment.cashDesc', { defaultValue: 'Pay with cash to driver' })}
                         {method === 'wallet' && t('booking.payment.walletDesc', { defaultValue: 'Pay from your wallet balance' })}
-                        {method === 'card' && t('booking.payment.cardDesc', { defaultValue: 'Pay with credit/debit card' })}
+                        {method === 'card' && t('booking.payment.cardDesc', { defaultValue: 'Apple Pay or credit/debit card' })}
                       </Text>
                     </View>
                     {paymentMethod === method && (
