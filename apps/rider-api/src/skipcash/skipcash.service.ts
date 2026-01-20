@@ -81,23 +81,25 @@ export class SkipCashService {
 
   /**
    * Generate HMAC-SHA256 signature for SkipCash API
-   * IMPORTANT: Field order must match exactly what's sent in the request body
+   * IMPORTANT: ALL non-empty request fields must be included in exact order
    */
   private generateSignature(params: Record<string, string>): string {
-    // Build signature string from params in the EXACT order they appear
+    // Build signature string from ALL params in the EXACT order they appear in request body
     // Only include non-empty fields
     const signatureFields: string[] = [];
 
-    // Order must match the request body order exactly
+    // Order must match the request body order exactly - include ALL fields
     if (params.Uid) signatureFields.push(`Uid=${params.Uid}`);
     if (params.KeyId) signatureFields.push(`KeyId=${params.KeyId}`);
     if (params.Amount) signatureFields.push(`Amount=${params.Amount}`);
     if (params.FirstName) signatureFields.push(`FirstName=${params.FirstName}`);
     if (params.LastName) signatureFields.push(`LastName=${params.LastName}`);
-    if (params.Phone) signatureFields.push(`Phone=${params.Phone}`);
     if (params.Email) signatureFields.push(`Email=${params.Email}`);
+    if (params.Phone) signatureFields.push(`Phone=${params.Phone}`);
     if (params.TransactionId) signatureFields.push(`TransactionId=${params.TransactionId}`);
     if (params.Custom1) signatureFields.push(`Custom1=${params.Custom1}`);
+    if (params.WebhookUrl) signatureFields.push(`WebhookUrl=${params.WebhookUrl}`);
+    if (params.ReturnUrl) signatureFields.push(`ReturnUrl=${params.ReturnUrl}`);
 
     const combinedData = signatureFields.join(',');
 
@@ -137,6 +139,8 @@ export class SkipCashService {
       Phone: request.phone || '',
       TransactionId: request.transactionId,
       Custom1: JSON.stringify({ orderId: request.orderId, customerId: request.customerId }),
+      WebhookUrl: this.webhookUrl,
+      ReturnUrl: this.returnUrl,
     };
 
     const signature = this.generateSignature(params);
@@ -158,8 +162,8 @@ export class SkipCashService {
           Phone: params.Phone,
           TransactionId: params.TransactionId,
           Custom1: params.Custom1,
-          WebhookUrl: this.webhookUrl,
-          ReturnUrl: this.returnUrl,
+          WebhookUrl: params.WebhookUrl,
+          ReturnUrl: params.ReturnUrl,
         }),
       });
 
@@ -207,6 +211,7 @@ export class SkipCashService {
     }
 
     const uid = this.generateUid();
+    const returnUrlWithType = `${this.returnUrl}?type=prepay`;
     const params: Record<string, string> = {
       Uid: uid,
       KeyId: this.keyId,
@@ -221,6 +226,8 @@ export class SkipCashService {
         customerId: request.customerId,
         bookingDetails: request.bookingDetails,
       }),
+      WebhookUrl: this.webhookUrl,
+      ReturnUrl: returnUrlWithType,
     };
 
     const signature = this.generateSignature(params);
@@ -242,8 +249,8 @@ export class SkipCashService {
           Phone: params.Phone,
           TransactionId: params.TransactionId,
           Custom1: params.Custom1,
-          WebhookUrl: this.webhookUrl,
-          ReturnUrl: `${this.returnUrl}?type=prepay`,
+          WebhookUrl: params.WebhookUrl,
+          ReturnUrl: params.ReturnUrl,
         }),
       });
 
