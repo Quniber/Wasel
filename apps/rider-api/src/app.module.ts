@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { OrdersModule } from './orders/orders.module';
@@ -15,7 +16,14 @@ import { SkipCashModule } from './skipcash/skipcash.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        join(__dirname, '..', '..', '..', '.env'), // /var/www/wasel/.env (from dist)
+        join(__dirname, '..', '..', '.env'),       // fallback
+        '.env',                                     // local fallback
+      ],
+    }),
     PrismaModule,
     AuthModule,
     OrdersModule,
