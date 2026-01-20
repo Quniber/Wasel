@@ -16,11 +16,14 @@ export default function PaymentScreen() {
     payUrl: string;
     orderId: string;
     amount: string;
+    isPrePay: string;
+    serviceId: string;
   }>();
   const { resolvedTheme } = useThemeStore();
-  const { activeOrder, resetBooking } = useBookingStore();
+  const { activeOrder, resetBooking, pickup, dropoff, selectedService, setActiveOrder } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
+  const isPrePay = params.isPrePay === 'true';
 
   const [paymentStatus, setPaymentStatus] = useState<'loading' | 'processing' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -50,16 +53,42 @@ export default function PaymentScreen() {
   useEffect(() => {
     // Auto-redirect after success
     if (paymentStatus === 'success') {
-      const timer = setTimeout(() => {
-        router.replace('/(main)/ride-complete');
+      const timer = setTimeout(async () => {
+        if (isPrePay) {
+          // For pre-payment, set up the active order with the order created by server
+          if (prePayOrderId && pickup && dropoff && selectedService) {
+            setActiveOrder({
+              id: prePayOrderId,
+              status: 'Requested',
+              pickup,
+              dropoff,
+              service: selectedService,
+              fare: parseFloat(params.amount || '0'),
+              driver: null,
+              createdAt: new Date().toISOString(),
+            });
+          }
+          // Navigate to finding-driver to wait for driver assignment
+          router.replace('/(main)/finding-driver');
+        } else {
+          // For post-ride payment, navigate to ride complete
+          router.replace('/(main)/ride-complete');
+        }
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [paymentStatus]);
+  }, [paymentStatus, isPrePay, prePayOrderId, pickup, dropoff, selectedService]);
 
-  const handlePaymentSuccess = () => {
-    console.log('[Payment] WebView reported success');
+  const [prePayOrderId, setPrePayOrderId] = useState<string | null>(null);
+
+  const handlePaymentSuccess = (data?: { orderId?: string; paymentId?: string }) => {
+    console.log('[Payment] WebView reported success:', data);
     setPaymentStatus('processing');
+
+    // For pre-payment, store the orderId from the return URL
+    if (isPrePay && data?.orderId) {
+      setPrePayOrderId(data.orderId);
+    }
 
     // Wait for socket confirmation or timeout
     setTimeout(() => {

@@ -14,6 +14,26 @@ export interface SkipCashPaymentRequest {
   customerId: number;
 }
 
+export interface SkipCashPrePaymentRequest {
+  amount: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  transactionId: string;
+  customerId: number;
+  bookingDetails: {
+    serviceId: number;
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+    dropoffAddress: string;
+    dropoffLatitude: number;
+    dropoffLongitude: number;
+    amount: number;
+  };
+}
+
 export interface SkipCashPaymentResponse {
   success: boolean;
   paymentId?: string;
@@ -164,6 +184,100 @@ export class SkipCashService {
         error: error.message || 'Failed to connect to payment gateway',
       };
     }
+  }
+
+  /**
+   * Create a pre-payment request (before order creation) for card/Apple Pay
+   */
+  async createPrePayment(request: SkipCashPrePaymentRequest): Promise<SkipCashPaymentResponse> {
+    if (!this.keyId || !this.secretKey) {
+      this.logger.warn('SkipCash credentials not configured, using simulation mode');
+      return this.simulatePrePayment(request);
+    }
+
+    const uid = this.generateUid();
+    const params: Record<string, string> = {
+      Uid: uid,
+      KeyId: this.keyId,
+      Amount: request.amount.toFixed(2),
+      FirstName: request.firstName,
+      LastName: request.lastName,
+      Email: request.email,
+      Phone: request.phone || '',
+      TransactionId: request.transactionId,
+      Custom1: JSON.stringify({
+        type: 'prepay',
+        customerId: request.customerId,
+        bookingDetails: request.bookingDetails,
+      }),
+    };
+
+    const signature = this.generateSignature(params);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': signature,
+        },
+        body: JSON.stringify({
+          uid: params.Uid,
+          keyId: params.KeyId,
+          amount: params.Amount,
+          firstName: params.FirstName,
+          lastName: params.LastName,
+          email: params.Email,
+          phone: params.Phone,
+          transactionId: params.TransactionId,
+          custom1: params.Custom1,
+          webhookUrl: this.webhookUrl,
+          returnUrl: `${this.returnUrl}?type=prepay`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.returnCode === 200 && data.resultObj) {
+        this.logger.log(`SkipCash pre-payment created: ${data.resultObj.id}`);
+
+        return {
+          success: true,
+          paymentId: data.resultObj.id,
+          payUrl: data.resultObj.payUrl,
+        };
+      } else {
+        this.logger.error(`SkipCash pre-payment failed: ${data.errorMessage}`);
+        return {
+          success: false,
+          error: data.errorMessage || 'Payment creation failed',
+        };
+      }
+    } catch (error) {
+      this.logger.error(`SkipCash API error: ${error.message}`);
+      return {
+        success: false,
+        error: error.message || 'Failed to connect to payment gateway',
+      };
+    }
+  }
+
+  /**
+   * Simulate pre-payment for development/testing
+   */
+  private simulatePrePayment(request: SkipCashPrePaymentRequest): SkipCashPaymentResponse {
+    const paymentId = `sim_prepay_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+
+    this.logger.log(`Simulated SkipCash pre-payment created: ${paymentId}`);
+
+    // Return a simulated payment URL that will auto-complete
+    const returnUrl = `${this.returnUrl}?type=prepay&simulated=true&paymentId=${paymentId}&customerId=${request.customerId}&bookingDetails=${encodeURIComponent(JSON.stringify(request.bookingDetails))}`;
+
+    return {
+      success: true,
+      paymentId,
+      payUrl: returnUrl,
+    };
   }
 
   /**

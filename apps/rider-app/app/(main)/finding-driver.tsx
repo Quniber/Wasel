@@ -24,7 +24,15 @@ export default function FindingDriverScreen() {
 
   useEffect(() => {
     startPulseAnimation();
-    createOrder();
+
+    // Check if we already have an order from pre-payment
+    const existingOrder = useBookingStore.getState().activeOrder;
+    if (existingOrder?.id && existingOrder.status === 'Requested') {
+      console.log('[FindingDriver] Using existing pre-paid order:', existingOrder.id);
+      waitForDriver(Number(existingOrder.id));
+    } else {
+      createOrder();
+    }
 
     return () => {
       // Cleanup
@@ -47,6 +55,111 @@ export default function FindingDriverScreen() {
         }),
       ])
     ).start();
+  };
+
+  // Wait for driver assignment when order already exists (from pre-payment)
+  const waitForDriver = async (orderId: number) => {
+    try {
+      // Ensure socket is connected before joining room
+      await socketService.connect();
+      console.log('[FindingDriver] Socket connected, joining order room:', orderId);
+
+      // Join order room for real-time updates
+      socketService.joinOrderRoom(orderId);
+
+      // Listen for driver acceptance
+      const unsubscribe = socketService.on('order:status', async (data) => {
+        console.log('[FindingDriver] Received order:status:', data);
+        if (data.status === 'DriverAccepted') {
+          // Build driver object with proper fallbacks
+          const buildDriverObject = (driverData: any) => {
+            if (!driverData) return null;
+            return {
+              id: String(driverData.id || ''),
+              firstName: driverData.firstName || 'Driver',
+              lastName: driverData.lastName || '',
+              mobileNumber: driverData.mobileNumber || '',
+              rating: driverData.rating || 5.0,
+              reviewCount: driverData.reviewCount || 0,
+              carModel: typeof driverData.carModel === 'string'
+                ? driverData.carModel
+                : driverData.carModel
+                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+                  : '',
+              carColor: typeof driverData.carColor === 'string'
+                ? driverData.carColor
+                : driverData.carColor?.name || '',
+              carPlate: driverData.carPlate || '',
+              latitude: driverData.latitude || pickup?.latitude,
+              longitude: driverData.longitude || pickup?.longitude,
+            };
+          };
+
+          try {
+            // Fetch full order details including driver info
+            const orderDetails = await orderApi.getOrderDetails(String(orderId));
+            const fullOrder = orderDetails.data;
+            console.log('[FindingDriver] Fetched order details:', fullOrder);
+
+            // Use fetched driver data, or socket data as fallback
+            const driverData = fullOrder.driver || data.driver;
+
+            setActiveOrder({
+              id: fullOrder.id?.toString() || orderId.toString(),
+              status: 'DriverAccepted',
+              pickup: pickup!,
+              dropoff: dropoff!,
+              service: selectedService!,
+              fare: data.fare || parseFloat(fullOrder.costBest) || 15,
+              driver: buildDriverObject(driverData),
+              createdAt: fullOrder.createdAt || new Date().toISOString(),
+            });
+            router.replace('/(main)/ride-active');
+          } catch (err) {
+            console.error('[FindingDriver] Error fetching order details:', err);
+            // Fallback with socket driver data
+            setActiveOrder({
+              id: data.orderId?.toString() || orderId.toString(),
+              status: 'DriverAccepted',
+              pickup: pickup!,
+              dropoff: dropoff!,
+              service: selectedService!,
+              fare: data.fare || 15,
+              driver: buildDriverObject(data.driver) || {
+                id: String(data.driverId || ''),
+                firstName: 'Driver',
+                lastName: '',
+                mobileNumber: '',
+                rating: 5.0,
+                reviewCount: 0,
+                carModel: '',
+                carColor: '',
+                carPlate: '',
+                latitude: pickup?.latitude || 0,
+                longitude: pickup?.longitude || 0,
+              },
+              createdAt: new Date().toISOString(),
+            });
+            router.replace('/(main)/ride-active');
+          }
+        } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
+          setStatus('not_found');
+        }
+      });
+
+      // Timeout after 60 seconds if no driver found
+      const timeout = setTimeout(() => {
+        setStatus('not_found');
+      }, 60000);
+
+      return () => {
+        unsubscribe?.();
+        clearTimeout(timeout);
+      };
+    } catch (error) {
+      console.error('[FindingDriver] Error waiting for driver:', error);
+      setStatus('not_found');
+    }
   };
 
   const createOrder = async () => {
