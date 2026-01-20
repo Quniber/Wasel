@@ -79,11 +79,15 @@ export class SkipCashService {
     this.returnUrl = this.configService.get<string>('SKIPCASH_RETURN_URL', '');
 
     // Debug logging to verify .env loading
-    this.logger.log(`SkipCash Environment: ${environment}`);
-    this.logger.log(`SkipCash KeyId: ${this.keyId ? this.keyId.substring(0, 8) + '...' : 'NOT SET'}`);
-    this.logger.log(`SkipCash SecretKey: ${this.secretKey ? this.secretKey.substring(0, 8) + '... (length: ' + this.secretKey.length + ')' : 'NOT SET'}`);
-    this.logger.log(`SkipCash WebhookUrl: ${this.webhookUrl || 'NOT SET'}`);
-    this.logger.log(`SkipCash ReturnUrl: ${this.returnUrl || 'NOT SET'}`);
+    this.logger.warn(`=== SKIPCASH CONFIG ===`);
+    this.logger.warn(`Environment: ${environment}`);
+    this.logger.warn(`KeyId: ${this.keyId}`);
+    this.logger.warn(`SecretKey (first 20 chars): "${this.secretKey?.substring(0, 20)}"`);
+    this.logger.warn(`SecretKey length: ${this.secretKey?.length}`);
+    this.logger.warn(`SecretKey hex (first 40): ${this.secretKey ? Buffer.from(this.secretKey.substring(0, 20)).toString('hex') : 'N/A'}`);
+    this.logger.warn(`WebhookUrl: ${this.webhookUrl}`);
+    this.logger.warn(`ReturnUrl: ${this.returnUrl}`);
+    this.logger.warn(`========================`);
   }
 
   /**
