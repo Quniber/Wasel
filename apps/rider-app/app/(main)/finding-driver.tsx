@@ -14,7 +14,7 @@ import { socketService } from '@/lib/socket';
 export default function FindingDriverScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { pickup, dropoff, selectedService, setActiveOrder, resetBooking } = useBookingStore();
+  const { pickup, dropoff, selectedService, paymentMethod, setActiveOrder, resetBooking } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
 
   const mapRef = useRef<MapView>(null);
@@ -53,6 +53,13 @@ export default function FindingDriverScreen() {
     if (!pickup || !dropoff || !selectedService) return;
 
     try {
+      // Map payment method to API format
+      const paymentModeMap: Record<string, string> = {
+        cash: 'cash',
+        wallet: 'wallet',
+        card: 'payment_gateway',
+      };
+
       // Create order via API
       const response = await orderApi.createOrder({
         serviceId: selectedService.id,
@@ -62,6 +69,7 @@ export default function FindingDriverScreen() {
         dropoffAddress: dropoff.address,
         dropoffLatitude: dropoff.latitude,
         dropoffLongitude: dropoff.longitude,
+        paymentMode: paymentModeMap[paymentMethod] || 'cash',
       });
 
       const order = response.data;

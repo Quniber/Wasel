@@ -32,6 +32,8 @@ export interface FareEstimate {
   eta: number;
 }
 
+export type PaymentMethod = 'cash' | 'wallet' | 'card';
+
 export interface Driver {
   id: string;
   firstName: string;
@@ -73,6 +75,9 @@ interface BookingState {
   couponCode: string | null;
   couponDiscount: number;
 
+  // Payment
+  paymentMethod: PaymentMethod;
+
   // Scheduling
   isScheduled: boolean;
   scheduledDate: Date | null;
@@ -91,6 +96,7 @@ interface BookingState {
   setSelectedService: (service: Service | null) => void;
   setFareEstimates: (estimates: FareEstimate[]) => void;
   setCoupon: (code: string | null, discount: number) => void;
+  setPaymentMethod: (method: PaymentMethod) => void;
   setScheduled: (isScheduled: boolean, date: Date | null) => void;
   setActiveOrder: (order: ActiveOrder | null) => void;
   updateDriverLocation: (latitude: number, longitude: number) => void;
@@ -108,6 +114,7 @@ export const useBookingStore = create<BookingState>()(
       fareEstimates: [],
       couponCode: null,
       couponDiscount: 0,
+      paymentMethod: 'cash',
       isScheduled: false,
       scheduledDate: null,
       activeOrder: null,
@@ -120,6 +127,7 @@ export const useBookingStore = create<BookingState>()(
       setSelectedService: (selectedService) => set({ selectedService }),
       setFareEstimates: (fareEstimates) => set({ fareEstimates }),
       setCoupon: (couponCode, couponDiscount) => set({ couponCode, couponDiscount }),
+      setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
       setScheduled: (isScheduled, scheduledDate) => set({ isScheduled, scheduledDate }),
       setActiveOrder: (activeOrder) => set({ activeOrder }),
 
@@ -158,6 +166,7 @@ export const useBookingStore = create<BookingState>()(
         fareEstimates: [],
         couponCode: null,
         couponDiscount: 0,
+        paymentMethod: 'cash',
         isScheduled: false,
         scheduledDate: null,
         activeOrder: null,

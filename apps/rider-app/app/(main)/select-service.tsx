@@ -6,8 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import { useThemeStore } from '@/stores/theme-store';
-import { useBookingStore, Service, FareEstimate } from '@/stores/booking-store';
+import { useBookingStore, Service, FareEstimate, PaymentMethod } from '@/stores/booking-store';
 import { orderApi, couponApi } from '@/lib/api';
+import { getColors } from '@/constants/Colors';
 
 export default function SelectServiceScreen() {
   const { t } = useTranslation();
@@ -24,14 +25,24 @@ export default function SelectServiceScreen() {
     couponCode,
     couponDiscount,
     setCoupon,
+    paymentMethod,
+    setPaymentMethod,
   } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
+  const colors = getColors(isDark);
 
   const mapRef = useRef<MapView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
+
+  const paymentMethods: { id: PaymentMethod; icon: string; label: string }[] = [
+    { id: 'cash', icon: 'cash', label: t('booking.payment.cash') },
+    { id: 'wallet', icon: 'wallet', label: t('booking.payment.wallet') },
+    { id: 'card', icon: 'card', label: t('booking.payment.card') },
+  ];
 
   useEffect(() => {
     loadServicesAndFares();
@@ -266,11 +277,19 @@ export default function SelectServiceScreen() {
         <View className="px-4 py-4">
           {/* Payment & Coupon */}
           <View className="flex-row mb-4">
-            <TouchableOpacity className={`flex-1 flex-row items-center px-4 py-3 rounded-xl mr-2 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-              <Ionicons name="cash" size={20} color="#4CAF50" />
+            <TouchableOpacity
+              onPress={() => setShowPaymentModal(true)}
+              className={`flex-1 flex-row items-center px-4 py-3 rounded-xl mr-2 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
+            >
+              <Ionicons
+                name={paymentMethod === 'cash' ? 'cash' : paymentMethod === 'wallet' ? 'wallet' : 'card'}
+                size={20}
+                color="#4CAF50"
+              />
               <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {t('booking.payment.cash')}
+                {paymentMethods.find(p => p.id === paymentMethod)?.label}
               </Text>
+              <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} className="ml-1" />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -342,6 +361,72 @@ export default function SelectServiceScreen() {
 
             {couponError && (
               <Text className="text-destructive text-sm mt-2">{couponError}</Text>
+            )}
+
+            <SafeAreaView edges={['bottom']} />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Method Modal */}
+      <Modal visible={showPaymentModal} transparent animationType="slide">
+        <View className="flex-1 justify-end bg-black/50">
+          <View className={`rounded-t-3xl p-6 ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className={`text-xl font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {t('booking.payment.title', { defaultValue: 'Payment Method' })}
+              </Text>
+              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
+                <Ionicons name="close" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+              </TouchableOpacity>
+            </View>
+
+            {paymentMethods.map((method) => (
+              <TouchableOpacity
+                key={method.id}
+                onPress={() => {
+                  setPaymentMethod(method.id);
+                  setShowPaymentModal(false);
+                }}
+                className={`flex-row items-center p-4 rounded-xl mb-3 border-2 ${
+                  paymentMethod === method.id
+                    ? 'border-primary bg-primary/5'
+                    : isDark
+                    ? 'border-border-dark bg-muted-dark'
+                    : 'border-border bg-muted'
+                }`}
+              >
+                <View className={`w-12 h-12 rounded-full items-center justify-center ${
+                  paymentMethod === method.id ? 'bg-primary/20' : isDark ? 'bg-background-dark' : 'bg-white'
+                }`}>
+                  <Ionicons
+                    name={method.icon as any}
+                    size={24}
+                    color={paymentMethod === method.id ? '#4CAF50' : (isDark ? '#FAFAFA' : '#212121')}
+                  />
+                </View>
+                <Text className={`ml-4 text-lg font-medium ${
+                  paymentMethod === method.id ? 'text-primary' : (isDark ? 'text-foreground-dark' : 'text-foreground')
+                }`}>
+                  {method.label}
+                </Text>
+                {paymentMethod === method.id && (
+                  <View className="ml-auto">
+                    <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+
+            {paymentMethod === 'card' && (
+              <View className={`p-3 rounded-xl mt-2 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
+                <View className="flex-row items-center">
+                  <Ionicons name="logo-apple" size={20} color={isDark ? '#FAFAFA' : '#212121'} />
+                  <Text className={`ml-2 text-sm ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                    {t('booking.payment.applePaySupported', { defaultValue: 'Apple Pay & Cards supported via SkipCash' })}
+                  </Text>
+                </View>
+              </View>
             )}
 
             <SafeAreaView edges={['bottom']} />
