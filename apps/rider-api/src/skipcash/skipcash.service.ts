@@ -81,16 +81,27 @@ export class SkipCashService {
 
   /**
    * Generate HMAC-SHA256 signature for SkipCash API
+   * IMPORTANT: Field order must match exactly what's sent in the request body
    */
   private generateSignature(params: Record<string, string>): string {
-    // Combine parameters in the required order
-    const fields = ['Uid', 'KeyId', 'Amount', 'FirstName', 'LastName', 'Phone', 'Email',
-                    'Street', 'City', 'State', 'Country', 'PostalCode', 'TransactionId', 'Custom1'];
+    // Build signature string from params in the EXACT order they appear
+    // Only include non-empty fields
+    const signatureFields: string[] = [];
 
-    const combinedData = fields
-      .filter(field => params[field] && params[field].trim() !== '')
-      .map(field => `${field}=${params[field]}`)
-      .join(',');
+    // Order must match the request body order exactly
+    if (params.Uid) signatureFields.push(`Uid=${params.Uid}`);
+    if (params.KeyId) signatureFields.push(`KeyId=${params.KeyId}`);
+    if (params.Amount) signatureFields.push(`Amount=${params.Amount}`);
+    if (params.FirstName) signatureFields.push(`FirstName=${params.FirstName}`);
+    if (params.LastName) signatureFields.push(`LastName=${params.LastName}`);
+    if (params.Phone) signatureFields.push(`Phone=${params.Phone}`);
+    if (params.Email) signatureFields.push(`Email=${params.Email}`);
+    if (params.TransactionId) signatureFields.push(`TransactionId=${params.TransactionId}`);
+    if (params.Custom1) signatureFields.push(`Custom1=${params.Custom1}`);
+
+    const combinedData = signatureFields.join(',');
+
+    this.logger.debug(`Signature string: ${combinedData}`);
 
     const hash = crypto.createHmac('sha256', this.secretKey)
       .update(combinedData)
