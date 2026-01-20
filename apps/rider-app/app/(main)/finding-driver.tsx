@@ -62,7 +62,7 @@ export default function FindingDriverScreen() {
 
       // Create order via API
       const response = await orderApi.createOrder({
-        serviceId: selectedService.id,
+        serviceId: parseInt(selectedService.id, 10),
         pickupAddress: pickup.address,
         pickupLatitude: pickup.latitude,
         pickupLongitude: pickup.longitude,

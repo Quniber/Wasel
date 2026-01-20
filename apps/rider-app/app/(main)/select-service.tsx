@@ -38,10 +38,18 @@ export default function SelectServiceScreen() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
 
-  const paymentMethods: { id: PaymentMethod; icon: string; label: string }[] = [
-    { id: 'cash', icon: 'cash', label: t('booking.payment.cash') },
-    { id: 'wallet', icon: 'wallet', label: t('booking.payment.wallet') },
-    { id: 'card', icon: 'card', label: t('booking.payment.card') },
+  const getPaymentLabel = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash': return t('booking.payment.cash', { defaultValue: 'Cash' });
+      case 'wallet': return t('booking.payment.wallet', { defaultValue: 'Wallet' });
+      case 'card': return t('booking.payment.card', { defaultValue: 'Card' });
+    }
+  };
+
+  const paymentMethods: { id: PaymentMethod; icon: string }[] = [
+    { id: 'cash', icon: 'cash' },
+    { id: 'wallet', icon: 'wallet' },
+    { id: 'card', icon: 'card' },
   ];
 
   useEffect(() => {
@@ -287,7 +295,7 @@ export default function SelectServiceScreen() {
                 color="#4CAF50"
               />
               <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {paymentMethods.find(p => p.id === paymentMethod)?.label}
+                {getPaymentLabel(paymentMethod)}
               </Text>
               <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} className="ml-1" />
             </TouchableOpacity>
@@ -408,7 +416,7 @@ export default function SelectServiceScreen() {
                 <Text className={`ml-4 text-lg font-medium ${
                   paymentMethod === method.id ? 'text-primary' : (isDark ? 'text-foreground-dark' : 'text-foreground')
                 }`}>
-                  {method.label}
+                  {getPaymentLabel(method.id)}
                 </Text>
                 {paymentMethod === method.id && (
                   <View className="ml-auto">
