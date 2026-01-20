@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Modal, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import { useThemeStore } from '@/stores/theme-store';
-import { useBookingStore, Service, FareEstimate } from '@/stores/booking-store';
+import { useBookingStore, Service, FareEstimate, PaymentMethod } from '@/stores/booking-store';
 import { orderApi } from '@/lib/api';
 
 // Calculate distance between two points (Haversine formula)
@@ -75,6 +75,8 @@ export default function RoutePreviewScreen() {
     setSelectedService,
     fareEstimates,
     setFareEstimates,
+    paymentMethod,
+    setPaymentMethod,
   } = useBookingStore();
   const isDark = resolvedTheme === 'dark';
 
@@ -82,6 +84,23 @@ export default function RoutePreviewScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; distanceValue: number; durationValue: number } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const getPaymentLabel = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash': return t('booking.payment.cash', { defaultValue: 'Cash' });
+      case 'wallet': return t('booking.payment.wallet', { defaultValue: 'Wallet' });
+      case 'card': return t('booking.payment.card', { defaultValue: 'Card' });
+    }
+  };
+
+  const getPaymentIcon = (method: PaymentMethod): keyof typeof Ionicons.glyphMap => {
+    switch (method) {
+      case 'cash': return 'cash-outline';
+      case 'wallet': return 'wallet-outline';
+      case 'card': return 'card-outline';
+    }
+  };
 
   // Set initial route line immediately
   useEffect(() => {
@@ -443,6 +462,20 @@ export default function RoutePreviewScreen() {
             </View>
           )}
 
+          {/* Payment Method Selector */}
+          <TouchableOpacity
+            onPress={() => setShowPaymentModal(true)}
+            className={`flex-row items-center justify-between p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
+          >
+            <View className="flex-row items-center">
+              <Ionicons name={getPaymentIcon(paymentMethod)} size={24} color="#4CAF50" />
+              <Text className={`ml-3 font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {getPaymentLabel(paymentMethod)}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#757575" />
+          </TouchableOpacity>
+
           {/* Request Ride Button */}
           <TouchableOpacity
             onPress={handleRequestRide}
@@ -465,6 +498,82 @@ export default function RoutePreviewScreen() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Payment Method Modal */}
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/50"
+          onPress={() => setShowPaymentModal(false)}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            className={`rounded-t-3xl ${isDark ? 'bg-background-dark' : 'bg-white'}`}
+          >
+            <SafeAreaView edges={['bottom']}>
+              <View className="p-6">
+                <View className="w-12 h-1 bg-muted dark:bg-muted-dark rounded-full self-center mb-4" />
+                <Text className={`text-xl font-bold mb-6 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                  {t('booking.payment.selectMethod', { defaultValue: 'Select Payment Method' })}
+                </Text>
+
+                {(['cash', 'wallet', 'card'] as PaymentMethod[]).map((method) => (
+                  <TouchableOpacity
+                    key={method}
+                    onPress={() => {
+                      setPaymentMethod(method);
+                      setShowPaymentModal(false);
+                    }}
+                    className={`flex-row items-center p-4 rounded-xl mb-3 ${
+                      paymentMethod === method
+                        ? 'bg-primary/10 border-2 border-primary'
+                        : isDark
+                        ? 'bg-muted-dark'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <View className={`w-12 h-12 rounded-full items-center justify-center ${
+                      paymentMethod === method ? 'bg-primary' : isDark ? 'bg-background-dark' : 'bg-white'
+                    }`}>
+                      <Ionicons
+                        name={getPaymentIcon(method)}
+                        size={24}
+                        color={paymentMethod === method ? '#FFFFFF' : '#4CAF50'}
+                      />
+                    </View>
+                    <View className="ml-4 flex-1">
+                      <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                        {getPaymentLabel(method)}
+                      </Text>
+                      <Text className="text-muted-foreground text-sm">
+                        {method === 'cash' && t('booking.payment.cashDesc', { defaultValue: 'Pay with cash to driver' })}
+                        {method === 'wallet' && t('booking.payment.walletDesc', { defaultValue: 'Pay from your wallet balance' })}
+                        {method === 'card' && t('booking.payment.cardDesc', { defaultValue: 'Pay with credit/debit card' })}
+                      </Text>
+                    </View>
+                    {paymentMethod === method && (
+                      <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  onPress={() => setShowPaymentModal(false)}
+                  className="mt-4 py-4 items-center"
+                >
+                  <Text className="text-muted-foreground font-medium">
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
