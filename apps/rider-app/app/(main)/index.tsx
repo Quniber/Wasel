@@ -26,6 +26,7 @@ export default function HomeScreen() {
   const colors = getColors(isDark);
 
   const mapRef = useRef<MapView>(null);
+  const lastGeocodeTime = useRef<number>(0);
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -156,6 +157,23 @@ export default function HomeScreen() {
       const { latitude, longitude } = location.coords;
       setCurrentLocation({ latitude, longitude });
 
+      // Rate limit geocoding to prevent "too many requests" error
+      // Only call reverseGeocodeAsync if at least 5 seconds have passed
+      const now = Date.now();
+      const timeSinceLastGeocode = now - lastGeocodeTime.current;
+
+      if (timeSinceLastGeocode < 5000) {
+        console.log('[Home] Skipping geocode - rate limited');
+        // Use coordinates as fallback address
+        setPickup({
+          latitude,
+          longitude,
+          address: pickup?.address || t('home.currentLocation'),
+        });
+        return;
+      }
+
+      lastGeocodeTime.current = now;
       const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
       const addressString = [
         address?.street,
@@ -170,6 +188,14 @@ export default function HomeScreen() {
       });
     } catch (error) {
       console.error('Error getting location:', error);
+      // If geocoding fails, still set the location with a fallback address
+      if (currentLocation) {
+        setPickup({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          address: t('home.currentLocation'),
+        });
+      }
     } finally {
       setIsLoadingLocation(false);
     }

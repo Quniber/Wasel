@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Platform, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,9 @@ export default function FindingDriverScreen() {
   const [status, setStatus] = useState<'searching' | 'not_found'>('searching');
   const [searchRadius, setSearchRadius] = useState(500);
 
+  // Store cleanup function ref
+  const cleanupRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     startPulseAnimation();
 
@@ -35,7 +38,11 @@ export default function FindingDriverScreen() {
     }
 
     return () => {
-      // Cleanup
+      // Cleanup socket listeners when unmounting
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
     };
   }, []);
 
@@ -114,6 +121,11 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(driverData),
               createdAt: fullOrder.createdAt || new Date().toISOString(),
             });
+            // Clean up before navigating
+            if (cleanupRef.current) {
+              cleanupRef.current();
+              cleanupRef.current = null;
+            }
             router.replace('/(main)/ride-active');
           } catch (err) {
             console.error('[FindingDriver] Error fetching order details:', err);
@@ -140,10 +152,24 @@ export default function FindingDriverScreen() {
               },
               createdAt: new Date().toISOString(),
             });
+            // Clean up before navigating
+            if (cleanupRef.current) {
+              cleanupRef.current();
+              cleanupRef.current = null;
+            }
             router.replace('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
+        } else if (data.status === 'Finished' || data.status === 'finished') {
+          // Ride already completed, go to ride-complete
+          console.log('[FindingDriver] Order already finished, going to ride-complete');
+          // Clean up before navigating
+          if (cleanupRef.current) {
+            cleanupRef.current();
+            cleanupRef.current = null;
+          }
+          router.replace('/(main)/ride-complete');
         }
       });
 
@@ -152,7 +178,8 @@ export default function FindingDriverScreen() {
         setStatus('not_found');
       }, 60000);
 
-      return () => {
+      // Store cleanup function
+      cleanupRef.current = () => {
         unsubscribe?.();
         clearTimeout(timeout);
       };
@@ -242,6 +269,11 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(driverData),
               createdAt: order.createdAt || new Date().toISOString(),
             });
+            // Clean up before navigating
+            if (cleanupRef.current) {
+              cleanupRef.current();
+              cleanupRef.current = null;
+            }
             router.replace('/(main)/ride-active');
           } catch (err) {
             console.error('[FindingDriver] Error fetching order details:', err);
@@ -268,10 +300,24 @@ export default function FindingDriverScreen() {
               },
               createdAt: order.createdAt || new Date().toISOString(),
             });
+            // Clean up before navigating
+            if (cleanupRef.current) {
+              cleanupRef.current();
+              cleanupRef.current = null;
+            }
             router.replace('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
+        } else if (data.status === 'Finished' || data.status === 'finished') {
+          // Ride already completed, go to ride-complete
+          console.log('[FindingDriver] Order already finished, going to ride-complete');
+          // Clean up before navigating
+          if (cleanupRef.current) {
+            cleanupRef.current();
+            cleanupRef.current = null;
+          }
+          router.replace('/(main)/ride-complete');
         }
       });
 
@@ -292,7 +338,8 @@ export default function FindingDriverScreen() {
         setStatus('not_found');
       }, 60000);
 
-      return () => {
+      // Store cleanup function
+      cleanupRef.current = () => {
         unsubscribe?.();
         clearTimeout(timeout);
       };

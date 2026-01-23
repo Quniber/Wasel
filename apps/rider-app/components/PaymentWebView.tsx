@@ -50,15 +50,45 @@ export default function PaymentWebView({
     return params;
   };
 
+  // Extract orderId and paymentId from various URL formats
+  const extractPaymentData = (url: string): { orderId?: string; paymentId?: string } => {
+    const params = extractParams(url);
+
+    // Handle different param naming conventions:
+    // - SkipCash uses: id (payment ID), transId (transaction ID)
+    // - Our deep links use: orderId, paymentId
+    const paymentId = params.paymentId || params.id;
+    const orderId = params.orderId || (params.transId?.startsWith('order_') ? params.transId.split('_')[1] : undefined);
+
+    console.log('[PaymentWebView] Extracted payment data:', { orderId, paymentId, rawParams: params });
+
+    return { orderId, paymentId };
+  };
+
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     const { url } = navState;
     console.log('[PaymentWebView] Navigation:', url);
 
-    // Check for success redirect (app deep link or return URL)
-    if (url.startsWith('waselrider://payment-complete') || url.startsWith('waselrider://payment-success') || url.includes('/skipcash/return')) {
-      console.log('[PaymentWebView] Payment success detected');
+    // Check for SkipCash return URL - need to check status before treating as success
+    if (url.includes('/skipcash/return')) {
       const params = extractParams(url);
-      onSuccess({ orderId: params.orderId, paymentId: params.paymentId });
+      // SkipCash uses statusId=2 for success (Paid)
+      if (params.status === 'Paid' || params.statusId === '2') {
+        console.log('[PaymentWebView] Payment success detected');
+        const paymentData = extractPaymentData(url);
+        onSuccess(paymentData);
+      } else {
+        console.log('[PaymentWebView] Payment failed/cancelled:', params.status);
+        onCancel();
+      }
+      return;
+    }
+
+    // Check for success redirect (app deep link)
+    if (url.startsWith('waselrider://payment-complete') || url.startsWith('waselrider://payment-success')) {
+      console.log('[PaymentWebView] Payment success detected');
+      const paymentData = extractPaymentData(url);
+      onSuccess(paymentData);
       return;
     }
 
@@ -71,8 +101,8 @@ export default function PaymentWebView({
 
     // Check for custom success URL
     if (successUrl && url.startsWith(successUrl)) {
-      const params = extractParams(url);
-      onSuccess({ orderId: params.orderId, paymentId: params.paymentId });
+      const paymentData = extractPaymentData(url);
+      onSuccess(paymentData);
       return;
     }
 
@@ -88,9 +118,9 @@ export default function PaymentWebView({
 
     // Handle deep links - don't load them in WebView, trigger callbacks instead
     if (url.startsWith('waselrider://')) {
-      const params = extractParams(url);
       if (url.includes('payment-complete') || url.includes('payment-success')) {
-        onSuccess({ orderId: params.orderId, paymentId: params.paymentId });
+        const paymentData = extractPaymentData(url);
+        onSuccess(paymentData);
       } else if (url.includes('payment-failed') || url.includes('payment-cancelled')) {
         onCancel();
       }

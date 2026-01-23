@@ -162,19 +162,23 @@ export default function ActiveRideScreen() {
       const completedRide = { ...activeRide }; // Save ride data for summary screen
       await ordersApi.completeRide(activeRide.orderId);
 
-      // Clear active ride state BEFORE navigating
-      setActiveRide(null);
-
-      // Navigate to completion screen (ride data passed via route or stored temporarily)
+      // Navigate to completion screen FIRST, then clear active ride
+      // This prevents the index screen from showing home before navigation completes
       router.replace({
         pathname: '/(main)/ride-complete',
         params: {
-          orderId: completedRide.orderId,
+          orderId: String(completedRide.orderId),
           fare: completedRide.estimatedFare?.toString() || '0',
           distance: completedRide.distance?.toString() || '0',
           paymentMethod: completedRide.paymentMethod || 'cash',
         },
       });
+
+      // Clear active ride state AFTER navigation is initiated
+      // Use setTimeout to ensure navigation happens first
+      setTimeout(() => {
+        setActiveRide(null);
+      }, 100);
     } catch (error) {
       console.error('Error completing ride:', error);
       setIsLoading(false);
