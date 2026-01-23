@@ -19,7 +19,7 @@ interface CreatePrePaymentDto {
 @Controller('skipcash')
 export class SkipCashController {
   private readonly logger = new Logger(SkipCashController.name);
-  private readonly ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3002';
+  private readonly ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3000';
 
   constructor(
     private skipCashService: SkipCashService,
