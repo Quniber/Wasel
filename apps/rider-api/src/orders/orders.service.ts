@@ -518,13 +518,17 @@ export class OrdersService {
     }
 
     // Cancel dispatch and notify driver(s) who received the order request
+    this.logger.log(`[Cancel] Calling cancel-dispatch for order ${orderId} at ${this.ADMIN_API_URL}`);
     try {
-      await firstValueFrom(
+      const response = await firstValueFrom(
         this.httpService.post(`${this.ADMIN_API_URL}/api/internal/orders/${orderId}/cancel-dispatch`),
       );
-      this.logger.log(`Dispatch cancelled for order ${orderId}`);
+      this.logger.log(`[Cancel] Dispatch cancelled for order ${orderId}, response: ${JSON.stringify(response.data)}`);
     } catch (error) {
-      this.logger.warn(`Failed to cancel dispatch for order ${orderId}: ${error.message}`);
+      this.logger.error(`[Cancel] Failed to cancel dispatch for order ${orderId}: ${error.message}`);
+      if (error.response) {
+        this.logger.error(`[Cancel] Response status: ${error.response.status}, data: ${JSON.stringify(error.response.data)}`);
+      }
     }
 
     // Notify about cancellation
