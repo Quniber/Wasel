@@ -10,10 +10,18 @@ interface PendingOrder {
   timeout: NodeJS.Timeout | null;
 }
 
+// Track which driver is currently being offered an order (even after pendingOrders is cleared)
+interface ActiveOffer {
+  orderId: number;
+  driverId: number;
+  expiresAt: number;
+}
+
 @Injectable()
 export class DispatchService {
   private logger = new Logger('DispatchService');
   private pendingOrders = new Map<number, PendingOrder>();
+  private activeOffers = new Map<number, ActiveOffer>(); // orderId -> current offer
   private readonly DRIVER_RESPONSE_TIMEOUT = 15000; // 15 seconds (matches driver app timeout)
   private readonly SEARCH_RADIUS_KM = 10; // 10km radius
 
@@ -302,6 +310,13 @@ export class DispatchService {
       distanceToPickup,
     });
 
+    // Track active offer so we can notify this driver on cancellation
+    this.activeOffers.set(orderId, {
+      orderId,
+      driverId,
+      expiresAt: Date.now() + this.DRIVER_RESPONSE_TIMEOUT + 5000, // Extra 5s buffer
+    });
+
     this.logger.log(
       `Sent order ${orderId} to driver ${driverId} (${pending.currentDriverIndex + 1}/${pending.nearbyDriverIds.length})`,
     );
@@ -380,6 +395,8 @@ export class DispatchService {
       this.pendingOrders.delete(orderId);
       this.logger.log(`Order ${orderId} accepted by driver ${driverId}`);
     }
+    // Clean up active offer
+    this.activeOffers.delete(orderId);
   }
 
   /**
@@ -392,6 +409,8 @@ export class DispatchService {
       if (pending.timeout) {
         clearTimeout(pending.timeout);
       }
+      // Clear active offer since we're moving to next driver
+      this.activeOffers.delete(orderId);
       this.handleDriverTimeout(orderId);
     }
   }
@@ -402,6 +421,8 @@ export class DispatchService {
   cancelDispatch(orderId: number): void {
     this.logger.log(`[cancelDispatch] Called for order ${orderId}`);
     this.logger.log(`[cancelDispatch] pendingOrders has ${this.pendingOrders.size} entries: ${Array.from(this.pendingOrders.keys()).join(', ')}`);
+
+    const notifiedDrivers = new Set<number>();
 
     const pending = this.pendingOrders.get(orderId);
     if (pending) {
@@ -416,6 +437,7 @@ export class DispatchService {
         const driverId = pending.nearbyDriverIds[i];
         this.logger.log(`[cancelDispatch] Notifying driver ${driverId} about cancellation`);
         this.socketService.notifyDriverOrderCancelled(driverId, orderId, 'Order cancelled by rider');
+        notifiedDrivers.add(driverId);
         this.logger.log(`Notified driver ${driverId} that order ${orderId} was cancelled`);
       }
 
@@ -424,6 +446,19 @@ export class DispatchService {
     } else {
       this.logger.warn(`[cancelDispatch] Order ${orderId} NOT found in pendingOrders`);
     }
+
+    // Also check activeOffers for the driver currently viewing the order
+    const activeOffer = this.activeOffers.get(orderId);
+    if (activeOffer && activeOffer.expiresAt > Date.now()) {
+      if (!notifiedDrivers.has(activeOffer.driverId)) {
+        this.logger.log(`[cancelDispatch] Found active offer for driver ${activeOffer.driverId}, notifying`);
+        this.socketService.notifyDriverOrderCancelled(activeOffer.driverId, orderId, 'Order cancelled by rider');
+        this.logger.log(`Notified driver ${activeOffer.driverId} (from activeOffers) that order ${orderId} was cancelled`);
+      }
+    }
+
+    // Clean up active offer
+    this.activeOffers.delete(orderId);
   }
 
   /**
