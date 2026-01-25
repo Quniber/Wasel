@@ -457,7 +457,9 @@ export class OrdersService {
 
   // Cancel order
   async cancel(customerId: number, orderId: number, cancelReasonId?: number, note?: string) {
+    this.logger.log(`[Cancel] START - customerId: ${customerId}, orderId: ${orderId}`);
     const order = await this.findOne(customerId, orderId);
+    this.logger.log(`[Cancel] Found order ${orderId} with status: ${order.status}`);
 
     const cancellableStatuses: OrderStatus[] = [
       OrderStatus.Requested,
