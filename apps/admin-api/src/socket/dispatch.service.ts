@@ -418,9 +418,10 @@ export class DispatchService {
   /**
    * Cancel dispatch for an order
    */
-  cancelDispatch(orderId: number): void {
+  async cancelDispatch(orderId: number): Promise<void> {
     this.logger.log(`[cancelDispatch] Called for order ${orderId}`);
     this.logger.log(`[cancelDispatch] pendingOrders has ${this.pendingOrders.size} entries: ${Array.from(this.pendingOrders.keys()).join(', ')}`);
+    this.logger.log(`[cancelDispatch] activeOffers has ${this.activeOffers.size} entries: ${Array.from(this.activeOffers.keys()).join(', ')}`);
 
     const notifiedDrivers = new Set<number>();
 
@@ -436,7 +437,7 @@ export class DispatchService {
       for (let i = 0; i <= pending.currentDriverIndex && i < pending.nearbyDriverIds.length; i++) {
         const driverId = pending.nearbyDriverIds[i];
         this.logger.log(`[cancelDispatch] Notifying driver ${driverId} about cancellation`);
-        this.socketService.notifyDriverOrderCancelled(driverId, orderId, 'Order cancelled by rider');
+        await this.socketService.notifyDriverOrderCancelled(driverId, orderId, 'Order cancelled by rider');
         notifiedDrivers.add(driverId);
         this.logger.log(`Notified driver ${driverId} that order ${orderId} was cancelled`);
       }
@@ -449,16 +450,20 @@ export class DispatchService {
 
     // Also check activeOffers for the driver currently viewing the order
     const activeOffer = this.activeOffers.get(orderId);
-    if (activeOffer && activeOffer.expiresAt > Date.now()) {
-      if (!notifiedDrivers.has(activeOffer.driverId)) {
+    this.logger.log(`[cancelDispatch] activeOffer for order ${orderId}: ${activeOffer ? JSON.stringify(activeOffer) : 'none'}`);
+    if (activeOffer) {
+      const isNotExpired = activeOffer.expiresAt > Date.now();
+      this.logger.log(`[cancelDispatch] activeOffer isNotExpired: ${isNotExpired}, expiresAt: ${activeOffer.expiresAt}, now: ${Date.now()}`);
+      if (isNotExpired && !notifiedDrivers.has(activeOffer.driverId)) {
         this.logger.log(`[cancelDispatch] Found active offer for driver ${activeOffer.driverId}, notifying`);
-        this.socketService.notifyDriverOrderCancelled(activeOffer.driverId, orderId, 'Order cancelled by rider');
+        await this.socketService.notifyDriverOrderCancelled(activeOffer.driverId, orderId, 'Order cancelled by rider');
         this.logger.log(`Notified driver ${activeOffer.driverId} (from activeOffers) that order ${orderId} was cancelled`);
       }
     }
 
     // Clean up active offer
     this.activeOffers.delete(orderId);
+    this.logger.log(`[cancelDispatch] Completed for order ${orderId}`);
   }
 
   /**

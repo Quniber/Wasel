@@ -167,11 +167,19 @@ export class SocketService {
   }
 
   // Notify driver that order was cancelled
-  notifyDriverOrderCancelled(driverId: number, orderId: number, reason?: string) {
-    this.callSocketApi(`emit/driver/${driverId}`, {
-      event: 'order:cancelled',
-      data: { orderId, reason: reason || 'Order was cancelled' },
-    });
+  async notifyDriverOrderCancelled(driverId: number, orderId: number, reason?: string) {
+    this.logger.log(`[notifyDriverOrderCancelled] Notifying driver ${driverId} about cancelled order ${orderId}`);
+    try {
+      const result = await this.callSocketApi(`emit/driver/${driverId}`, {
+        event: 'order:cancelled',
+        data: { orderId, reason: reason || 'Order was cancelled', cancelledBy: 'rider' },
+      });
+      this.logger.log(`[notifyDriverOrderCancelled] Result for driver ${driverId}, order ${orderId}: ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`[notifyDriverOrderCancelled] Error notifying driver ${driverId}: ${error.message}`);
+      return { success: false };
+    }
   }
 
   // Notify rider about order update

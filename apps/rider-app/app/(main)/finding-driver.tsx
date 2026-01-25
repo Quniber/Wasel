@@ -406,6 +406,7 @@ export default function FindingDriverScreen() {
     isCancellingRef.current = true;
 
     const { activeOrder } = useBookingStore.getState();
+    console.log('[FindingDriver] handleCancel called, activeOrder:', activeOrder?.id, 'status:', activeOrder?.status);
 
     // If order is already finished, just go to ride-complete instead of home
     if (activeOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(activeOrder.status)) {
@@ -418,14 +419,20 @@ export default function FindingDriverScreen() {
     // Cancel the order in the database if we have an order ID
     if (activeOrder?.id) {
       try {
-        console.log('[FindingDriver] Cancelling order:', activeOrder.id);
-        await orderApi.cancelOrder(activeOrder.id);
+        console.log('[FindingDriver] About to call cancelOrder API for order:', activeOrder.id);
+        const cancelResponse = await orderApi.cancelOrder(activeOrder.id);
+        console.log('[FindingDriver] cancelOrder API response:', JSON.stringify(cancelResponse?.data));
         socketService.leaveOrderRoom(Number(activeOrder.id));
+        console.log('[FindingDriver] Left order room:', activeOrder.id);
       } catch (error: any) {
-        console.error('[FindingDriver] Error cancelling order:', error);
+        console.error('[FindingDriver] Error cancelling order:', error?.message);
+        console.error('[FindingDriver] Error response:', JSON.stringify(error?.response?.data));
+        console.error('[FindingDriver] Error status:', error?.response?.status);
         // If order can't be cancelled (already finished/cancelled), just clear state and go home
         console.log('[FindingDriver] Proceeding with cleanup despite error');
       }
+    } else {
+      console.log('[FindingDriver] No activeOrder.id, skipping API cancel');
     }
 
     // Cleanup socket listeners
