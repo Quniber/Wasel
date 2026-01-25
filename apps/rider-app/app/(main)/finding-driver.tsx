@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { MapView, MapMarker as Marker, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 const Circle = ({ center, radius, ...props }: any) => null; // Web placeholder
 import { useThemeStore } from '@/stores/theme-store';
@@ -12,9 +13,11 @@ import { orderApi } from '@/lib/api';
 import { socketService } from '@/lib/socket';
 
 export default function FindingDriverScreen() {
+  console.log('[FindingDriver] Component rendering...');
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const { pickup, dropoff, selectedService, paymentMethod, setActiveOrder, resetBooking } = useBookingStore();
+  console.log('[FindingDriver] After hooks - pickup:', !!pickup, 'dropoff:', !!dropoff, 'service:', !!selectedService);
   const isDark = resolvedTheme === 'dark';
 
   const mapRef = useRef<MapView>(null);
@@ -27,51 +30,58 @@ export default function FindingDriverScreen() {
   // Track if cancel has been triggered to prevent loops
   const isCancellingRef = useRef(false);
 
-  useEffect(() => {
-    startPulseAnimation();
+  // Use useFocusEffect instead of useEffect to handle screen re-focus
+  // This ensures order creation runs every time the screen comes into focus,
+  // not just on initial mount (which doesn't re-run with Expo Router's Drawer)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[FindingDriver] Screen focused, starting order flow...');
+      startPulseAnimation();
 
-    // Log current state for debugging
-    const currentState = useBookingStore.getState();
-    console.log('[FindingDriver] Mount state:', {
-      hasPickup: !!currentState.pickup,
-      hasDropoff: !!currentState.dropoff,
-      hasSelectedService: !!currentState.selectedService,
-      activeOrderId: currentState.activeOrder?.id,
-      activeOrderStatus: currentState.activeOrder?.status,
-    });
+      // Log current state for debugging
+      const currentState = useBookingStore.getState();
+      console.log('[FindingDriver] Focus state:', {
+        hasPickup: !!currentState.pickup,
+        hasDropoff: !!currentState.dropoff,
+        hasSelectedService: !!currentState.selectedService,
+        activeOrderId: currentState.activeOrder?.id,
+        activeOrderStatus: currentState.activeOrder?.status,
+      });
 
-    // Check if we already have an order from pre-payment
-    const existingOrder = currentState.activeOrder;
+      // Check if we already have an order from pre-payment
+      const existingOrder = currentState.activeOrder;
 
-    // If order is already finished, go directly to ride-complete
-    if (existingOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)) {
-      console.log('[FindingDriver] Order already finished, redirecting to ride-complete');
-      router.replace('/(main)/ride-complete');
-      return;
-    }
-
-    // If order has a driver (DriverAccepted or later status), go to ride-active
-    if (existingOrder?.id && existingOrder.driver && ['DriverAccepted', 'Arrived', 'Started'].includes(existingOrder.status)) {
-      console.log('[FindingDriver] Order has driver, redirecting to ride-active');
-      router.replace('/(main)/ride-active');
-      return;
-    }
-
-    if (existingOrder?.id && existingOrder.status === 'Requested') {
-      console.log('[FindingDriver] Using existing pre-paid order:', existingOrder.id);
-      waitForDriver(Number(existingOrder.id));
-    } else {
-      createOrder();
-    }
-
-    return () => {
-      // Cleanup socket listeners when unmounting
-      if (cleanupRef.current) {
-        cleanupRef.current();
-        cleanupRef.current = null;
+      // If order is already finished, go directly to ride-complete
+      if (existingOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)) {
+        console.log('[FindingDriver] Order already finished, redirecting to ride-complete');
+        router.replace('/(main)/ride-complete');
+        return;
       }
-    };
-  }, []);
+
+      // If order has a driver (DriverAccepted or later status), go to ride-active
+      if (existingOrder?.id && existingOrder.driver && ['DriverAccepted', 'Arrived', 'Started'].includes(existingOrder.status)) {
+        console.log('[FindingDriver] Order has driver, redirecting to ride-active');
+        router.replace('/(main)/ride-active');
+        return;
+      }
+
+      if (existingOrder?.id && existingOrder.status === 'Requested') {
+        console.log('[FindingDriver] Using existing pre-paid order:', existingOrder.id);
+        waitForDriver(Number(existingOrder.id));
+      } else {
+        createOrder();
+      }
+
+      return () => {
+        // Cleanup socket listeners when losing focus
+        console.log('[FindingDriver] Screen losing focus, cleaning up...');
+        if (cleanupRef.current) {
+          cleanupRef.current();
+          cleanupRef.current = null;
+        }
+      };
+    }, [])
+  );
 
   const startPulseAnimation = () => {
     Animated.loop(
@@ -437,6 +447,7 @@ export default function FindingDriverScreen() {
   };
 
   if (!pickup) {
+    console.log('[FindingDriver] No pickup data, showing error view');
     return (
       <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
         <Text className="text-muted-foreground">{t('errors.generic')}</Text>

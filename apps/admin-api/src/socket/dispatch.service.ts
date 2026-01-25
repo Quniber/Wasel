@@ -400,8 +400,13 @@ export class DispatchService {
    * Cancel dispatch for an order
    */
   cancelDispatch(orderId: number): void {
+    this.logger.log(`[cancelDispatch] Called for order ${orderId}`);
+    this.logger.log(`[cancelDispatch] pendingOrders has ${this.pendingOrders.size} entries: ${Array.from(this.pendingOrders.keys()).join(', ')}`);
+
     const pending = this.pendingOrders.get(orderId);
     if (pending) {
+      this.logger.log(`[cancelDispatch] Found pending order ${orderId} with ${pending.nearbyDriverIds.length} drivers, currentIndex: ${pending.currentDriverIndex}`);
+
       if (pending.timeout) {
         clearTimeout(pending.timeout);
       }
@@ -409,12 +414,15 @@ export class DispatchService {
       // Notify all drivers who received the order request
       for (let i = 0; i <= pending.currentDriverIndex && i < pending.nearbyDriverIds.length; i++) {
         const driverId = pending.nearbyDriverIds[i];
+        this.logger.log(`[cancelDispatch] Notifying driver ${driverId} about cancellation`);
         this.socketService.notifyDriverOrderCancelled(driverId, orderId, 'Order cancelled by rider');
         this.logger.log(`Notified driver ${driverId} that order ${orderId} was cancelled`);
       }
 
       this.pendingOrders.delete(orderId);
       this.logger.log(`Dispatch cancelled for order ${orderId}`);
+    } else {
+      this.logger.warn(`[cancelDispatch] Order ${orderId} NOT found in pendingOrders`);
     }
   }
 
