@@ -24,12 +24,29 @@ export default function FindingDriverScreen() {
 
   // Store cleanup function ref
   const cleanupRef = useRef<(() => void) | null>(null);
+  // Track if cancel has been triggered to prevent loops
+  const isCancellingRef = useRef(false);
 
   useEffect(() => {
     startPulseAnimation();
 
     // Check if we already have an order from pre-payment
     const existingOrder = useBookingStore.getState().activeOrder;
+
+    // If order is already finished, go directly to ride-complete
+    if (existingOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)) {
+      console.log('[FindingDriver] Order already finished, redirecting to ride-complete');
+      router.replace('/(main)/ride-complete');
+      return;
+    }
+
+    // If order has a driver (DriverAccepted or later status), go to ride-active
+    if (existingOrder?.id && existingOrder.driver && ['DriverAccepted', 'Arrived', 'Started'].includes(existingOrder.status)) {
+      console.log('[FindingDriver] Order has driver, redirecting to ride-active');
+      router.replace('/(main)/ride-active');
+      return;
+    }
+
     if (existingOrder?.id && existingOrder.status === 'Requested') {
       console.log('[FindingDriver] Using existing pre-paid order:', existingOrder.id);
       waitForDriver(Number(existingOrder.id));
@@ -350,7 +367,22 @@ export default function FindingDriverScreen() {
   };
 
   const handleCancel = async () => {
+    // Prevent multiple cancel calls
+    if (isCancellingRef.current) {
+      console.log('[FindingDriver] Cancel already in progress, ignoring');
+      return;
+    }
+    isCancellingRef.current = true;
+
     const { activeOrder } = useBookingStore.getState();
+
+    // If order is already finished, just go to ride-complete instead of home
+    if (activeOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(activeOrder.status)) {
+      console.log('[FindingDriver] Order already finished, going to ride-complete');
+      router.replace('/(main)/ride-complete');
+      isCancellingRef.current = false;
+      return;
+    }
 
     // Cancel the order in the database if we have an order ID
     if (activeOrder?.id) {
@@ -358,14 +390,23 @@ export default function FindingDriverScreen() {
         console.log('[FindingDriver] Cancelling order:', activeOrder.id);
         await orderApi.cancelOrder(activeOrder.id);
         socketService.leaveOrderRoom(Number(activeOrder.id));
-      } catch (error) {
+      } catch (error: any) {
         console.error('[FindingDriver] Error cancelling order:', error);
+        // If order can't be cancelled (already finished/cancelled), just clear state and go home
+        console.log('[FindingDriver] Proceeding with cleanup despite error');
       }
+    }
+
+    // Cleanup socket listeners
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
     }
 
     // Reset local state
     resetBooking();
     router.replace('/(main)');
+    isCancellingRef.current = false;
   };
 
   const handleRetry = () => {

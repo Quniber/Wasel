@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -51,8 +51,13 @@ export default function RideCompleteScreen() {
   }, [activeOrder?.id]);
 
   // Handle missing activeOrder in useEffect, not during render
+  // Use a ref to track if we've already redirected to prevent loops
+  const hasRedirectedRef = useRef(false);
+
   useEffect(() => {
-    if (!activeOrder) {
+    if (!activeOrder && !hasRedirectedRef.current) {
+      console.log('[RideComplete] No active order, redirecting to home');
+      hasRedirectedRef.current = true;
       resetBooking();
       router.replace('/(main)');
     }

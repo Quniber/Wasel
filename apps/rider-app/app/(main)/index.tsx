@@ -61,8 +61,9 @@ export default function HomeScreen() {
           console.log('[Home] Found active order:', order.id, 'status:', order.status);
 
           // Skip completed/cancelled orders
-          if (['Finished', 'Cancelled', 'Expired'].includes(order.status)) {
-            console.log('[Home] Order is completed, clearing state');
+          const completedStatuses = ['Finished', 'Cancelled', 'Expired', 'RiderCanceled', 'DriverCanceled'];
+          if (completedStatuses.includes(order.status)) {
+            console.log('[Home] Order is completed/cancelled, clearing state');
             setActiveOrder(null);
             return;
           }
@@ -125,7 +126,20 @@ export default function HomeScreen() {
             createdAt: order.createdAt || new Date().toISOString(),
           });
 
-          router.replace('/(main)/ride-active');
+          // Navigate based on order status
+          if (order.status === 'Requested' || order.status === 'Found') {
+            // Order is still searching for driver
+            router.replace('/(main)/finding-driver');
+          } else if (['DriverAccepted', 'Arrived', 'Started'].includes(order.status)) {
+            // Order has driver, go to ride-active
+            router.replace('/(main)/ride-active');
+          } else if (order.status === 'WaitingForPostPay') {
+            // Order needs payment
+            router.replace('/(main)/ride-complete');
+          } else {
+            // Default to ride-active
+            router.replace('/(main)/ride-active');
+          }
         } else if (activeOrder) {
           // Local state has order but server doesn't, clear local
           console.log('[Home] No active order on server, clearing local state');

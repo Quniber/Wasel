@@ -113,9 +113,13 @@ export default function RideActiveScreen() {
       const status = data.status?.toLowerCase();
       if (status === 'driver_arrived' || status === 'arrived') {
         setStatus('driver_arrived');
+        updateOrderStatus('Arrived');
       } else if (status === 'trip_started' || status === 'started') {
         setStatus('trip_started');
+        updateOrderStatus('Started');
       } else if (status === 'trip_completed' || status === 'completed' || status === 'finished') {
+        // Update local status before navigating to prevent stale state
+        updateOrderStatus('Finished');
         router.replace('/(main)/ride-complete');
       }
     });
