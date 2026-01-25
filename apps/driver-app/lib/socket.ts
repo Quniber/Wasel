@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 // Connect to centralized socket-api service
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://wasel.shafrah.qa';
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'https://api.waselapp.qa';
 
 // Helper to get token cross-platform
 const getAuthToken = async (): Promise<string | null> => {

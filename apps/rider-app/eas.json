@@ -13,8 +13,8 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://wasel.shafrah.qa/rider-api/api",
-        "EXPO_PUBLIC_SOCKET_URL": "https://wasel.shafrah.qa",
+        "EXPO_PUBLIC_API_URL": "https://api.waselapp.qa/rider-api/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://api.waselapp.qa",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
       }
     },
@@ -28,8 +28,8 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://wasel.shafrah.qa/rider-api/api",
-        "EXPO_PUBLIC_SOCKET_URL": "https://wasel.shafrah.qa",
+        "EXPO_PUBLIC_API_URL": "https://api.waselapp.qa/rider-api/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://api.waselapp.qa",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
       }
     }
