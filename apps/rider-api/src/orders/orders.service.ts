@@ -8,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
-  private readonly ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3002';
+  private readonly ADMIN_API_URL = process.env.ADMIN_API_URL || 'http://localhost:3000';
 
   constructor(
     private prisma: PrismaService,
@@ -515,6 +515,16 @@ export class OrdersService {
         where: { id: order.driverId },
         data: { status: 'online' as any },
       });
+    }
+
+    // Cancel dispatch and notify driver(s) who received the order request
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${this.ADMIN_API_URL}/api/internal/orders/${orderId}/cancel-dispatch`),
+      );
+      this.logger.log(`Dispatch cancelled for order ${orderId}`);
+    } catch (error) {
+      this.logger.warn(`Failed to cancel dispatch for order ${orderId}: ${error.message}`);
     }
 
     // Notify about cancellation

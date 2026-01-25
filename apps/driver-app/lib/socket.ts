@@ -60,9 +60,13 @@ class DriverSocketService {
 
     // Re-emit events to registered listeners
     this.socket.onAny((event, ...args) => {
+      console.log('[Socket] Received event:', event, JSON.stringify(args));
       const callbacks = this.listeners.get(event);
       if (callbacks) {
+        console.log('[Socket] Found', callbacks.size, 'listeners for event:', event);
         callbacks.forEach((callback) => callback(...args));
+      } else {
+        console.log('[Socket] No listeners registered for event:', event);
       }
     });
   }

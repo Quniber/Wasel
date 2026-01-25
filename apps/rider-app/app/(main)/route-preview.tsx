@@ -268,7 +268,17 @@ export default function RoutePreviewScreen() {
   const [isRequestingRide, setIsRequestingRide] = useState(false);
 
   const handleRequestRide = async () => {
-    if (!pickup || !dropoff || !selectedService) return;
+    console.log('[RoutePreview] handleRequestRide called:', {
+      hasPickup: !!pickup,
+      hasDropoff: !!dropoff,
+      hasSelectedService: !!selectedService,
+      paymentMethod,
+    });
+
+    if (!pickup || !dropoff || !selectedService) {
+      console.log('[RoutePreview] Cannot request ride - missing data');
+      return;
+    }
 
     const fare = getFareForService(selectedService.id);
     const amount = fare?.totalFare || selectedService.minimumFare || 15;
@@ -317,6 +327,7 @@ export default function RoutePreviewScreen() {
       }
     } else {
       // For cash/wallet, proceed directly to finding driver
+      console.log('[RoutePreview] Navigating to finding-driver');
       router.push('/(main)/finding-driver');
     }
   };
@@ -439,7 +450,7 @@ export default function RoutePreviewScreen() {
           {/* Services */}
           {isLoading ? (
             <View className="py-8 items-center">
-              <ActivityIndicator size="large" color="#4CAF50" />
+              <ActivityIndicator size="large" color="#0366FB" />
               <Text className="text-muted-foreground mt-2">{t('common.loading')}</Text>
             </View>
           ) : (

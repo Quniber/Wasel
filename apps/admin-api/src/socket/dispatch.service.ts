@@ -405,6 +405,14 @@ export class DispatchService {
       if (pending.timeout) {
         clearTimeout(pending.timeout);
       }
+
+      // Notify all drivers who received the order request
+      for (let i = 0; i <= pending.currentDriverIndex && i < pending.nearbyDriverIds.length; i++) {
+        const driverId = pending.nearbyDriverIds[i];
+        this.socketService.notifyDriverOrderCancelled(driverId, orderId, 'Order cancelled by rider');
+        this.logger.log(`Notified driver ${driverId} that order ${orderId} was cancelled`);
+      }
+
       this.pendingOrders.delete(orderId);
       this.logger.log(`Dispatch cancelled for order ${orderId}`);
     }

@@ -30,8 +30,18 @@ export default function FindingDriverScreen() {
   useEffect(() => {
     startPulseAnimation();
 
+    // Log current state for debugging
+    const currentState = useBookingStore.getState();
+    console.log('[FindingDriver] Mount state:', {
+      hasPickup: !!currentState.pickup,
+      hasDropoff: !!currentState.dropoff,
+      hasSelectedService: !!currentState.selectedService,
+      activeOrderId: currentState.activeOrder?.id,
+      activeOrderStatus: currentState.activeOrder?.status,
+    });
+
     // Check if we already have an order from pre-payment
-    const existingOrder = useBookingStore.getState().activeOrder;
+    const existingOrder = currentState.activeOrder;
 
     // If order is already finished, go directly to ride-complete
     if (existingOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)) {
@@ -207,7 +217,18 @@ export default function FindingDriverScreen() {
   };
 
   const createOrder = async () => {
-    if (!pickup || !dropoff || !selectedService) return;
+    // Read latest values from store to avoid stale closure issues
+    const { pickup: currentPickup, dropoff: currentDropoff, selectedService: currentService, paymentMethod: currentPaymentMethod } = useBookingStore.getState();
+
+    if (!currentPickup || !currentDropoff || !currentService) {
+      console.log('[FindingDriver] Cannot create order - missing data:', {
+        hasPickup: !!currentPickup,
+        hasDropoff: !!currentDropoff,
+        hasSelectedService: !!currentService,
+      });
+      setStatus('not_found');
+      return;
+    }
 
     try {
       // Map payment method to API format
@@ -219,14 +240,14 @@ export default function FindingDriverScreen() {
 
       // Create order via API
       const response = await orderApi.createOrder({
-        serviceId: parseInt(selectedService.id, 10),
-        pickupAddress: pickup.address,
-        pickupLatitude: pickup.latitude,
-        pickupLongitude: pickup.longitude,
-        dropoffAddress: dropoff.address,
-        dropoffLatitude: dropoff.latitude,
-        dropoffLongitude: dropoff.longitude,
-        paymentMode: paymentModeMap[paymentMethod] || 'cash',
+        serviceId: parseInt(currentService.id, 10),
+        pickupAddress: currentPickup.address,
+        pickupLatitude: currentPickup.latitude,
+        pickupLongitude: currentPickup.longitude,
+        dropoffAddress: currentDropoff.address,
+        dropoffLatitude: currentDropoff.latitude,
+        dropoffLongitude: currentDropoff.longitude,
+        paymentMode: paymentModeMap[currentPaymentMethod] || 'cash',
       });
 
       const order = response.data;
@@ -262,8 +283,8 @@ export default function FindingDriverScreen() {
                 ? driverData.carColor
                 : driverData.carColor?.name || '',
               carPlate: driverData.carPlate || '',
-              latitude: driverData.latitude || pickup.latitude,
-              longitude: driverData.longitude || pickup.longitude,
+              latitude: driverData.latitude || currentPickup.latitude,
+              longitude: driverData.longitude || currentPickup.longitude,
             };
           };
 
@@ -279,9 +300,9 @@ export default function FindingDriverScreen() {
             setActiveOrder({
               id: fullOrder.id?.toString() || order.id.toString(),
               status: 'DriverAccepted',
-              pickup,
-              dropoff,
-              service: selectedService,
+              pickup: currentPickup,
+              dropoff: currentDropoff,
+              service: currentService,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
               driver: buildDriverObject(driverData),
               createdAt: order.createdAt || new Date().toISOString(),
@@ -298,9 +319,9 @@ export default function FindingDriverScreen() {
             setActiveOrder({
               id: data.orderId?.toString() || order.id.toString(),
               status: 'DriverAccepted',
-              pickup,
-              dropoff,
-              service: selectedService,
+              pickup: currentPickup,
+              dropoff: currentDropoff,
+              service: currentService,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
               driver: buildDriverObject(data.driver) || {
                 id: String(data.driverId || ''),
@@ -312,8 +333,8 @@ export default function FindingDriverScreen() {
                 carModel: '',
                 carColor: '',
                 carPlate: '',
-                latitude: pickup.latitude,
-                longitude: pickup.longitude,
+                latitude: currentPickup.latitude,
+                longitude: currentPickup.longitude,
               },
               createdAt: order.createdAt || new Date().toISOString(),
             });
@@ -342,9 +363,9 @@ export default function FindingDriverScreen() {
       setActiveOrder({
         id: order.id.toString(),
         status: 'searching',
-        pickup,
-        dropoff,
-        service: selectedService,
+        pickup: currentPickup,
+        dropoff: currentDropoff,
+        service: currentService,
         fare: parseFloat(order.fare) || 15,
         driver: null,
         createdAt: order.createdAt || new Date().toISOString(),

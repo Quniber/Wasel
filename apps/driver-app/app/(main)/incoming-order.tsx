@@ -153,6 +153,22 @@ export default function IncomingOrderScreen() {
     }
   };
 
+  // Listen for order cancelled by rider
+  useEffect(() => {
+    if (!incomingOrder) return;
+
+    const unsubscribe = socketService.on('order:cancelled', (data: { orderId: number; cancelledBy?: string; reason?: string }) => {
+      console.log('[IncomingOrder] Order cancelled:', data);
+      if (data.orderId === incomingOrder.orderId) {
+        console.log('[IncomingOrder] This order was cancelled by rider, dismissing...');
+        clearIncomingOrder();
+        router.replace('/(main)');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [incomingOrder?.orderId]);
+
   // Redirect if no incoming order
   useEffect(() => {
     if (!incomingOrder) {

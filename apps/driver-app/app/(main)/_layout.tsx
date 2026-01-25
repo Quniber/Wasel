@@ -109,6 +109,9 @@ export default function MainLayout() {
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
 
+  const { setIncomingOrder, incomingOrder } = useDriverStore();
+  const pathname = usePathname();
+
   useEffect(() => {
     // Connect socket when entering main
     if (isAuthenticated) {
@@ -119,6 +122,29 @@ export default function MainLayout() {
       // Don't disconnect on unmount - keep connected while in app
     };
   }, [isAuthenticated]);
+
+  // Global listener for incoming orders - survives navigation
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const unsubscribe = socketService.on('order:new', (order: any) => {
+      console.log('[Layout] Received new order:', order.orderId);
+      console.log('[Layout] Current path:', pathname);
+      setIncomingOrder(order);
+
+      // Only navigate if not already on incoming-order screen
+      if (!pathname.includes('incoming-order')) {
+        console.log('[Layout] Navigating to incoming-order screen');
+        router.push('/(main)/incoming-order');
+      } else {
+        console.log('[Layout] Already on incoming-order screen, order will update in place');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, pathname]);
 
   return (
     <Drawer

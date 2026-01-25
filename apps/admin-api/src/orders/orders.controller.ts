@@ -154,4 +154,10 @@ export class InternalOrdersController {
     const result = await this.dispatchService.dispatchOrder(orderId);
     return { success: result, orderId };
   }
+
+  @Post(':id/cancel-dispatch')
+  async cancelDispatch(@Param('id', ParseIntPipe) orderId: number) {
+    this.dispatchService.cancelDispatch(orderId);
+    return { success: true, orderId };
+  }
 }
