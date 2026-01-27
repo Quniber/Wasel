@@ -59,8 +59,8 @@ export class AuthService {
 
     return {
       message: 'OTP sent successfully',
-      // Include OTP in dev mode for testing
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      // Always return devOtp during testing phase - remove before actual production
+      devOtp: otp,
     };
   }
 
@@ -148,7 +148,8 @@ export class AuthService {
 
     return {
       message: 'OTP sent successfully',
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      // Always return devOtp during testing phase - remove before actual production
+      devOtp: otp,
     };
   }
 
@@ -207,7 +208,8 @@ export class AuthService {
 
     return {
       message: 'OTP resent successfully',
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      // Always return devOtp during testing phase - remove before actual production
+      devOtp: otp,
     };
   }
 
