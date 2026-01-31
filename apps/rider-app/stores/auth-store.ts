@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { sessionManager, SessionTokens, getDeviceInfo } from '@/lib/session';
+import { socketService } from '@/lib/socket';
 
 export interface User {
   id: string;
@@ -87,6 +88,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       token: tokens.accessToken,
       isAuthenticated: true
     });
+    // Reconnect socket with new token
+    await socketService.reconnect();
   },
 
   setLoading: (isLoading) => {
@@ -94,6 +97,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    socketService.disconnect();
     await sessionManager.logout();
     set({ user: null, isAuthenticated: false, token: null });
   },

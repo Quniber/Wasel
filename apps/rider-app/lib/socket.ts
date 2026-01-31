@@ -72,6 +72,13 @@ class SocketService {
     }
   }
 
+  // Force reconnect with fresh token (call after login)
+  async reconnect() {
+    console.log('[Socket] Reconnecting with fresh token...');
+    this.disconnect();
+    await this.connect();
+  }
+
   // Subscribe to events
   on(event: string, callback: (...args: any[]) => void) {
     if (!this.listeners.has(event)) {
