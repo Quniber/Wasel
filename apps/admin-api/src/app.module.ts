@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomersModule } from './customers/customers.module';
@@ -19,7 +20,14 @@ import { CustomerAuthModule } from './customer-auth/customer-auth.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        '/var/www/Wasel/.env',                      // Server absolute path
+        join(__dirname, '..', '..', '..', '.env'),  // Root .env
+        '.env',                                      // Local fallback
+      ],
+    }),
     PrismaModule,
     AuthModule,
     DriverAuthModule,

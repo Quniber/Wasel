@@ -19,7 +19,7 @@ import { SkipCashModule } from './skipcash/skipcash.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
-        '/var/www/wasel/.env',                      // Server absolute path
+        '/var/www/Wasel/.env',                      // Server absolute path (capital W)
         join(__dirname, '..', '..', '..', '..', '.env'), // From dist/src to root
         join(__dirname, '..', '..', '..', '.env'), // Fallback
         '.env',                                     // Local fallback
