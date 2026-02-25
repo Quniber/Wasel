@@ -22,19 +22,57 @@ export default function ConfirmLocationScreen() {
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [region, setRegion] = useState<Region | null>(null);
 
-  const locationType = type || 'dropoff';
+  // Handle both 'dropoff' and 'destination' as the same (search.tsx uses 'destination')
+  const locationType = type === 'pickup' ? 'pickup' : 'dropoff';
   const currentLocation = locationType === 'pickup' ? pickup : dropoff;
 
   useEffect(() => {
-    if (currentLocation) {
-      setRegion({
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      });
-      setAddress(currentLocation.address);
-    }
+    const initializeLocation = async () => {
+      // If we already have the target location, use it
+      if (currentLocation) {
+        setRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        });
+        setAddress(currentLocation.address);
+        return;
+      }
+
+      // If target location is null (e.g., dropoff not set yet),
+      // use pickup location as starting point, or get current GPS location
+      if (pickup) {
+        setRegion({
+          latitude: pickup.latitude,
+          longitude: pickup.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        });
+        setAddress('');
+        return;
+      }
+
+      // Fallback: get current GPS location
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          });
+        }
+      } catch (error) {
+        console.error('Error getting current location:', error);
+      }
+    };
+
+    initializeLocation();
   }, []);
 
   const handleRegionChangeComplete = async (newRegion: Region) => {
@@ -84,7 +122,7 @@ export default function ConfirmLocationScreen() {
   if (!region) {
     return (
       <View className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#0366FB" />
       </View>
     );
   }
@@ -150,7 +188,7 @@ export default function ConfirmLocationScreen() {
             />
             <View className="flex-1 ml-3">
               {isLoadingAddress ? (
-                <ActivityIndicator size="small" color="#4CAF50" />
+                <ActivityIndicator size="small" color="#0366FB" />
               ) : (
                 <Text
                   className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}

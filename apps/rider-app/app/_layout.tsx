@@ -35,7 +35,7 @@ function RootLayoutContent() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-background dark:bg-background-dark">
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#0366FB" />
       </View>
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, ActivityIndicator, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, ActivityIndicator, TextInput, Modal, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
 import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore, Service, FareEstimate, PaymentMethod } from '@/stores/booking-store';
-import { orderApi, couponApi } from '@/lib/api';
+import { api, orderApi, couponApi } from '@/lib/api';
 import { getColors } from '@/constants/Colors';
 
 export default function SelectServiceScreen() {
@@ -146,8 +146,62 @@ export default function SelectServiceScreen() {
     }
   };
 
-  const handleRequestRide = () => {
-    router.push('/(main)/finding-driver');
+  const [isRequestingRide, setIsRequestingRide] = useState(false);
+
+  const handleRequestRide = async () => {
+    if (!pickup || !dropoff || !selectedService) {
+      return;
+    }
+
+    const fare = getFareForService(selectedService.id);
+    const amount = fare?.totalFare || selectedService.minimumFare || 15;
+
+    // For card payments, show payment screen first
+    if (paymentMethod === 'card') {
+      setIsRequestingRide(true);
+      try {
+        // Create pre-payment session
+        const response = await api.post('/skipcash/prepay', {
+          amount,
+          serviceId: parseInt(selectedService.id, 10),
+          pickupAddress: pickup.address,
+          pickupLatitude: pickup.latitude,
+          pickupLongitude: pickup.longitude,
+          dropoffAddress: dropoff.address,
+          dropoffLatitude: dropoff.latitude,
+          dropoffLongitude: dropoff.longitude,
+        });
+
+        if (response.data.success && response.data.payUrl) {
+          // Navigate to payment screen with WebView
+          router.push({
+            pathname: '/(main)/payment',
+            params: {
+              payUrl: response.data.payUrl,
+              amount: String(amount),
+              isPrePay: 'true',
+              serviceId: selectedService.id,
+            },
+          });
+        } else {
+          Alert.alert(
+            t('payment.error.title', { defaultValue: 'Payment Error' }),
+            response.data.error || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
+          );
+        }
+      } catch (error: any) {
+        console.error('[SelectService] Error creating pre-payment:', error);
+        Alert.alert(
+          t('payment.error.title', { defaultValue: 'Payment Error' }),
+          error.response?.data?.message || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
+        );
+      } finally {
+        setIsRequestingRide(false);
+      }
+    } else {
+      // For cash/wallet, proceed directly to finding driver
+      router.push('/(main)/finding-driver');
+    }
   };
 
   const getFareForService = (serviceId: string) => {
@@ -317,12 +371,23 @@ export default function SelectServiceScreen() {
           {/* Request Ride Button */}
           <TouchableOpacity
             onPress={handleRequestRide}
-            disabled={!selectedService}
-            className={`py-4 rounded-xl items-center ${selectedService ? 'bg-primary' : 'bg-muted dark:bg-muted-dark'}`}
+            disabled={!selectedService || isRequestingRide}
+            className={`py-4 rounded-xl items-center flex-row justify-center ${selectedService && !isRequestingRide ? 'bg-primary' : 'bg-muted dark:bg-muted-dark'}`}
           >
-            <Text className={`text-lg font-semibold ${selectedService ? 'text-white' : 'text-muted-foreground'}`}>
-              {t('booking.requestRide')}
-            </Text>
+            {isRequestingRide ? (
+              <>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text className="text-white text-lg font-semibold ml-2">
+                  {t('payment.processing', { defaultValue: 'Processing...' })}
+                </Text>
+              </>
+            ) : (
+              <Text className={`text-lg font-semibold ${selectedService ? 'text-white' : 'text-muted-foreground'}`}>
+                {paymentMethod === 'card'
+                  ? t('booking.payAndRequest', { defaultValue: 'Pay & Request Ride' })
+                  : t('booking.requestRide')}
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* Schedule Later */}

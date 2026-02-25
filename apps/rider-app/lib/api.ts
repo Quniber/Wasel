@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.waselapp.qa/rider-api/api';
 
 // Cross-platform storage helpers
 const storage = {

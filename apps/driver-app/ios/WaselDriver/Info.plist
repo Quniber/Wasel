@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>wasel-driver</string>
-          <string>com.shafrah.wasel.driver</string>
+          <string>qa.waselapp.driver</string>
         </array>
       </dict>
       <dict>
@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>5</string>
+    <string>10</string>
     <key>GMSApiKey</key>
     <string>AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE</string>
     <key>ITSAppUsesNonExemptEncryption</key>

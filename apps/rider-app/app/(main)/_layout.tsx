@@ -87,7 +87,7 @@ function CustomDrawerContent(props: any) {
             <Ionicons
               name={item.icon as any}
               size={24}
-              color={props.state.index === index ? '#4CAF50' : (isDark ? '#FAFAFA' : '#212121')}
+              color={props.state.index === index ? (isDark ? '#60a5fa' : '#3b82f6') : (isDark ? '#FAFAFA' : '#212121')}
             />
             <Text
               className={`ml-4 text-base ${
@@ -121,7 +121,7 @@ function CustomDrawerContent(props: any) {
           <Switch
             value={mode === 'dark'}
             onValueChange={toggleDarkMode}
-            trackColor={{ false: '#E0E0E0', true: '#4CAF50' }}
+            trackColor={{ false: '#E0E0E0', true: isDark ? '#60a5fa' : '#3b82f6' }}
             thumbColor="#FFFFFF"
           />
         </View>

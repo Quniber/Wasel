@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wasel.rider",
+      "bundleIdentifier": "qa.waselapp.rider",
       "config": {
         "googleMapsApiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
       },
@@ -23,14 +23,14 @@
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
       },
-      "buildNumber": "12"
+      "buildNumber": "18"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4CAF50"
       },
-      "package": "com.wasel.rider",
+      "package": "qa.waselapp.rider",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",

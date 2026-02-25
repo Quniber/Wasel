@@ -28,7 +28,11 @@
       "title": "Wasel",
       "subtitle": "Your ride, your way",
       "getStarted": "Get Started",
-      "loginWithEmail": "Login with Email"
+      "loginWithEmail": "Login with Email",
+      "feature1": "Safe & Secure Rides",
+      "feature2": "Available 24/7",
+      "feature3": "Easy Payments",
+      "terms": "By continuing, you agree to our Terms of Service and Privacy Policy"
     },
     "phone": {
       "title": "Enter your phone number",

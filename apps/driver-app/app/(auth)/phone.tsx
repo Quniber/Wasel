@@ -44,26 +44,8 @@ export default function PhoneScreen() {
         params: { phone: formattedPhone, mode: 'login' },
       });
     } catch (err: any) {
-      // If user not found, try registration
-      if (err.response?.status === 404) {
-        try {
-          const formattedPhone = phone.startsWith('+') ? phone : `+974${phone}`;
-          const regResponse = await authApi.registerWithPhone(formattedPhone);
-
-          if (regResponse.data.devOtp) {
-            Alert.alert('Dev OTP', `Your OTP is: ${regResponse.data.devOtp}`);
-          }
-
-          router.push({
-            pathname: '/(auth)/otp',
-            params: { phone: formattedPhone, mode: 'register' },
-          });
-        } catch (regErr: any) {
-          setError(regErr.response?.data?.message || t('errors.generic'));
-        }
-      } else {
-        setError(err.response?.data?.message || t('errors.generic'));
-      }
+      // Show error message from server (e.g., "Phone number not registered")
+      setError(err.response?.data?.message || t('errors.generic'));
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Alert, TextInput, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -256,54 +256,59 @@ export default function PlacesScreen() {
 
       {/* Edit/Add Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
-        <View className="flex-1 justify-end bg-black/50">
-          <View className={`rounded-t-3xl p-6 ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-            <View className="flex-row items-center justify-between mb-6">
-              <Text className={`text-xl font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {editingPlace ? t('places.editPlace') : t('places.addPlace')}
-              </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <View className={`rounded-t-3xl p-6 ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
+              <View className="flex-row items-center justify-between mb-6">
+                <Text className={`text-xl font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                  {editingPlace ? t('places.editPlace') : t('places.addPlace')}
+                </Text>
+                <TouchableOpacity onPress={() => setShowModal(false)}>
+                  <Ionicons name="close" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-muted-foreground text-sm mb-2">{t('places.nameLabel')}</Text>
+              <TextInput
+                className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
+                placeholder={t('places.namePlaceholder')}
+                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
+                value={placeName}
+                onChangeText={setPlaceName}
+              />
+
+              <Text className="text-muted-foreground text-sm mb-2">{t('places.addressLabel')}</Text>
+              <TextInput
+                className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
+                placeholder={t('places.addressPlaceholder')}
+                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
+                value={placeAddress}
+                onChangeText={setPlaceAddress}
+                multiline
+              />
+
+              <TouchableOpacity
+                onPress={handleSave}
+                disabled={isSaving}
+                className="bg-primary py-4 rounded-xl items-center mb-4"
+              >
+                <Text className="text-white text-lg font-semibold">
+                  {isSaving ? t('common.loading') : t('common.save')}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowModal(false)}
+                className="py-3 items-center"
+              >
+                <Text className="text-muted-foreground">{t('common.cancel')}</Text>
               </TouchableOpacity>
             </View>
-
-            <Text className="text-muted-foreground text-sm mb-2">{t('places.nameLabel')}</Text>
-            <TextInput
-              className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
-              placeholder={t('places.namePlaceholder')}
-              placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-              value={placeName}
-              onChangeText={setPlaceName}
-            />
-
-            <Text className="text-muted-foreground text-sm mb-2">{t('places.addressLabel')}</Text>
-            <TextInput
-              className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
-              placeholder={t('places.addressPlaceholder')}
-              placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-              value={placeAddress}
-              onChangeText={setPlaceAddress}
-              multiline
-            />
-
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={isSaving}
-              className="bg-primary py-4 rounded-xl items-center mb-4"
-            >
-              <Text className="text-white text-lg font-semibold">
-                {isSaving ? t('common.loading') : t('common.save')}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowModal(false)}
-              className="py-3 items-center"
-            >
-              <Text className="text-muted-foreground">{t('common.cancel')}</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
