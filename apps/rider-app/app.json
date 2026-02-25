@@ -22,9 +22,10 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
-        "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
+        "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
+        "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "22"
+      "buildNumber": "23"
     },
     "android": {
       "adaptiveIcon": {
@@ -58,7 +59,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Wasel to use your location to show nearby drivers and track your rides."
         }
-      ]
+      ],
+      "./plugins/iphone-only"
     ],
     "experiments": {
       "typedRoutes": true

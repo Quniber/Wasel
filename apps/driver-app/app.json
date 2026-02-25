@@ -28,15 +28,7 @@
           "location",
           "fetch"
         ],
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIDeviceFamily": [1],
-        "UIRequiresFullScreen": true,
-        "UISupportedInterfaceOrientations~ipad": [
-          "UIInterfaceOrientationPortrait",
-          "UIInterfaceOrientationPortraitUpsideDown",
-          "UIInterfaceOrientationLandscapeLeft",
-          "UIInterfaceOrientationLandscapeRight"
-        ]
+        "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "16"
     },
@@ -82,7 +74,8 @@
         {
           "photosPermission": "Allow Wasel Driver to access your photos to upload documents."
         }
-      ]
+      ],
+      "./plugins/iphone-only"
     ],
     "experiments": {
       "typedRoutes": true
