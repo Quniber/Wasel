@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
+      "requireFullScreen": true,
       "bundleIdentifier": "qa.waselapp.rider",
       "config": {
         "googleMapsApiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
@@ -23,7 +24,7 @@
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
       },
-      "buildNumber": "20"
+      "buildNumber": "21"
     },
     "android": {
       "adaptiveIcon": {
