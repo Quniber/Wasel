@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>18</string>
+    <string>20</string>
     <key>GMSApiKey</key>
     <string>AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE</string>
     <key>LSMinimumSystemVersion</key>
@@ -82,12 +82,9 @@
       <string>UIInterfaceOrientationPortrait</string>
       <string>UIInterfaceOrientationPortraitUpsideDown</string>
     </array>
-    <key>UISupportedInterfaceOrientations~ipad</key>
+    <key>UIDeviceFamily</key>
     <array>
-      <string>UIInterfaceOrientationPortrait</string>
-      <string>UIInterfaceOrientationPortraitUpsideDown</string>
-      <string>UIInterfaceOrientationLandscapeLeft</string>
-      <string>UIInterfaceOrientationLandscapeRight</string>
+      <integer>1</integer>
     </array>
     <key>UIUserInterfaceStyle</key>
     <string>Automatic</string>
