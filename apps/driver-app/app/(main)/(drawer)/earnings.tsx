@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useThemeStore } from '@/stores/theme-store';
 import { useDriverStore } from '@/stores/driver-store';
 import { getColors } from '@/constants/Colors';
@@ -20,6 +21,7 @@ interface EarningsData {
 
 export default function EarningsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { resolvedTheme } = useThemeStore();
   const { balance } = useDriverStore();
   const isDark = resolvedTheme === 'dark';
@@ -73,7 +75,7 @@ export default function EarningsScreen() {
       <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
         <View className="flex-row items-center">
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
             className="w-11 h-11 rounded-xl items-center justify-center mr-3"
             style={{ backgroundColor: colors.secondary }}
           >
@@ -162,7 +164,7 @@ export default function EarningsScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                onPress={() => router.push('/(main)/withdrawals')}
+                onPress={() => router.push('/(main)/(drawer)/withdrawals')}
                 className="px-4 py-2 rounded-lg"
                 style={{ backgroundColor: colors.primary }}
               >

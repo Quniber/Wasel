@@ -63,7 +63,7 @@ export default function ScheduleScreen() {
         [
           {
             text: t('common.ok'),
-            onPress: () => router.replace('/(main)/scheduled'),
+            onPress: () => router.replace('/(main)/(drawer)/scheduled'),
           },
         ]
       );

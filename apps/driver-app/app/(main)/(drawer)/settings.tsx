@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
@@ -11,6 +12,7 @@ import i18n from '@/i18n';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { resolvedTheme, mode, setMode } = useThemeStore();
   const { logout } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
@@ -121,7 +123,7 @@ export default function SettingsScreen() {
           icon: 'help-circle-outline' as const,
           label: t('settings.helpCenter'),
           type: 'arrow',
-          onPress: () => router.push('/(main)/support'),
+          onPress: () => router.push('/(main)/(drawer)/support'),
         },
         {
           icon: 'document-text-outline' as const,
@@ -144,11 +146,11 @@ export default function SettingsScreen() {
       {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b" style={{ borderColor: colors.border }}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
           className="w-10 h-10 rounded-full items-center justify-center"
           style={{ backgroundColor: colors.secondary }}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.foreground} />
+          <Ionicons name="menu" size={24} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={{ color: colors.foreground }} className="text-xl font-bold ml-4">
           {t('settings.title')}

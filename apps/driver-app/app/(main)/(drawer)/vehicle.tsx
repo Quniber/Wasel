@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
-import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
@@ -37,6 +37,7 @@ interface CarColor {
 
 export default function VehicleScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
@@ -170,11 +171,11 @@ export default function VehicleScreen() {
       <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderColor: colors.border }}>
         <View className="flex-row items-center">
           <TouchableOpacity
-            onPress={() => (isEditing ? cancelEdit() : router.back())}
+            onPress={() => (isEditing ? cancelEdit() : navigation.dispatch(DrawerActions.openDrawer()))}
             className="w-10 h-10 rounded-full items-center justify-center"
             style={{ backgroundColor: colors.secondary }}
           >
-            <Ionicons name={isEditing ? 'close' : 'arrow-back'} size={24} color={colors.foreground} />
+            <Ionicons name={isEditing ? 'close' : 'menu'} size={24} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={{ color: colors.foreground }} className="text-xl font-bold ml-4">
             {t('vehicle.title')}

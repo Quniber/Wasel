@@ -249,13 +249,13 @@ export default function HomeScreen() {
   };
 
   const menuItems = [
-    { icon: 'home', label: t('drawer.home'), route: '/(main)' },
-    { icon: 'time', label: t('drawer.myRides'), route: '/(main)/history' },
-    { icon: 'calendar', label: t('drawer.scheduledRides'), route: '/(main)/scheduled' },
-    { icon: 'location', label: t('drawer.savedPlaces'), route: '/(main)/places' },
-    { icon: 'pricetag', label: t('drawer.promotions'), route: '/(main)/promotions' },
-    { icon: 'chatbubbles', label: t('drawer.support'), route: '/(main)/support' },
-    { icon: 'settings', label: t('drawer.settings'), route: '/(main)/settings' },
+    { icon: 'home', label: t('drawer.home'), route: '/(main)/(drawer)' },
+    { icon: 'time', label: t('drawer.myRides'), route: '/(main)/(drawer)/history' },
+    { icon: 'calendar', label: t('drawer.scheduledRides'), route: '/(main)/(drawer)/scheduled' },
+    { icon: 'location', label: t('drawer.savedPlaces'), route: '/(main)/(drawer)/places' },
+    { icon: 'pricetag', label: t('drawer.promotions'), route: '/(main)/(drawer)/promotions' },
+    { icon: 'chatbubbles', label: t('drawer.support'), route: '/(main)/(drawer)/support' },
+    { icon: 'settings', label: t('drawer.settings'), route: '/(main)/(drawer)/settings' },
   ];
 
 

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useThemeStore } from '@/stores/theme-store';
 import { orderApi } from '@/lib/api';
 
@@ -20,6 +21,7 @@ interface RideHistoryItem {
 
 export default function HistoryScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
 
@@ -65,7 +67,7 @@ export default function HistoryScreen() {
 
   const renderRideItem = ({ item }: { item: RideHistoryItem }) => (
     <TouchableOpacity
-      onPress={() => router.push(`/(main)/history/${item.id}` as any)}
+      onPress={() => router.push(`/(main)/(drawer)/history/${item.id}` as any)}
       className={`mx-4 mb-3 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'} shadow-sm`}
     >
       <View className="flex-row justify-between mb-2">
@@ -105,8 +107,8 @@ export default function HistoryScreen() {
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
       {/* Header */}
       <View className="flex-row items-center px-4 py-4">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+        <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} className="w-10 h-10 items-center justify-center">
+          <Ionicons name="menu" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
         </TouchableOpacity>
         <Text className={`flex-1 text-xl font-semibold text-center mr-10 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
           {t('history.title')}

@@ -13,7 +13,7 @@ import { useDriverStore } from '@/stores/driver-store';
 import { getColors } from '@/constants/Colors';
 import { socketService, IncomingOrder } from '@/lib/socket';
 import { driverApi } from '@/lib/api';
-import ActiveRideScreen from './active-ride';
+import ActiveRideScreen from '../active-ride';
 
 export default function HomeScreen() {
   const { t } = useTranslation();

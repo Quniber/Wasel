@@ -14,7 +14,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "qa.waselapp.rider",
       "config": {
         "googleMapsApiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
@@ -23,7 +23,7 @@
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
       },
-      "buildNumber": "18"
+      "buildNumber": "19"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,10 +32,6 @@
       },
       "package": "qa.waselapp.rider",
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -69,10 +65,10 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"
+        "projectId": "2dbd08b4-54a6-413f-8534-5a08bee0d56f"
       }
     },
-    "owner": "quniber",
+    "owner": "rshafrah",
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/2c517f43-3fc2-4cd0-bc63-6fe5d4fbc575"

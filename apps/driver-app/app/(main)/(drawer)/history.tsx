@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
@@ -30,6 +31,7 @@ interface RideHistory {
 
 export default function HistoryScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation();
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
@@ -171,11 +173,11 @@ export default function HistoryScreen() {
       <View className="px-4 py-4 border-b" style={{ borderColor: colors.border }}>
         <View className="flex-row items-center">
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
             className="w-11 h-11 rounded-xl items-center justify-center mr-3"
             style={{ backgroundColor: colors.secondary }}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+            <Ionicons name="menu" size={22} color={colors.foreground} />
           </TouchableOpacity>
           <View className="flex-1">
             <Text style={{ color: colors.foreground }} className="text-2xl font-bold">

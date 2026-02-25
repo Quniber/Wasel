@@ -11,11 +11,11 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { icon: 'card-outline', label: t('profile.paymentMethods') || 'Payment Methods', route: '/(main)/payments' },
-    { icon: 'location-outline', label: t('profile.savedPlaces') || 'Saved Places', route: '/(main)/places' },
+    { icon: 'location-outline', label: t('profile.savedPlaces') || 'Saved Places', route: '/(main)/(drawer)/places' },
     { icon: 'notifications-outline', label: t('profile.notifications') || 'Notifications', route: '/(main)/notifications' },
     { icon: 'shield-checkmark-outline', label: t('profile.safety') || 'Safety', route: '/(main)/safety' },
-    { icon: 'help-circle-outline', label: t('profile.support') || 'Help & Support', route: '/(main)/support' },
-    { icon: 'settings-outline', label: t('profile.settings') || 'Settings', route: '/(main)/settings' },
+    { icon: 'help-circle-outline', label: t('profile.support') || 'Help & Support', route: '/(main)/(drawer)/support' },
+    { icon: 'settings-outline', label: t('profile.settings') || 'Settings', route: '/(main)/(drawer)/settings' },
   ];
 
   const handleLogout = async () => {

@@ -14,7 +14,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "qa.waselapp.driver",
       "config": {
         "googleMapsApiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
@@ -29,7 +29,7 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "10"
+      "buildNumber": "11"
     },
     "android": {
       "adaptiveIcon": {
@@ -81,9 +81,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4baaf775-2e93-489f-9362-d5bc600587fa"
+        "projectId": "4747bf5d-9bb2-476d-9c9d-5a41358e1c4b"
       }
     },
-    "owner": "quniber"
+    "owner": "rshafrah"
   }
 }

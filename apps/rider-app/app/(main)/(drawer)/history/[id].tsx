@@ -117,7 +117,7 @@ export default function RideDetailsScreen() {
   };
 
   const handleReportIssue = () => {
-    router.push('/(main)/support');
+    router.push('/(main)/(drawer)/support');
   };
 
   if (isLoading) {

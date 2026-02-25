@@ -143,7 +143,7 @@ export default function ProfileScreen() {
               <View className="flex-row items-center mt-2">
                 <Ionicons name="star" size={16} color="#f59e0b" />
                 <Text style={{ color: colors.mutedForeground }} className="ml-1">
-                  {user?.rating?.toFixed(1) || '5.0'} {t('profile.rating')}
+                  {Number(user?.rating || 5).toFixed(1)} {t('profile.rating')}
                 </Text>
               </View>
             </>
