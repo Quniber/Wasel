@@ -24,7 +24,7 @@
         "NSLocationWhenInUseUsageDescription": "We need your location to show nearby drivers and calculate routes.",
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress."
       },
-      "buildNumber": "21"
+      "buildNumber": "22"
     },
     "android": {
       "adaptiveIcon": {

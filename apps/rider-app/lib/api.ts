@@ -291,10 +291,10 @@ export const addressApi = {
 
 // Coupon APIs
 export const couponApi = {
-  getAvailableCoupons: () => api.get('/coupons/available'),
+  getAvailableCoupons: () => api.get('/coupons'),
 
-  validateCoupon: (code: string, serviceId: string) =>
-    api.post('/coupons/validate', { code, serviceId }),
+  validateCoupon: (code: string, serviceId?: string) =>
+    api.get('/coupons/validate', { params: { code } }),
 };
 
 // Cancel Reasons
