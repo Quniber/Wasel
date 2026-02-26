@@ -1,18 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'path';
-import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { OrdersModule } from './orders/orders.module';
-import { AddressesModule } from './addresses/addresses.module';
-import { WalletModule } from './wallet/wallet.module';
-import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
-import { PaymentModule } from './payment/payment.module';
-import { CouponsModule } from './coupons/coupons.module';
-import { SocketModule } from './socket/socket.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { SessionsModule } from './sessions/sessions.module';
-import { SkipCashModule } from './skipcash/skipcash.module';
+import { PrismaModule } from './common/prisma/prisma.module';
+import { V1Module } from './v1/v1.module';
+import { V2Module } from './v2/v2.module';
 
 @Module({
   imports: [
@@ -26,17 +17,8 @@ import { SkipCashModule } from './skipcash/skipcash.module';
       ],
     }),
     PrismaModule,
-    AuthModule,
-    OrdersModule,
-    AddressesModule,
-    WalletModule,
-    PaymentMethodsModule,
-    PaymentModule,
-    CouponsModule,
-    SocketModule,
-    NotificationsModule,
-    SessionsModule,
-    SkipCashModule,
+    V1Module,
+    V2Module,
   ],
 })
 export class AppModule {}
