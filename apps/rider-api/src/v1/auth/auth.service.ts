@@ -1,12 +1,16 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import Twilio from 'twilio';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
 import { Gender } from 'database';
 
-// In-memory OTP storage for development (use Redis in production)
-const otpStore = new Map<string, { code: string; expiresAt: Date; customerId?: number }>();
+const twilioClient = Twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN,
+);
+const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!;
 
 @Injectable()
 export class AuthService {
@@ -17,15 +21,17 @@ export class AuthService {
     private sessionsService: SessionsService,
   ) {}
 
-  // Generate 6-digit OTP
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  private async sendTwilioOtp(mobileNumber: string): Promise<void> {
+    await twilioClient.verify.v2
+      .services(VERIFY_SID)
+      .verifications.create({ to: mobileNumber, channel: 'sms' });
   }
 
-  // Send OTP (fake for dev - just logs it)
-  private async sendOtp(mobileNumber: string, otp: string): Promise<void> {
-    // In production, integrate with Twilio or other SMS provider
-    console.log(`[DEV SMS] OTP for ${mobileNumber}: ${otp}`);
+  private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
+    const check = await twilioClient.verify.v2
+      .services(VERIFY_SID)
+      .verificationChecks.create({ to: mobileNumber, code });
+    return check.status === 'approved';
   }
 
   // Step 1: Register with phone - sends OTP
@@ -39,19 +45,10 @@ export class AuthService {
       throw new ConflictException('Phone number already registered');
     }
 
-    // Generate and store OTP
-    const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    otpStore.set(mobileNumber, { code: otp, expiresAt });
-
-    // Send OTP via SMS (fake for dev)
-    await this.sendOtp(mobileNumber, otp);
+    await this.sendTwilioOtp(mobileNumber);
 
     return {
       message: 'OTP sent successfully',
-      // Always return devOtp during testing phase - remove before actual production
-      devOtp: otp,
     };
   }
 
@@ -63,26 +60,10 @@ export class AuthService {
     lastName: string;
     email?: string;
   }) {
-    // Accept fixed OTP "123123" for testing
-    if (data.otp !== '123123') {
-      const stored = otpStore.get(data.mobileNumber);
-
-      if (!stored) {
-        throw new BadRequestException('OTP not found. Please request a new one.');
-      }
-
-      if (new Date() > stored.expiresAt) {
-        otpStore.delete(data.mobileNumber);
-        throw new BadRequestException('OTP expired. Please request a new one.');
-      }
-
-      if (stored.code !== data.otp) {
-        throw new BadRequestException('Invalid OTP');
-      }
+    const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+    if (!valid) {
+      throw new BadRequestException('Invalid OTP');
     }
-
-    // OTP is valid, clean up
-    otpStore.delete(data.mobileNumber);
 
     // Check for existing customer
     let customer = await this.prisma.customer.findFirst({
@@ -129,26 +110,10 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    // Accept fixed OTP "123123" for testing
-    if (data.otp !== '123123') {
-      const stored = otpStore.get(data.mobileNumber);
-
-      if (!stored) {
-        throw new BadRequestException('OTP not found. Please request a new one.');
-      }
-
-      if (new Date() > stored.expiresAt) {
-        otpStore.delete(data.mobileNumber);
-        throw new BadRequestException('OTP expired. Please request a new one.');
-      }
-
-      if (stored.code !== data.otp) {
-        throw new BadRequestException('Invalid OTP');
-      }
+    const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+    if (!valid) {
+      throw new BadRequestException('Invalid OTP');
     }
-
-    // OTP is valid, clean up
-    otpStore.delete(data.mobileNumber);
 
     // Check for existing customer
     let customer = await this.prisma.customer.findFirst({
@@ -196,44 +161,19 @@ export class AuthService {
       throw new UnauthorizedException('Account is disabled');
     }
 
-    // Generate and store OTP
-    const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-    otpStore.set(mobileNumber, { code: otp, expiresAt, customerId: customer.id });
-
-    // Send OTP via SMS
-    await this.sendOtp(mobileNumber, otp);
+    await this.sendTwilioOtp(mobileNumber);
 
     return {
       message: 'OTP sent successfully',
-      // Always return devOtp during testing phase - remove before actual production
-      devOtp: otp,
     };
   }
 
   // Verify OTP for login
   async verifyOtpLogin(mobileNumber: string, otp: string) {
-    // Accept fixed OTP "123123" for testing
-    if (otp !== '123123') {
-      const stored = otpStore.get(mobileNumber);
-
-      if (!stored) {
-        throw new BadRequestException('OTP not found. Please request a new one.');
-      }
-
-      if (new Date() > stored.expiresAt) {
-        otpStore.delete(mobileNumber);
-        throw new BadRequestException('OTP expired. Please request a new one.');
-      }
-
-      if (stored.code !== otp) {
-        throw new BadRequestException('Invalid OTP');
-      }
+    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    if (!valid) {
+      throw new BadRequestException('Invalid OTP');
     }
-
-    // OTP is valid
-    otpStore.delete(mobileNumber);
 
     const customer = await this.prisma.customer.findFirst({
       where: { mobileNumber },
@@ -260,26 +200,10 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    // Accept fixed OTP "123123" for testing
-    if (otp !== '123123') {
-      const stored = otpStore.get(mobileNumber);
-
-      if (!stored) {
-        throw new BadRequestException('OTP not found. Please request a new one.');
-      }
-
-      if (new Date() > stored.expiresAt) {
-        otpStore.delete(mobileNumber);
-        throw new BadRequestException('OTP expired. Please request a new one.');
-      }
-
-      if (stored.code !== otp) {
-        throw new BadRequestException('Invalid OTP');
-      }
+    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    if (!valid) {
+      throw new BadRequestException('Invalid OTP');
     }
-
-    // OTP is valid
-    otpStore.delete(mobileNumber);
 
     const customer = await this.prisma.customer.findFirst({
       where: { mobileNumber },
@@ -300,24 +224,10 @@ export class AuthService {
 
   // Resend OTP
   async resendOtp(mobileNumber: string) {
-    // Generate new OTP
-    const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    // Check if there's existing data for this number
-    const existing = otpStore.get(mobileNumber);
-    otpStore.set(mobileNumber, {
-      code: otp,
-      expiresAt,
-      customerId: existing?.customerId,
-    });
-
-    await this.sendOtp(mobileNumber, otp);
+    await this.sendTwilioOtp(mobileNumber);
 
     return {
       message: 'OTP resent successfully',
-      // Always return devOtp during testing phase - remove before actual production
-      devOtp: otp,
     };
   }
 
