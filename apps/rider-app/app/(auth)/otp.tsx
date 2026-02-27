@@ -141,7 +141,7 @@ export default function OTPScreen() {
               {t('auth.otp.title')}
             </Text>
             <Text className={`text-base mt-2 ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-              {t('auth.otp.subtitle')} {phone}
+              {t('auth.otp.subtitle')} {phone?.replace(/^(\+\d{3})/, '$1 ')}
             </Text>
           </View>
 

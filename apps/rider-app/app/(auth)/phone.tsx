@@ -24,7 +24,7 @@ export default function PhoneScreen() {
 
     setIsLoading(true);
     setError('');
-    const fullPhone = countryCode + phoneNumber;
+    const fullPhone = countryCode + phoneNumber.replace(/^0+/, '');
 
     try {
       // Try login first (for existing users)
