@@ -21,7 +21,7 @@ DB_NAME="wasel"
 DB_USER="wasel_user"
 DB_PASS="WaselDb2024!Secure"
 JWT_SECRET="wasel-taxi-jwt-secret-key-production-2024-very-secure"
-SERVER_IP="72.60.80.118"
+SERVER_IP="46.202.141.196"
 
 cd $APP_DIR
 
@@ -68,6 +68,9 @@ JWT_SECRET="${JWT_SECRET}"
 PORT=3002
 NODE_ENV="production"
 DRIVER_API_URL="http://localhost:3002"
+TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID}"
+TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN}"
+TWILIO_VERIFY_SERVICE_SID="${TWILIO_VERIFY_SERVICE_SID}"
 EOF
 
 # Admin Panel .env

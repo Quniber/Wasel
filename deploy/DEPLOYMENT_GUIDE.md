@@ -2,7 +2,7 @@
 
 ## Server Information
 
-- **IP Address:** 72.60.80.118
+- **IP Address:** 46.202.141.196
 - **Username:** root
 - **Password:** Shafrah974@@
 - **OS:** Ubuntu 24.04 LTS
@@ -12,7 +12,7 @@
 ### Step 1: Connect to Server
 
 ```bash
-ssh root@72.60.80.118
+ssh root@46.202.141.196
 ```
 
 ### Step 2: Upload Project Files
@@ -21,11 +21,11 @@ Option A: Using SCP (from your local machine)
 ```bash
 # From your local machine, in the Wasel directory
 cd /Users/quniber/Desktop/shafrah/Wasel
-scp -r . root@72.60.80.118:/var/www/wasel/
+scp -r . root@46.202.141.196:/var/www/wasel/
 ```
 
 Option B: Using SFTP client (FileZilla, Cyberduck, etc.)
-- Host: 72.60.80.118
+- Host: 46.202.141.196
 - Username: root
 - Password: Shafrah974@@
 - Upload to: /var/www/wasel/
@@ -33,7 +33,7 @@ Option B: Using SFTP client (FileZilla, Cyberduck, etc.)
 ### Step 3: Run Server Setup (First Time Only)
 
 ```bash
-ssh root@72.60.80.118
+ssh root@46.202.141.196
 mkdir -p /var/www/wasel
 cd /var/www/wasel
 chmod +x deploy/*.sh
@@ -65,18 +65,18 @@ After deployment, your services will be available at:
 
 | Service | URL |
 |---------|-----|
-| Admin Panel | http://72.60.80.118 |
-| Admin API | http://72.60.80.118:3000 |
-| Rider API | http://72.60.80.118:3001 |
-| Driver API | http://72.60.80.118:3002 |
+| Admin Panel | http://46.202.141.196 |
+| Admin API | http://46.202.141.196:3000 |
+| Rider API | http://46.202.141.196:3001 |
+| Driver API | http://46.202.141.196:3002 |
 
 ### Via Nginx Proxy
 
 | Service | URL |
 |---------|-----|
-| Admin API | http://72.60.80.118/admin-api/ |
-| Rider API | http://72.60.80.118/rider-api/ |
-| Driver API | http://72.60.80.118/driver-api/ |
+| Admin API | http://46.202.141.196/admin-api/ |
+| Rider API | http://46.202.141.196/rider-api/ |
+| Driver API | http://46.202.141.196/driver-api/ |
 
 ## Default Admin Login
 
@@ -147,14 +147,14 @@ Update your mobile apps to use these API endpoints:
 
 ### Rider App (.env)
 ```
-EXPO_PUBLIC_API_URL=http://72.60.80.118:3001
-EXPO_PUBLIC_SOCKET_URL=http://72.60.80.118:3001
+EXPO_PUBLIC_API_URL=http://46.202.141.196:3001
+EXPO_PUBLIC_SOCKET_URL=http://46.202.141.196:3001
 ```
 
 ### Driver App (.env)
 ```
-EXPO_PUBLIC_API_URL=http://72.60.80.118:3002
-EXPO_PUBLIC_SOCKET_URL=http://72.60.80.118:3002
+EXPO_PUBLIC_API_URL=http://46.202.141.196:3002
+EXPO_PUBLIC_SOCKET_URL=http://46.202.141.196:3002
 ```
 
 ## Security Notes

@@ -21,7 +21,7 @@ DB_NAME="wasel"
 DB_USER="wasel_user"
 DB_PASS="WaselDb2024!Secure"
 JWT_SECRET="wasel-taxi-jwt-secret-key-production-2024-very-secure"
-SERVER_IP="72.60.80.118"
+SERVER_IP="46.202.141.196"
 
 echo -e "${YELLOW}[1/8] Updating system packages...${NC}"
 apt update && apt upgrade -y
