@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,11 +29,6 @@ export default function PhoneScreen() {
     try {
       // Try login first (for existing users)
       const response = await authApi.loginWithPhone(fullPhone);
-
-      // If dev mode, show OTP in alert
-      if (response.data.devOtp) {
-        Alert.alert('Dev OTP', `Your OTP is: ${response.data.devOtp}`);
-      }
 
       router.push({
         pathname: '/(auth)/otp',

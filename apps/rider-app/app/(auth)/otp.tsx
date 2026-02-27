@@ -110,10 +110,7 @@ export default function OTPScreen() {
     setError('');
 
     try {
-      const response = await authApi.resendOtp(phone || '');
-      if (response.data.devOtp) {
-        Alert.alert('Dev OTP', `Your new OTP is: ${response.data.devOtp}`);
-      }
+      await authApi.resendOtp(phone || '');
     } catch (err: any) {
       setError(err.response?.data?.message || t('errors.generic'));
     }
