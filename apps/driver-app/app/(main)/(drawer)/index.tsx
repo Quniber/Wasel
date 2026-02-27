@@ -56,6 +56,17 @@ export default function HomeScreen() {
     })();
   }, []);
 
+  // Center map on current location when it becomes available
+  useEffect(() => {
+    if (currentLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...currentLocation,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+  }, [currentLocation]);
+
   // Verify persisted active ride with server on app load
   useEffect(() => {
     if (!_hasHydrated) return;
