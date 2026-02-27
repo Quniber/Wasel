@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { DriverStatus } from 'database';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.waselapp.qa/driver-api/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.waselapp.qa/driver-api/api/v1';
 
 // Cross-platform storage helpers
 const storage = {

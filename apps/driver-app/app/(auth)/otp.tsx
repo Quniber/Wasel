@@ -157,13 +157,8 @@ export default function OtpScreen() {
     if (resendTimer > 0) return;
 
     try {
-      const response = await authApi.resendOtp(phone!);
+      await authApi.resendOtp(phone!);
       setResendTimer(60);
-
-      // Show OTP in dev mode
-      if (response.data.devOtp) {
-        Alert.alert('Dev OTP', `Your new OTP is: ${response.data.devOtp}`);
-      }
     } catch (err) {
       setError(t('errors.generic'));
     }
