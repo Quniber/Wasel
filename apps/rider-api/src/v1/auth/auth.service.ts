@@ -13,6 +13,10 @@ const twilioClient = Twilio(
 );
 const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!;
 
+// Test account bypass - skip Twilio for this number
+const TEST_PHONE_NUMBER = '55555555';
+const TEST_OTP_CODE = '123456';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -22,13 +26,19 @@ export class AuthService {
     private sessionsService: SessionsService,
   ) {}
 
+  private isTestNumber(mobileNumber: string): boolean {
+    return mobileNumber.replace(/\D/g, '').endsWith(TEST_PHONE_NUMBER);
+  }
+
   private async sendTwilioOtp(mobileNumber: string): Promise<void> {
+    if (this.isTestNumber(mobileNumber)) return;
     await twilioClient.verify.v2
       .services(VERIFY_SID)
       .verifications.create({ to: mobileNumber, channel: 'sms' });
   }
 
   private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
+    if (this.isTestNumber(mobileNumber)) return code === TEST_OTP_CODE;
     const check = await twilioClient.verify.v2
       .services(VERIFY_SID)
       .verificationChecks.create({ to: mobileNumber, code });
