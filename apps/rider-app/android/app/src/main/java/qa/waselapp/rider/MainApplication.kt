@@ -1,4 +1,4 @@
-package com.wasel.rider
+package qa.waselapp.rider
 
 import android.app.Application
 import android.content.res.Configuration

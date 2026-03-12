@@ -1,4 +1,4 @@
-package com.wasel.rider
+package qa.waselapp.rider
 
 import android.os.Build
 import android.os.Bundle

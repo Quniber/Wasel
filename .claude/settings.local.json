@@ -22,9 +22,17 @@
       "Bash(tar:*)",
       "mcp__hostinger-mcp__billing_getPaymentMethodListV1",
       "Bash(grep:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(echo sshpass not available:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(sshpass:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

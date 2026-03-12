@@ -36,7 +36,13 @@ export default function PhoneScreen() {
       });
     } catch (err: any) {
       // Show error message from server (e.g., "Phone number not registered")
-      setError(err.response?.data?.message || t('errors.generic'));
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err.message === 'Network Error') {
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        setError(t('errors.generic'));
+      }
     } finally {
       setIsLoading(false);
     }

@@ -69,7 +69,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               const { status } = await ImagePicker.requestCameraPermissionsAsync();
-              if (status === 'denied') {
+              if (status !== 'granted') {
                 Alert.alert(t('common.error'), 'Please allow camera access in Settings.');
                 return;
               }
@@ -93,7 +93,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (status === 'denied') {
+              if (status !== 'granted') {
                 Alert.alert(t('common.error'), 'Please allow photo access in Settings.');
                 return;
               }

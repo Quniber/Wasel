@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		110AF478D91188DCEEE2FAD9 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D690095ECDFC0384AAEA20AC /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		35DB5F14F645E60B8B8E1E30 /* libPods-WaselRider.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D3ED90CEC220AB551B97E8D1 /* libPods-WaselRider.a */; };
+		367048CE96F3F30CDC65671A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E998B6C81645A0EBE334E06B /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		78A1868D6160E9F2D72320C6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EB1D5841139A98CE856A90AD /* PrivacyInfo.xcprivacy */; };
+		79A549C28F8FE6469AB1E643 /* libPods-WaselRider.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A5AC37ED12F1399F91FA294 /* libPods-WaselRider.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		E2B1F8CB97DBD9203327010F /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7769DAF3A027988CC12A55ED /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -20,16 +20,16 @@
 		13B07F961A680F5B00A75B9A /* WaselRider.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaselRider.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = WaselRider/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = WaselRider/Info.plist; sourceTree = "<group>"; };
-		88A7CD8D789F85E5EA06C5DC /* Pods-WaselRider.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WaselRider.debug.xcconfig"; path = "Target Support Files/Pods-WaselRider/Pods-WaselRider.debug.xcconfig"; sourceTree = "<group>"; };
+		4A5AC37ED12F1399F91FA294 /* libPods-WaselRider.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-WaselRider.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7769DAF3A027988CC12A55ED /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-WaselRider/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		88E91A584BE964DA3412AA44 /* Pods-WaselRider.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WaselRider.debug.xcconfig"; path = "Target Support Files/Pods-WaselRider/Pods-WaselRider.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = WaselRider/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D3ED90CEC220AB551B97E8D1 /* libPods-WaselRider.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-WaselRider.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		D690095ECDFC0384AAEA20AC /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-WaselRider/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		EB1D5841139A98CE856A90AD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = WaselRider/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D96F3A45EE360B6C460AB16F /* Pods-WaselRider.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WaselRider.release.xcconfig"; path = "Target Support Files/Pods-WaselRider/Pods-WaselRider.release.xcconfig"; sourceTree = "<group>"; };
+		E998B6C81645A0EBE334E06B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = WaselRider/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = WaselRider/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* WaselRider-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "WaselRider-Bridging-Header.h"; path = "WaselRider/WaselRider-Bridging-Header.h"; sourceTree = "<group>"; };
-		F43155D76DDF544E88421C5A /* Pods-WaselRider.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WaselRider.release.xcconfig"; path = "Target Support Files/Pods-WaselRider/Pods-WaselRider.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				35DB5F14F645E60B8B8E1E30 /* libPods-WaselRider.a in Frameworks */,
+				79A549C28F8FE6469AB1E643 /* libPods-WaselRider.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				EB1D5841139A98CE856A90AD /* PrivacyInfo.xcprivacy */,
+				E998B6C81645A0EBE334E06B /* PrivacyInfo.xcprivacy */,
 			);
 			name = WaselRider;
 			sourceTree = "<group>";
@@ -62,19 +62,17 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				D3ED90CEC220AB551B97E8D1 /* libPods-WaselRider.a */,
+				4A5AC37ED12F1399F91FA294 /* libPods-WaselRider.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		7DFBA8F833E280C24B1DEBCF /* Pods */ = {
+		5689C9C4A30097621742528F /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				88A7CD8D789F85E5EA06C5DC /* Pods-WaselRider.debug.xcconfig */,
-				F43155D76DDF544E88421C5A /* Pods-WaselRider.release.xcconfig */,
+				89CDE9E37CB14973A236C033 /* WaselRider */,
 			);
-			name = Pods;
-			path = Pods;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -91,8 +89,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				7DFBA8F833E280C24B1DEBCF /* Pods */,
-				99908F30240C06B7E583FF07 /* ExpoModulesProviders */,
+				DDE3972AD003BA77C8018686 /* Pods */,
+				5689C9C4A30097621742528F /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -107,12 +105,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		99908F30240C06B7E583FF07 /* ExpoModulesProviders */ = {
+		89CDE9E37CB14973A236C033 /* WaselRider */ = {
 			isa = PBXGroup;
 			children = (
-				DE26990DB900D1C178C55DFD /* WaselRider */,
+				7769DAF3A027988CC12A55ED /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = WaselRider;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -124,12 +122,14 @@
 			path = WaselRider/Supporting;
 			sourceTree = "<group>";
 		};
-		DE26990DB900D1C178C55DFD /* WaselRider */ = {
+		DDE3972AD003BA77C8018686 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				D690095ECDFC0384AAEA20AC /* ExpoModulesProvider.swift */,
+				88E91A584BE964DA3412AA44 /* Pods-WaselRider.debug.xcconfig */,
+				D96F3A45EE360B6C460AB16F /* Pods-WaselRider.release.xcconfig */,
 			);
-			name = WaselRider;
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "WaselRider" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				04AD082751B8DDEDE557009F /* [Expo] Configure project */,
+				1E47733BF517745EEDC1035C /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				7D60B0A51CC7B37BA283D9A7 /* [CP] Embed Pods Frameworks */,
+				2F881002512EEBADB07A5088 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				78A1868D6160E9F2D72320C6 /* PrivacyInfo.xcprivacy in Resources */,
+				367048CE96F3F30CDC65671A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -220,7 +220,29 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n`\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
-		04AD082751B8DDEDE557009F /* [Expo] Configure project */ = {
+		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-WaselRider-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		1E47733BF517745EEDC1035C /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -244,29 +266,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-WaselRider/expo-configure-project.sh\"\n";
 		};
-		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-WaselRider-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		7D60B0A51CC7B37BA283D9A7 /* [CP] Embed Pods Frameworks */ = {
+		2F881002512EEBADB07A5088 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -346,7 +346,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				110AF478D91188DCEEE2FAD9 /* ExpoModulesProvider.swift in Sources */,
+				E2B1F8CB97DBD9203327010F /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -355,7 +355,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 88A7CD8D789F85E5EA06C5DC /* Pods-WaselRider.debug.xcconfig */;
+			baseConfigurationReference = 88E91A584BE964DA3412AA44 /* Pods-WaselRider.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -384,14 +384,14 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "WaselRider/WaselRider-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F43155D76DDF544E88421C5A /* Pods-WaselRider.release.xcconfig */;
+			baseConfigurationReference = D96F3A45EE360B6C460AB16F /* Pods-WaselRider.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -414,7 +414,7 @@
 				PRODUCT_NAME = WaselRider;
 				SWIFT_OBJC_BRIDGING_HEADER = "WaselRider/WaselRider-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;

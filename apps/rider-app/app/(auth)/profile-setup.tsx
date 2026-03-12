@@ -28,7 +28,7 @@ export default function ProfileSetupScreen() {
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status === 'denied') {
+      if (status !== 'granted') {
         Alert.alert(
           t('common.error'),
           'Please allow photo access in Settings to add a profile photo.',
