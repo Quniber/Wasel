@@ -77,6 +77,7 @@ export default function ProfileScreen() {
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.8,
+                presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
               });
               if (!result.canceled && result.assets[0]) {
                 const uri = result.assets[0].uri;
@@ -102,6 +103,7 @@ export default function ProfileScreen() {
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.8,
+                presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
               });
               if (!result.canceled && result.assets[0]) {
                 const uri = result.assets[0].uri;

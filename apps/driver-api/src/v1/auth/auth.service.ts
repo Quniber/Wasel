@@ -117,8 +117,39 @@ export class AuthService {
     return this.generateToken(driver);
   }
 
+  // Find test account driver (flexible match for demo account)
+  private async findTestDriver(mobileNumber: string) {
+    // Try exact match first
+    let driver = await this.prisma.driver.findFirst({
+      where: { mobileNumber },
+    });
+    if (driver) return driver;
+
+    // Try fuzzy match - find any driver whose number contains the test digits
+    driver = await this.prisma.driver.findFirst({
+      where: { mobileNumber: { contains: TEST_PHONE_NUMBER } },
+    });
+    if (driver) return driver;
+
+    // Auto-create demo driver if none exists
+    driver = await this.prisma.driver.create({
+      data: {
+        firstName: 'Demo',
+        lastName: 'Driver',
+        mobileNumber,
+        status: DriverStatus.online,
+      },
+    });
+    return driver;
+  }
+
   // Login with phone - sends OTP
   async loginWithPhone(mobileNumber: string) {
+    // Test account bypass - skip DB check entirely
+    if (this.isTestNumber(mobileNumber)) {
+      return { message: 'OTP sent successfully' };
+    }
+
     const driver = await this.prisma.driver.findFirst({
       where: { mobileNumber },
     });
@@ -146,9 +177,15 @@ export class AuthService {
       throw new BadRequestException('Invalid OTP');
     }
 
-    const driver = await this.prisma.driver.findFirst({
-      where: { mobileNumber },
-    });
+    let driver;
+    if (this.isTestNumber(mobileNumber)) {
+      // Test account - use flexible matching to always find/create demo driver
+      driver = await this.findTestDriver(mobileNumber);
+    } else {
+      driver = await this.prisma.driver.findFirst({
+        where: { mobileNumber },
+      });
+    }
 
     if (!driver) {
       throw new NotFoundException('Driver not found');

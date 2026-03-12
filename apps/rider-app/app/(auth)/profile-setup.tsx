@@ -41,6 +41,7 @@ export default function ProfileSetupScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
       });
 
       if (!result.canceled && result.assets[0]) {
