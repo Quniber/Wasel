@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { authApi } from '@/lib/api';
@@ -21,16 +22,37 @@ export default function EmailRegisterScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [gender, setGender] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const genderOptions = [
-    { value: 'male', label: t('auth.profile.male') },
-    { value: 'female', label: t('auth.profile.female') },
-    { value: 'other', label: t('auth.profile.other') },
-  ];
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status === 'denied') {
+        Alert.alert(
+          t('common.error'),
+          'Please allow photo access in Settings to add a profile photo.',
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      Alert.alert(t('common.error'), 'Unable to open photo library. Please try again.');
+    }
+  };
 
   const isValid = firstName && lastName && email && phone && password && password === confirmPassword;
 
@@ -47,7 +69,6 @@ export default function EmailRegisterScreen() {
         email,
         mobileNumber: countryCode + phone,
         password,
-        gender: gender || undefined,
       });
 
       // Save session with tokens (for persistence)
@@ -110,13 +131,17 @@ export default function EmailRegisterScreen() {
           </View>
 
           {/* Avatar */}
-          <TouchableOpacity className="self-center mt-6">
-            <View className={`w-24 h-24 rounded-full items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-              <Ionicons
-                name="camera"
-                size={32}
-                color={isDark ? '#757575' : '#9E9E9E'}
-              />
+          <TouchableOpacity className="self-center mt-6" onPress={pickImage}>
+            <View className={`w-24 h-24 rounded-full items-center justify-center overflow-hidden ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} className="w-24 h-24" />
+              ) : (
+                <Ionicons
+                  name="camera"
+                  size={32}
+                  color={isDark ? '#757575' : '#9E9E9E'}
+                />
+              )}
             </View>
             <Text className="text-primary text-center mt-2 font-medium">
               {t('auth.profile.addPhoto')}
@@ -240,40 +265,6 @@ export default function EmailRegisterScreen() {
                   Passwords do not match
                 </Text>
               )}
-            </View>
-
-            {/* Gender Selection */}
-            <View>
-              <Text className={`mb-2 font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {t('profile.gender')}
-              </Text>
-              <View className="flex-row gap-2">
-                {genderOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => setGender(option.value)}
-                    className={`flex-1 py-3 rounded-xl items-center border-2 ${
-                      gender === option.value
-                        ? 'border-primary bg-primary/10'
-                        : isDark
-                        ? 'border-border-dark bg-muted-dark'
-                        : 'border-border bg-muted'
-                    }`}
-                  >
-                    <Text
-                      className={`font-medium ${
-                        gender === option.value
-                          ? 'text-primary'
-                          : isDark
-                          ? 'text-foreground-dark'
-                          : 'text-foreground'
-                      }`}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </View>
 
             {/* Register Button */}

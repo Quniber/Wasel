@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Switch, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, Platform, Image } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { router } from 'expo-router';
@@ -52,10 +52,14 @@ function CustomDrawerContent(props: any) {
         className={`px-4 py-6 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}
       >
         <View className="flex-row items-center">
-          <View className="w-16 h-16 rounded-full bg-primary items-center justify-center">
-            <Text className="text-white text-2xl font-bold">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
-            </Text>
+          <View className="w-16 h-16 rounded-full bg-primary items-center justify-center overflow-hidden">
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} className="w-16 h-16" />
+            ) : (
+              <Text className="text-white text-2xl font-bold">
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </Text>
+            )}
           </View>
           <View className="ml-4 flex-1">
             <Text className={`text-lg font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>

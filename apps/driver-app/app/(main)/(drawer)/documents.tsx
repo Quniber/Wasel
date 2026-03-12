@@ -99,13 +99,13 @@ export default function DocumentsScreen() {
   const handleUpload = async (type: string) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      if (status === 'denied') {
         Alert.alert(t('errors.permissionRequired'), t('errors.photoPermission'));
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });

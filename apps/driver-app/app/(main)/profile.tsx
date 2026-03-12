@@ -55,22 +55,27 @@ export default function ProfileScreen() {
   };
 
   const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t('errors.permissionRequired'), t('errors.photoPermission'));
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status === 'denied') {
+        Alert.alert(t('errors.permissionRequired'), t('errors.photoPermission'));
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      // Upload photo
-      // await driverApi.uploadPhoto(result.assets[0]);
+      if (!result.canceled && result.assets[0]) {
+        // Upload photo
+        // await driverApi.uploadPhoto(result.assets[0]);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      Alert.alert(t('errors.permissionRequired'), 'Unable to open photo library. Please try again.');
     }
   };
 

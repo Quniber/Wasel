@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { getColors } from '@/constants/Colors';
@@ -23,9 +24,37 @@ export default function EmailRegisterScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status === 'denied') {
+        Alert.alert(
+          t('common.error'),
+          'Please allow photo access in Settings to add a profile photo.',
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      Alert.alert(t('common.error'), 'Unable to open photo library. Please try again.');
+    }
+  };
 
   const isValid = firstName && lastName && email && phone && password && password === confirmPassword;
 
@@ -74,7 +103,7 @@ export default function EmailRegisterScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 }}>
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
           {/* Header */}
           <View className="flex-row items-center mt-4">
             <TouchableOpacity
@@ -97,12 +126,16 @@ export default function EmailRegisterScreen() {
           </View>
 
           {/* Avatar */}
-          <TouchableOpacity className="self-center mt-6">
+          <TouchableOpacity className="self-center mt-6" onPress={pickImage}>
             <View
-              className="w-24 h-24 rounded-full items-center justify-center"
+              className="w-24 h-24 rounded-full items-center justify-center overflow-hidden"
               style={{ backgroundColor: colors.secondary }}
             >
-              <Ionicons name="camera" size={32} color={colors.mutedForeground} />
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} className="w-24 h-24" />
+              ) : (
+                <Ionicons name="camera" size={32} color={colors.mutedForeground} />
+              )}
             </View>
             <Text style={{ color: colors.primary }} className="text-center mt-2 font-medium">
               {t('auth.profile.addPhoto')}

@@ -25,7 +25,7 @@
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "23"
+      "buildNumber": "28"
     },
     "android": {
       "adaptiveIcon": {
@@ -58,6 +58,12 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Wasel to use your location to show nearby drivers and track your rides."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Wasel to access your photos to set your profile picture."
         }
       ],
       "./plugins/iphone-only"

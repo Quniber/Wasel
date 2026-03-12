@@ -98,8 +98,9 @@ export default function PhoneScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 value={phone}
                 onChangeText={(text) => {
-                  setPhone(text.replace(/[^0-9]/g, ''));
-                  setError('');
+                  const digits = text.replace(/[^0-9]/g, '');
+                  setPhone(digits);
+                  if (error) setError('');
                 }}
                 keyboardType="phone-pad"
                 maxLength={8}

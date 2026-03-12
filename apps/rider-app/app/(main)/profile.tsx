@@ -4,22 +4,23 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { authApi } from '@/lib/api';
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { user, updateUser } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.avatar || null);
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [gender, setGender] = useState(user?.gender || '');
-
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert(t('common.error'), t('profile.nameRequired'));
@@ -28,20 +29,24 @@ export default function ProfileScreen() {
 
     setIsSaving(true);
     try {
-      // API call to update profile
-      // await profileApi.update({ firstName, lastName, email, gender });
+      await authApi.updateProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim() || undefined,
+      });
 
-      updateUser({
+      setUser({
+        ...user!,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
-        gender,
       });
 
       setIsEditing(false);
       Alert.alert(t('common.success'), t('profile.updateSuccess'));
-    } catch (error) {
-      Alert.alert(t('common.error'), t('profile.updateError'));
+    } catch (error: any) {
+      console.error('Profile update error:', error?.response?.data || error?.message || error);
+      Alert.alert(t('common.error'), error?.response?.data?.message || t('profile.updateError'));
     } finally {
       setIsSaving(false);
     }
@@ -51,28 +56,67 @@ export default function ProfileScreen() {
     setFirstName(user?.firstName || '');
     setLastName(user?.lastName || '');
     setEmail(user?.email || '');
-    setGender(user?.gender || '');
     setIsEditing(false);
   };
 
   const handleChangePhoto = () => {
-    // Open image picker
     Alert.alert(
       t('profile.changePhoto'),
       t('profile.chooseOption'),
       [
-        { text: t('profile.takePhoto'), onPress: () => {} },
-        { text: t('profile.chooseLibrary'), onPress: () => {} },
+        {
+          text: t('profile.takePhoto'),
+          onPress: async () => {
+            try {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status === 'denied') {
+                Alert.alert(t('common.error'), 'Please allow camera access in Settings.');
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const uri = result.assets[0].uri;
+                setProfileImage(uri);
+                setUser({ ...user!, avatar: uri });
+              }
+            } catch (err) {
+              console.error('Camera error:', err);
+            }
+          },
+        },
+        {
+          text: t('profile.chooseLibrary'),
+          onPress: async () => {
+            try {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status === 'denied') {
+                Alert.alert(t('common.error'), 'Please allow photo access in Settings.');
+                return;
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+              if (!result.canceled && result.assets[0]) {
+                const uri = result.assets[0].uri;
+                setProfileImage(uri);
+                setUser({ ...user!, avatar: uri });
+              }
+            } catch (err) {
+              console.error('Image picker error:', err);
+            }
+          },
+        },
         { text: t('common.cancel'), style: 'cancel' },
       ]
     );
   };
-
-  const genderOptions = [
-    { value: 'male', label: t('profile.male') },
-    { value: 'female', label: t('profile.female') },
-    { value: 'other', label: t('profile.other') },
-  ];
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
@@ -97,8 +141,13 @@ export default function ProfileScreen() {
         {/* Avatar */}
         <View className="items-center my-6">
           <TouchableOpacity onPress={handleChangePhoto} disabled={!isEditing}>
-            <View className="w-28 h-28 rounded-full bg-primary items-center justify-center">
-              {user?.avatarUrl ? (
+            <View className="w-28 h-28 rounded-full bg-primary items-center justify-center overflow-hidden">
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  className="w-28 h-28"
+                />
+              ) : user?.avatarUrl ? (
                 <Image
                   source={{ uri: user.avatarUrl }}
                   className="w-28 h-28 rounded-full"
@@ -189,31 +238,6 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Gender */}
-          <View className="px-4 py-4">
-            <Text className="text-muted-foreground text-sm mb-2">{t('profile.gender')}</Text>
-            {isEditing ? (
-              <View className="flex-row gap-2">
-                {genderOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => setGender(option.value)}
-                    className={`flex-1 py-2 rounded-lg items-center ${
-                      gender === option.value ? 'bg-primary' : isDark ? 'bg-muted-dark' : 'bg-muted'
-                    }`}
-                  >
-                    <Text className={gender === option.value ? 'text-white font-medium' : 'text-muted-foreground'}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {genderOptions.find((g) => g.value === gender)?.label || '-'}
-              </Text>
-            )}
-          </View>
         </View>
 
         {/* Save/Cancel Buttons */}
