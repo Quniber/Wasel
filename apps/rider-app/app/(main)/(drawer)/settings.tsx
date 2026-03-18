@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useThemeStore, ThemeMode } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { authApi } from '@/lib/api';
 import { changeLanguage } from '@/i18n';
 
 export default function SettingsScreen() {
@@ -14,6 +15,29 @@ export default function SettingsScreen() {
   const { resolvedTheme, mode, setMode } = useThemeStore();
   const { logout } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('settings.deleteAccount'),
+      t('settings.deleteAccountConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.deleteAccount'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              await logout();
+              router.replace('/(auth)/welcome');
+            } catch (error) {
+              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -118,7 +142,7 @@ export default function SettingsScreen() {
             </Text>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
           </TouchableOpacity>
-          <TouchableOpacity className="flex-row items-center justify-between px-4 py-4">
+          <TouchableOpacity onPress={handleDeleteAccount} className="flex-row items-center justify-between px-4 py-4">
             <Text className="text-destructive">{t('settings.deleteAccount')}</Text>
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
           </TouchableOpacity>

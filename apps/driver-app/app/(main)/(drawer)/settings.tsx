@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { authApi } from '@/lib/api';
 import { getColors } from '@/constants/Colors';
 import i18n from '@/i18n';
 
@@ -27,6 +28,29 @@ export default function SettingsScreen() {
   const handleLanguageChange = () => {
     const newLang = i18n.language === 'ar' ? 'en' : 'ar';
     i18n.changeLanguage(newLang);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('settings.deleteAccount'),
+      t('settings.deleteAccountConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.deleteAccount'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              await logout();
+              router.replace('/(auth)/welcome');
+            } catch (error) {
+              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -114,6 +138,13 @@ export default function SettingsScreen() {
           type: 'arrow',
           onPress: () => {},
         },
+        {
+          icon: 'trash-outline' as const,
+          label: t('settings.deleteAccount'),
+          type: 'arrow',
+          onPress: handleDeleteAccount,
+          destructive: true,
+        },
       ],
     },
     {
@@ -183,11 +214,11 @@ export default function SettingsScreen() {
                   <View className="flex-row items-center">
                     <View
                       className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                      style={{ backgroundColor: colors.secondary }}
+                      style={{ backgroundColor: 'destructive' in item && item.destructive ? colors.destructive + '15' : colors.secondary }}
                     >
-                      <Ionicons name={item.icon} size={18} color={colors.foreground} />
+                      <Ionicons name={item.icon} size={18} color={'destructive' in item && item.destructive ? colors.destructive : colors.foreground} />
                     </View>
-                    <Text style={{ color: colors.foreground }} className="text-base">
+                    <Text style={{ color: 'destructive' in item && item.destructive ? colors.destructive : colors.foreground }} className="text-base">
                       {item.label}
                     </Text>
                   </View>

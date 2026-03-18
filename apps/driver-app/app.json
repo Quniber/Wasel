@@ -2,7 +2,7 @@
   "expo": {
     "name": "Wasel Driver",
     "slug": "driver-app",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "wasel-driver",
@@ -30,7 +30,7 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "24"
+      "buildNumber": "26"
     },
     "android": {
       "adaptiveIcon": {
@@ -72,7 +72,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Wasel Driver to access your photos to upload documents."
+          "photosPermission": "Wasel Driver needs access to your photo library so you can select photos of your driver documents for verification. For example, you can choose a photo of your driver's license from your library to upload for account approval.",
+          "cameraPermission": "Wasel Driver needs access to your camera so you can take photos of your driver documents for verification. For example, you can photograph your driver's license to upload for account approval."
         }
       ],
       "./plugins/iphone-only"

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Wasel Rider",
     "slug": "rider-app",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "wasel-rider",
@@ -25,7 +25,7 @@
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "29"
+      "buildNumber": "31"
     },
     "android": {
       "adaptiveIcon": {
@@ -63,7 +63,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Wasel to access your photos to set your profile picture."
+          "photosPermission": "Wasel needs access to your photo library so you can select a photo to use as your profile picture. For example, you can choose an existing photo from your library to personalize your rider profile.",
+          "cameraPermission": "Wasel needs access to your camera so you can take a photo to use as your profile picture. For example, you can snap a new selfie to set as your rider profile image."
         }
       ],
       "./plugins/iphone-only"

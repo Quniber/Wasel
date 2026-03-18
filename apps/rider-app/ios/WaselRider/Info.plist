@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>29</string>
+    <string>31</string>
     <key>GMSApiKey</key>
     <string>AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE</string>
     <key>LSMinimumSystemVersion</key>
@@ -54,7 +54,7 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
+    <string>Wasel Rider needs access to your camera so you can take a photo to use as your profile picture. For example, you can snap a new selfie to set as your rider profile image.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
@@ -66,7 +66,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your photos</string>
+    <string>Wasel Rider needs access to your photo library so you can select a photo to use as your profile picture. For example, you can choose an existing photo from your library to personalize your rider profile.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

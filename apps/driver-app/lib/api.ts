@@ -224,6 +224,9 @@ export const authApi = {
   // Notification token
   updateNotificationToken: (token: string) =>
     api.post('/auth/notification-token', { token }),
+
+  // Delete account
+  deleteAccount: () => api.delete('/auth/account'),
 };
 
 // Driver APIs - convenience wrappers around auth endpoints
