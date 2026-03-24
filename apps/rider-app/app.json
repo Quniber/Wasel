@@ -2,7 +2,7 @@
   "expo": {
     "name": "Wasel Rider",
     "slug": "rider-app",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "wasel-rider",
@@ -25,7 +25,7 @@
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "31"
+      "buildNumber": "34"
     },
     "android": {
       "adaptiveIcon": {

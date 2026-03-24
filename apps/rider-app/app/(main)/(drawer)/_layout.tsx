@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Switch, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, Alert, Platform, Image } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { router } from 'expo-router';
@@ -8,6 +8,7 @@ import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { changeLanguage } from '@/i18n';
 import { socketService } from '@/lib/socket';
+import { authApi } from '@/lib/api';
 
 function CustomDrawerContent(props: any) {
   const { t, i18n } = useTranslation();
@@ -19,6 +20,30 @@ function CustomDrawerContent(props: any) {
     await logout();
     socketService.disconnect();
     router.replace('/(auth)/welcome');
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('settings.deleteAccount'),
+      t('settings.deleteAccountConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.deleteAccount'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              socketService.disconnect();
+              await logout();
+              router.replace('/(auth)/welcome');
+            } catch (error) {
+              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const toggleDarkMode = () => {
@@ -140,16 +165,27 @@ function CustomDrawerContent(props: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Logout */}
-      <TouchableOpacity
-        onPress={handleLogout}
-        className={`flex-row items-center px-4 py-4 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}
-      >
-        <Ionicons name="log-out" size={24} color="#F44336" />
-        <Text className="ml-4 text-base text-destructive font-medium">
-          {t('drawer.logout')}
-        </Text>
-      </TouchableOpacity>
+      {/* Delete Account & Logout */}
+      <View className={`border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
+        <TouchableOpacity
+          onPress={handleDeleteAccount}
+          className={`flex-row items-center px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}
+        >
+          <Ionicons name="trash-outline" size={24} color="#F44336" />
+          <Text className="ml-4 text-base text-destructive font-medium">
+            {t('settings.deleteAccount')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleLogout}
+          className="flex-row items-center px-4 py-4"
+        >
+          <Ionicons name="log-out" size={24} color="#F44336" />
+          <Text className="ml-4 text-base text-destructive font-medium">
+            {t('drawer.logout')}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </DrawerContentScrollView>
   );
 }

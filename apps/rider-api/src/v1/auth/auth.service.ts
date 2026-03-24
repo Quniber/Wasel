@@ -168,8 +168,16 @@ export class AuthService {
       throw new NotFoundException('Phone number not registered');
     }
 
+    // Auto re-enable test account after deletion (for App Store review)
     if (customer.status !== 'enabled') {
-      throw new UnauthorizedException('Account is disabled');
+      if (this.isTestNumber(mobileNumber)) {
+        await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { status: 'enabled', deletedAt: null },
+        });
+      } else {
+        throw new UnauthorizedException('Account is disabled');
+      }
     }
 
     await this.sendTwilioOtp(mobileNumber);

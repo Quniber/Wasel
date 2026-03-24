@@ -8,11 +8,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { authApi } from '@/lib/api';
+import { socketService } from '@/lib/socket';
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { user, setUser } = useAuthStore();
+  const { user, setUser, logout } = useAuthStore();
   const isDark = resolvedTheme === 'dark';
 
   const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +58,30 @@ export default function ProfileScreen() {
     setLastName(user?.lastName || '');
     setEmail(user?.email || '');
     setIsEditing(false);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      t('settings.deleteAccount'),
+      t('settings.deleteAccountConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.deleteAccount'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authApi.deleteAccount();
+              socketService.disconnect();
+              await logout();
+              router.replace('/(auth)/welcome');
+            } catch (error) {
+              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleChangePhoto = () => {
@@ -258,6 +283,19 @@ export default function ProfileScreen() {
               <Text className="text-muted-foreground">{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* Delete Account */}
+        {!isEditing && (
+          <TouchableOpacity
+            onPress={handleDeleteAccount}
+            className="mt-8 mb-8 py-4 rounded-xl items-center flex-row justify-center border border-destructive/30"
+          >
+            <Ionicons name="trash-outline" size={20} color="#F44336" />
+            <Text className="text-destructive font-semibold ml-2">
+              {t('settings.deleteAccount')}
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </SafeAreaView>

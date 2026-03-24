@@ -143,8 +143,11 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDeleteAccount} className="flex-row items-center justify-between px-4 py-4">
-            <Text className="text-destructive">{t('settings.deleteAccount')}</Text>
-            <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
+            <View className="flex-row items-center">
+              <Ionicons name="trash-outline" size={20} color="#F44336" />
+              <Text className="text-destructive ml-3 font-medium">{t('settings.deleteAccount')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#F44336" />
           </TouchableOpacity>
         </View>
 
