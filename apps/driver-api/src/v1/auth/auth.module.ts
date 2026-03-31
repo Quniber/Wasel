@@ -1,10 +1,11 @@
-import { Module, Logger } from '@nestjs/common';
+import { Module, forwardRef, Logger } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
+import { SessionsModule } from '../sessions/sessions.module';
 
 const logger = new Logger('AuthModule');
 
@@ -19,10 +20,11 @@ const logger = new Logger('AuthModule');
         logger.log(`JWT_SECRET loaded: ${jwtSecret ? jwtSecret.substring(0, 10) + '...' : 'NOT FOUND - using fallback'}`);
         return {
           secret: jwtSecret || 'taxi-secret-key',
-          signOptions: { expiresIn: '30d' },
+          signOptions: { expiresIn: '15m' },
         };
       },
     }),
+    forwardRef(() => SessionsModule),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

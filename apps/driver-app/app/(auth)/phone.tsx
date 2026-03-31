@@ -94,14 +94,15 @@ export default function PhoneScreen() {
                 borderColor: error ? colors.destructive : colors.border,
                 borderWidth: 1,
               }}
-              className="flex-row items-center rounded-xl px-4 py-3"
+              className="flex-row items-center rounded-xl px-4 h-14"
             >
-              <Text style={{ color: colors.foreground }} className="text-lg mr-2">
+              <Text style={{ color: colors.foreground, fontSize: 18, includeFontPadding: false }} className="mr-2">
                 +974
               </Text>
+              <View style={{ width: 1, height: 24, backgroundColor: colors.border }} />
               <TextInput
-                style={{ color: colors.foreground }}
-                className="flex-1 text-lg"
+                style={{ color: colors.foreground, fontSize: 18, includeFontPadding: false, paddingTop: 0, paddingBottom: 0 }}
+                className="flex-1 ml-2"
                 placeholder={t('auth.phone.placeholder')}
                 placeholderTextColor={colors.mutedForeground}
                 value={phone}

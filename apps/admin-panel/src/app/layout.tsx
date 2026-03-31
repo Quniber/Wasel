@@ -11,6 +11,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Wasel Admin Panel',
   description: 'Admin dashboard for Wasel platform management',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

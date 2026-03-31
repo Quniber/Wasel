@@ -38,12 +38,28 @@ export default function OTPScreen() {
   }, [otp]);
 
   const handleOtpChange = (value: string, index: number) => {
+    const digits = value.replace(/[^0-9]/g, '');
+
+    // Handle paste / autofill — spread digits across all boxes
+    if (digits.length > 1) {
+      const newOtp = [...otp];
+      const chars = digits.slice(0, 6).split('');
+      chars.forEach((char, i) => {
+        if (index + i < 6) newOtp[index + i] = char;
+      });
+      setOtp(newOtp);
+
+      const nextIndex = Math.min(index + chars.length, 5);
+      inputRefs.current[nextIndex]?.focus();
+      return;
+    }
+
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = digits;
     setOtp(newOtp);
 
     // Move to next input
-    if (value && index < 5) {
+    if (digits && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -157,10 +173,10 @@ export default function OTPScreen() {
                     : 'bg-muted text-foreground border-border'
                 } ${digit ? 'border-2 border-primary' : 'border border-transparent'}`}
                 value={digit}
-                onChangeText={(value) => handleOtpChange(value.slice(-1), index)}
+                onChangeText={(value) => handleOtpChange(value, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 keyboardType="number-pad"
-                maxLength={1}
+                textContentType="oneTimeCode"
                 autoFocus={index === 0}
               />
             ))}

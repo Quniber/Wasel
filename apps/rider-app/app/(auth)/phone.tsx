@@ -96,33 +96,24 @@ export default function PhoneScreen() {
           )}
 
           {/* Phone Input */}
-          <View className="mt-8 flex-row gap-3">
-            {/* Country Code */}
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.secondary,
-                borderColor: colors.border,
-                borderWidth: 1,
-              }}
-              className="px-4 py-4 rounded-xl items-center justify-center"
+          <View
+            style={{
+              backgroundColor: colors.secondary,
+              borderColor: colors.border,
+              borderWidth: 1,
+            }}
+            className="mt-8 flex-row items-center rounded-xl px-4 h-14"
+          >
+            <Text
+              style={{ color: colors.foreground, fontSize: 18, includeFontPadding: false }}
+              className="font-medium mr-3"
             >
-              <Text
-                style={{ color: colors.foreground }}
-                className="text-lg font-medium"
-              >
-                {countryCode}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Phone Number */}
+              {countryCode}
+            </Text>
+            <View style={{ width: 1, height: 24, backgroundColor: colors.border }} />
             <TextInput
-              style={{
-                backgroundColor: colors.secondary,
-                borderColor: colors.border,
-                borderWidth: 1,
-                color: colors.foreground,
-              }}
-              className="flex-1 px-4 py-4 rounded-xl text-lg"
+              style={{ color: colors.foreground, fontSize: 18, includeFontPadding: false, paddingTop: 0, paddingBottom: 0 }}
+              className="flex-1 ml-3"
               placeholder={t('auth.phone.placeholder')}
               placeholderTextColor={colors.mutedForeground}
               value={phoneNumber}

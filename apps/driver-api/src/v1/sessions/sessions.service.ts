@@ -1,9 +1,8 @@
 import { Injectable, UnauthorizedException, Logger, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
-import { DevicePlatform } from 'database';
+import { DevicePlatform, DriverStatus } from 'database';
 
 export interface DeviceInfo {
   deviceId?: string;
@@ -22,17 +21,13 @@ export interface SessionTokens {
 @Injectable()
 export class SessionsService implements OnModuleInit {
   private readonly logger = new Logger(SessionsService.name);
-  private readonly accessTokenExpiry: string;
-  private readonly refreshTokenExpiry: number; // days
+  private readonly accessTokenExpiry: string = '15m';
+  private readonly refreshTokenExpiry: number = 30; // days
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private configService: ConfigService,
-  ) {
-    this.accessTokenExpiry = '15m'; // 15 minutes
-    this.refreshTokenExpiry = 30; // 30 days
-  }
+  ) {}
 
   onModuleInit() {
     // Run cleanup daily (every 24 hours)
@@ -41,14 +36,12 @@ export class SessionsService implements OnModuleInit {
     setTimeout(() => this.cleanupExpiredSessions(), 10000);
   }
 
-  // Generate a random refresh token
   private generateRefreshToken(): string {
     return randomBytes(64).toString('hex');
   }
 
-  // Create a new session for customer
   async createSession(
-    customerId: number,
+    driverId: number,
     deviceInfo: DeviceInfo,
     ipAddress?: string,
     userAgent?: string,
@@ -57,20 +50,17 @@ export class SessionsService implements OnModuleInit {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + this.refreshTokenExpiry);
 
-    // Generate access token
-    const payload = { sub: customerId, type: 'customer' };
+    const payload = { sub: driverId, type: 'driver' };
     const accessToken = this.jwtService.sign(payload, { expiresIn: this.accessTokenExpiry });
 
-    // Map device platform
     let platform: DevicePlatform | null = null;
     if (deviceInfo.devicePlatform === 'ios') platform = DevicePlatform.ios;
     else if (deviceInfo.devicePlatform === 'android') platform = DevicePlatform.android;
     else if (deviceInfo.devicePlatform === 'web') platform = DevicePlatform.web;
 
-    // Create session in database
-    await this.prisma.customerSession.create({
+    await this.prisma.driverSession.create({
       data: {
-        customerId,
+        driverId,
         refreshToken,
         accessToken,
         deviceId: deviceInfo.deviceId,
@@ -87,9 +77,9 @@ export class SessionsService implements OnModuleInit {
 
     // Clean up old sessions for this device (keep only latest)
     if (deviceInfo.deviceId) {
-      await this.prisma.customerSession.updateMany({
+      await this.prisma.driverSession.updateMany({
         where: {
-          customerId,
+          driverId,
           deviceId: deviceInfo.deviceId,
           refreshToken: { not: refreshToken },
         },
@@ -104,11 +94,10 @@ export class SessionsService implements OnModuleInit {
     };
   }
 
-  // Refresh access token using refresh token
   async refreshSession(refreshToken: string, ipAddress?: string): Promise<SessionTokens> {
-    const session = await this.prisma.customerSession.findUnique({
+    const session = await this.prisma.driverSession.findUnique({
       where: { refreshToken },
-      include: { customer: true },
+      include: { driver: true },
     });
 
     if (!session) {
@@ -120,24 +109,21 @@ export class SessionsService implements OnModuleInit {
     }
 
     if (new Date() > session.expiresAt) {
-      // Mark session as inactive
-      await this.prisma.customerSession.update({
+      await this.prisma.driverSession.update({
         where: { id: session.id },
         data: { isActive: false },
       });
       throw new UnauthorizedException('Session expired. Please login again.');
     }
 
-    if (session.customer.status !== 'enabled') {
+    if (session.driver.status === DriverStatus.blocked || session.driver.status === DriverStatus.hard_reject) {
       throw new UnauthorizedException('Account is disabled');
     }
 
-    // Generate new access token
-    const payload = { sub: session.customerId, type: 'customer' };
+    const payload = { sub: session.driverId, type: 'driver' };
     const newAccessToken = this.jwtService.sign(payload, { expiresIn: this.accessTokenExpiry });
 
-    // Update session
-    await this.prisma.customerSession.update({
+    await this.prisma.driverSession.update({
       where: { id: session.id },
       data: {
         accessToken: newAccessToken,
@@ -153,32 +139,22 @@ export class SessionsService implements OnModuleInit {
     };
   }
 
-  // Validate session by access token
-  async validateSession(accessToken: string): Promise<boolean> {
-    try {
-      const payload = this.jwtService.verify(accessToken);
-
-      // Check if session exists, is active, and not expired
-      const session = await this.prisma.customerSession.findFirst({
-        where: {
-          customerId: payload.sub,
-          accessToken,
-          isActive: true,
-          expiresAt: { gt: new Date() },
-        },
-      });
-
-      return !!session;
-    } catch {
-      return false;
-    }
+  async validateSession(driverId: number, accessToken: string): Promise<boolean> {
+    const session = await this.prisma.driverSession.findFirst({
+      where: {
+        driverId,
+        accessToken,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    return !!session;
   }
 
-  // Get all active sessions for a customer
-  async getActiveSessions(customerId: number) {
-    const sessions = await this.prisma.customerSession.findMany({
+  async getActiveSessions(driverId: number) {
+    return this.prisma.driverSession.findMany({
       where: {
-        customerId,
+        driverId,
         isActive: true,
         expiresAt: { gt: new Date() },
       },
@@ -193,21 +169,18 @@ export class SessionsService implements OnModuleInit {
       },
       orderBy: { lastActiveAt: 'desc' },
     });
-
-    return sessions;
   }
 
-  // Revoke a specific session
-  async revokeSession(customerId: number, sessionId: number) {
-    const session = await this.prisma.customerSession.findFirst({
-      where: { id: sessionId, customerId },
+  async revokeSession(driverId: number, sessionId: number) {
+    const session = await this.prisma.driverSession.findFirst({
+      where: { id: sessionId, driverId },
     });
 
     if (!session) {
       throw new UnauthorizedException('Session not found');
     }
 
-    await this.prisma.customerSession.update({
+    await this.prisma.driverSession.update({
       where: { id: sessionId },
       data: { isActive: false },
     });
@@ -215,11 +188,10 @@ export class SessionsService implements OnModuleInit {
     return { message: 'Session revoked successfully' };
   }
 
-  // Revoke all sessions except current
-  async revokeAllOtherSessions(customerId: number, currentRefreshToken: string) {
-    await this.prisma.customerSession.updateMany({
+  async revokeAllOtherSessions(driverId: number, currentRefreshToken: string) {
+    await this.prisma.driverSession.updateMany({
       where: {
-        customerId,
+        driverId,
         refreshToken: { not: currentRefreshToken },
       },
       data: { isActive: false },
@@ -228,19 +200,17 @@ export class SessionsService implements OnModuleInit {
     return { message: 'All other sessions revoked' };
   }
 
-  // Revoke all sessions (for logout everywhere)
-  async revokeAllSessions(customerId: number) {
-    await this.prisma.customerSession.updateMany({
-      where: { customerId },
+  async revokeAllSessions(driverId: number) {
+    await this.prisma.driverSession.updateMany({
+      where: { driverId },
       data: { isActive: false },
     });
 
     return { message: 'All sessions revoked' };
   }
 
-  // Logout - revoke current session
   async logout(refreshToken: string) {
-    await this.prisma.customerSession.updateMany({
+    await this.prisma.driverSession.updateMany({
       where: { refreshToken },
       data: { isActive: false },
     });
@@ -248,19 +218,17 @@ export class SessionsService implements OnModuleInit {
     return { message: 'Logged out successfully' };
   }
 
-  // Update device token (for push notifications)
-  async updateDeviceToken(customerId: number, refreshToken: string, deviceToken: string) {
-    await this.prisma.customerSession.updateMany({
-      where: { customerId, refreshToken },
+  async updateDeviceToken(driverId: number, refreshToken: string, deviceToken: string) {
+    await this.prisma.driverSession.updateMany({
+      where: { driverId, refreshToken },
       data: { deviceToken },
     });
 
     return { message: 'Device token updated' };
   }
 
-  // Clean up expired sessions - runs daily via onModuleInit
   async cleanupExpiredSessions() {
-    const result = await this.prisma.customerSession.deleteMany({
+    const result = await this.prisma.driverSession.deleteMany({
       where: {
         OR: [
           { expiresAt: { lt: new Date() } },
@@ -270,9 +238,7 @@ export class SessionsService implements OnModuleInit {
     });
 
     if (result.count > 0) {
-      this.logger.log(`Cleaned up ${result.count} expired customer sessions`);
+      this.logger.log(`Cleaned up ${result.count} expired driver sessions`);
     }
-
-    return { deletedCount: result.count };
   }
 }

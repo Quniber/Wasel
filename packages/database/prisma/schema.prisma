@@ -437,16 +437,25 @@ model DriverTransaction {
 }
 
 model DriverSession {
-  id            Int            @id @default(autoincrement())
-  driverId      Int
-  driver        Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  deviceToken   String?
+  id             Int            @id @default(autoincrement())
+  driverId       Int
+  driver         Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  refreshToken   String         @unique @db.VarChar(255)
+  accessToken    String?        @db.Text
+  deviceToken    String?
   devicePlatform DevicePlatform?
-  deviceModel   String?
-  appVersion    String?
-  lastActiveAt  DateTime       @default(now())
-  createdAt     DateTime       @default(now())
+  deviceModel    String?
+  deviceId       String?        @db.VarChar(100)
+  appVersion     String?
+  ipAddress      String?        @db.VarChar(45)
+  userAgent      String?        @db.Text
+  isActive       Boolean        @default(true)
+  expiresAt      DateTime
+  lastActiveAt   DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
+  @@index([driverId])
+  @@index([refreshToken])
   @@map("driver_sessions")
 }
 

@@ -1,11 +1,12 @@
 import 'dotenv/config';
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, UnauthorizedException, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
 import Twilio from 'twilio';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
 import { DriverStatus, Gender, DocumentStatus } from 'database';
 
 // Multer file type for uploaded files
@@ -33,6 +34,8 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    @Inject(forwardRef(() => SessionsService))
+    private sessionsService: SessionsService,
   ) {}
 
   private isTestNumber(mobileNumber: string): boolean {
@@ -278,28 +281,52 @@ export class AuthService {
     return this.generateToken(driver);
   }
 
+  private driverResponse(driver: any) {
+    return {
+      id: driver.id,
+      email: driver.email,
+      firstName: driver.firstName,
+      lastName: driver.lastName,
+      mobileNumber: driver.mobileNumber,
+      status: driver.status,
+      rating: driver.rating,
+      reviewCount: driver.reviewCount,
+      carModelId: driver.carModelId,
+      carColorId: driver.carColorId,
+      carPlate: driver.carPlate,
+      carProductionYear: driver.carProductionYear,
+    };
+  }
+
   private generateToken(driver: any) {
     const payload = { sub: driver.id, email: driver.email, type: 'driver' };
-    const expiresIn = 30 * 24 * 60 * 60; // 30 days in seconds
 
     return {
-      accessToken: this.jwtService.sign(payload),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '60d' }), // Refresh token valid for 60 days
-      expiresIn,
-      driver: {
-        id: driver.id,
-        email: driver.email,
-        firstName: driver.firstName,
-        lastName: driver.lastName,
-        mobileNumber: driver.mobileNumber,
-        status: driver.status,
-        rating: driver.rating,
-        reviewCount: driver.reviewCount,
-        carModelId: driver.carModelId,
-        carColorId: driver.carColorId,
-        carPlate: driver.carPlate,
-        carProductionYear: driver.carProductionYear,
-      },
+      accessToken: this.jwtService.sign(payload, { expiresIn: '15m' }),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '30d' }),
+      expiresIn: 900, // 15 minutes in seconds
+      driver: this.driverResponse(driver),
+    };
+  }
+
+  async generateTokenWithSession(
+    driver: any,
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    const tokens = await this.sessionsService.createSession(
+      driver.id,
+      deviceInfo,
+      ipAddress,
+      userAgent,
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      driver: this.driverResponse(driver),
     };
   }
 
@@ -307,22 +334,9 @@ export class AuthService {
     return this.prisma.driver.findUnique({ where: { id } });
   }
 
-  // Refresh token
-  async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken);
-      const driver = await this.prisma.driver.findUnique({
-        where: { id: payload.sub },
-      });
-
-      if (!driver) {
-        throw new UnauthorizedException('Driver not found');
-      }
-
-      return this.generateToken(driver);
-    } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+  // Refresh token - delegates to sessions service
+  async refreshToken(refreshToken: string, ipAddress?: string) {
+    return this.sessionsService.refreshSession(refreshToken, ipAddress);
   }
 
   // Get profile

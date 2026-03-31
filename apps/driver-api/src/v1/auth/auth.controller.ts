@@ -192,7 +192,8 @@ export class AuthController {
   // ========== Token Refresh ==========
 
   @Post('refresh')
-  refreshToken(@Body() body: { refreshToken: string }) {
-    return this.authService.refreshToken(body.refreshToken);
+  refreshToken(@Body() body: { refreshToken: string }, @Req() req: any) {
+    const ipAddress = req.ip || req.connection?.remoteAddress;
+    return this.authService.refreshToken(body.refreshToken, ipAddress);
   }
 }

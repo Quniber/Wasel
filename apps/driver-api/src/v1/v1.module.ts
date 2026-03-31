@@ -7,6 +7,7 @@ import { ServicesModule } from './services/services.module';
 import { PaymentModule } from './payment/payment.module';
 import { SocketModule } from './socket/socket.module';
 import { SettingsModule } from './settings/settings.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SettingsModule } from './settings/settings.module';
     PaymentModule,
     SocketModule,
     SettingsModule,
+    SessionsModule,
   ],
 })
 export class V1Module {}
