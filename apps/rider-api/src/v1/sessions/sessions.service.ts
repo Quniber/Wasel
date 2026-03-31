@@ -153,6 +153,13 @@ export class SessionsService implements OnModuleInit {
     };
   }
 
+  async hasActiveSessions(customerId: number): Promise<boolean> {
+    const count = await this.prisma.customerSession.count({
+      where: { customerId, isActive: true, expiresAt: { gt: new Date() } },
+    });
+    return count > 0;
+  }
+
   // Validate session by access token
   async validateSession(accessToken: string): Promise<boolean> {
     try {

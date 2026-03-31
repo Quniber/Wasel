@@ -139,6 +139,13 @@ export class SessionsService implements OnModuleInit {
     };
   }
 
+  async hasActiveSessions(driverId: number): Promise<boolean> {
+    const count = await this.prisma.driverSession.count({
+      where: { driverId, isActive: true, expiresAt: { gt: new Date() } },
+    });
+    return count > 0;
+  }
+
   async validateSession(driverId: number, accessToken: string): Promise<boolean> {
     const session = await this.prisma.driverSession.findFirst({
       where: {

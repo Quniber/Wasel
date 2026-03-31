@@ -30,12 +30,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    // Validate session is active
+    // Validate session is active (if sessions exist for this driver)
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     if (token) {
-      const isValidSession = await this.sessionsService.validateSession(payload.sub, token);
-      if (!isValidSession) {
-        throw new UnauthorizedException('Session expired or revoked');
+      const hasAnySessions = await this.sessionsService.hasActiveSessions(payload.sub);
+      if (hasAnySessions) {
+        const isValidSession = await this.sessionsService.validateSession(payload.sub, token);
+        if (!isValidSession) {
+          throw new UnauthorizedException('Session expired or revoked');
+        }
       }
     }
 

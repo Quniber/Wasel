@@ -48,10 +48,18 @@ export default function RideActiveScreen() {
         const response = await orderApi.getOrderDetails(String(activeOrder.id));
         if (response.data) {
           const order = response.data;
+          // Sync status from server
+          const serverStatus = order.status;
+          if (serverStatus === 'Arrived') {
+            setStatus('driver_arrived');
+          } else if (serverStatus === 'Started') {
+            setStatus('trip_started');
+          }
           // Update the active order with full details including driver
           const driverData = order.driver;
           setActiveOrder({
             ...activeOrder,
+            status: serverStatus || activeOrder.status,
             driver: driverData ? {
               id: String(driverData.id || ''),
               firstName: driverData.firstName || 'Driver',

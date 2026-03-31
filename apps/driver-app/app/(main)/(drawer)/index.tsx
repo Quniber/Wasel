@@ -12,7 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useDriverStore } from '@/stores/driver-store';
 import { getColors } from '@/constants/Colors';
 import { socketService, IncomingOrder } from '@/lib/socket';
-import { driverApi } from '@/lib/api';
+import { driverApi, ordersApi } from '@/lib/api';
 import ActiveRideScreen from '../active-ride';
 
 export default function HomeScreen() {
@@ -67,32 +67,66 @@ export default function HomeScreen() {
     }
   }, [currentLocation]);
 
-  // Verify persisted active ride with server on app load
+  // Always check server for active order on app load
   useEffect(() => {
     if (!_hasHydrated) return;
 
-    // If no active ride, nothing to verify
-    if (!activeRide) {
-      setIsVerifyingRide(false);
-      return;
-    }
-
-    // Check if the persisted ride is still valid
     (async () => {
       try {
-        console.log('[Home] Verifying persisted ride:', activeRide.orderId);
-        const response = await driverApi.getCurrentOrder();
-        if (!response.data) {
-          // No active order on server, clear local state
-          console.log('[Home] No active order on server, clearing local state');
-          setActiveRide(null);
+        console.log('[Home] Checking server for active order...');
+        const response = await ordersApi.getCurrentOrder();
+        if (response.data) {
+          const order = response.data;
+          console.log('[Home] Active order found:', order.id, 'status:', order.status);
+
+          // Map server status to local status
+          const statusMap: Record<string, string> = {
+            DriverAccepted: 'accepted',
+            Arrived: 'arrived',
+            Started: 'started',
+          };
+          const mappedStatus = statusMap[order.status] || 'accepted';
+
+          // Populate the store with server data
+          setActiveRide({
+            orderId: order.id,
+            status: mappedStatus as any,
+            pickup: {
+              latitude: parseFloat(order.pickupLatitude) || 0,
+              longitude: parseFloat(order.pickupLongitude) || 0,
+              address: order.pickupAddress || '',
+            },
+            dropoff: {
+              latitude: parseFloat(order.dropoffLatitude) || 0,
+              longitude: parseFloat(order.dropoffLongitude) || 0,
+              address: order.dropoffAddress || '',
+            },
+            rider: {
+              id: order.customer?.id || 0,
+              firstName: order.customer?.firstName || '',
+              lastName: order.customer?.lastName || '',
+              mobileNumber: order.customer?.mobileNumber || '',
+              rating: 5,
+            },
+            estimatedFare: parseFloat(order.costAfterCoupon) || parseFloat(order.costBest) || 0,
+            distance: (order.distanceMeters || 0) / 1000,
+            duration: (order.durationSeconds || 0) / 60,
+            paymentMethod: order.paymentMode || 'cash',
+          });
+
+          router.replace('/(main)/active-ride');
+          return;
         } else {
-          console.log('[Home] Active ride verified:', response.data.id);
+          console.log('[Home] No active order on server');
+          if (activeRide) setActiveRide(null);
         }
-      } catch (error) {
-        console.error('[Home] Error verifying active ride:', error);
-        // If we can't verify, clear the local state to be safe
-        setActiveRide(null);
+      } catch (error: any) {
+        console.log('[Home] Error checking active order:', error?.response?.status);
+        if (activeRide && error?.response?.status !== 404) {
+          router.replace('/(main)/active-ride');
+          return;
+        }
+        if (activeRide) setActiveRide(null);
       } finally {
         setIsVerifyingRide(false);
       }

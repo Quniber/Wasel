@@ -533,13 +533,22 @@ export class OrdersService {
       }
     }
 
-    // Notify about cancellation
+    // Notify about cancellation - order room + driver directly
     this.socketService.notifyOrderCancelled(
       customerId,
       orderId,
       'rider',
       note
     );
+
+    // Notify driver directly if assigned
+    if (updatedOrder.driverId) {
+      this.socketService.notifyDriver(updatedOrder.driverId, 'order:cancelled', {
+        orderId,
+        cancelledBy: 'rider',
+        reason: note,
+      });
+    }
 
     // Also notify admins dashboard
     this.socketService.notifyAdmins('order:cancelled', {

@@ -261,8 +261,30 @@ export class OrdersService {
       },
     });
 
+    // Link driver to order in socket-api (for location forwarding)
+    this.socketService.setDriverOrder(driverId, orderId);
+
     // Notify rider via socket with full driver info
     this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'DriverAccepted',
+      driver: {
+        id: driver.id,
+        firstName: driver.firstName,
+        lastName: driver.lastName,
+        mobileNumber: driver.mobileNumber,
+        rating: driver.rating || 5.0,
+        reviewCount: driver.reviewCount || 0,
+        carModel: driver.carModel ? `${driver.carModel.brand} ${driver.carModel.model}` : '',
+        carColor: driver.carColor?.name || '',
+        carPlate: driver.carPlate || '',
+        latitude: driver.latitude,
+        longitude: driver.longitude,
+      },
+    });
+
+    // Also notify rider directly in case they're not in the order room yet
+    this.socketService.notifyRider(updatedOrder.customerId, 'order:status', {
       orderId,
       status: 'DriverAccepted',
       driver: {
@@ -351,8 +373,12 @@ export class OrdersService {
       },
     });
 
-    // Notify rider via socket
+    // Notify via order room and directly to rider
     this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'Arrived',
+    });
+    this.socketService.notifyRider(updatedOrder.customerId, 'order:status', {
       orderId,
       status: 'Arrived',
     });
@@ -397,8 +423,12 @@ export class OrdersService {
       },
     });
 
-    // Notify rider via socket
+    // Notify via order room and directly to rider
     this.socketService.emitToOrder(orderId, 'order:status', {
+      orderId,
+      status: 'Started',
+    });
+    this.socketService.notifyRider(updatedOrder.customerId, 'order:status', {
       orderId,
       status: 'Started',
     });
@@ -498,6 +528,9 @@ export class OrdersService {
       where: { id: driverId },
       data: { status: DriverStatus.online },
     });
+
+    // Clear driver's order assignment in socket-api
+    this.socketService.setDriverOrder(driverId, null);
 
     if (paymentResult.success) {
       // Notify rider via socket - payment successful
