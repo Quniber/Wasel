@@ -56,20 +56,17 @@ export default function SelectServiceScreen() {
     loadServicesAndFares();
   }, []);
 
-  useEffect(() => {
-    if (pickup && dropoff && mapRef.current) {
-      mapRef.current.fitToCoordinates(
-        [
-          { latitude: pickup.latitude, longitude: pickup.longitude },
-          { latitude: dropoff.latitude, longitude: dropoff.longitude },
-        ],
-        {
-          edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
-          animated: true,
-        }
-      );
-    }
-  }, [pickup, dropoff]);
+  const getRegionForCoordinates = () => {
+    if (!pickup || !dropoff) return undefined;
+    const latDelta = Math.abs(pickup.latitude - dropoff.latitude) * 1.5 + 0.005;
+    const lngDelta = Math.abs(pickup.longitude - dropoff.longitude) * 1.5 + 0.005;
+    return {
+      latitude: (pickup.latitude + dropoff.latitude) / 2,
+      longitude: (pickup.longitude + dropoff.longitude) / 2,
+      latitudeDelta: Math.max(latDelta, 0.01),
+      longitudeDelta: Math.max(lngDelta, 0.01),
+    };
+  };
 
   const loadServicesAndFares = async () => {
     try {
@@ -222,17 +219,12 @@ export default function SelectServiceScreen() {
   return (
     <View className="flex-1">
       {/* Mini Map */}
-      <View className="h-48">
+      <View className="h-64">
         <MapView
           ref={mapRef}
           provider={PROVIDER_GOOGLE}
           style={{ flex: 1 }}
-          initialRegion={{
-            latitude: (pickup.latitude + dropoff.latitude) / 2,
-            longitude: (pickup.longitude + dropoff.longitude) / 2,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
+          region={getRegionForCoordinates()}
           scrollEnabled={false}
           zoomEnabled={false}
         >

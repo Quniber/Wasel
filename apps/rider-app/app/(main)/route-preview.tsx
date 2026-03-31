@@ -81,6 +81,7 @@ export default function RoutePreviewScreen() {
   const isDark = resolvedTheme === 'dark';
 
   const mapRef = useRef<MapView>(null);
+  const hasFitted = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; distanceValue: number; durationValue: number } | null>(null);
@@ -116,24 +117,26 @@ export default function RoutePreviewScreen() {
     }
   }, [pickup, dropoff]);
 
-  useEffect(() => {
-    if (pickup && dropoff && mapRef.current) {
-      // Fit map to show pickup and dropoff
-      const coords = routeCoordinates.length > 0
-        ? routeCoordinates
-        : [
-            { latitude: pickup.latitude, longitude: pickup.longitude },
-            { latitude: dropoff.latitude, longitude: dropoff.longitude },
-          ];
+  const fitMap = () => {
+    if (!pickup || !dropoff || !mapRef.current) return;
+    const coords = routeCoordinates.length > 0
+      ? routeCoordinates
+      : [
+          { latitude: pickup.latitude, longitude: pickup.longitude },
+          { latitude: dropoff.latitude, longitude: dropoff.longitude },
+        ];
 
-      setTimeout(() => {
-        mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 150, right: 50, bottom: 400, left: 50 },
-          animated: true,
-        });
-      }, 500);
+    mapRef.current.fitToCoordinates(coords, {
+      edgePadding: { top: 120, right: 60, bottom: 60, left: 60 },
+      animated: true,
+    });
+  };
+
+  useEffect(() => {
+    if (pickup && dropoff && mapRef.current && routeCoordinates.length > 0) {
+      setTimeout(fitMap, 500);
     }
-  }, [pickup, dropoff, routeCoordinates]);
+  }, [routeCoordinates]);
 
   const loadRouteAndServices = async () => {
     setIsLoading(true);
@@ -356,9 +359,10 @@ export default function RoutePreviewScreen() {
           initialRegion={{
             latitude: (pickup.latitude + dropoff.latitude) / 2,
             longitude: (pickup.longitude + dropoff.longitude) / 2,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
+            latitudeDelta: Math.abs(pickup.latitude - dropoff.latitude) * 1.5 + 0.01,
+            longitudeDelta: Math.abs(pickup.longitude - dropoff.longitude) * 1.5 + 0.01,
           }}
+          onMapReady={fitMap}
           showsUserLocation
           showsMyLocationButton={false}
         >
