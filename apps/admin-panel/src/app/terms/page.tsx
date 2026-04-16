@@ -150,7 +150,7 @@ export default function TermsPage() {
               If you have any questions about these Terms, please contact us at:
             </p>
             <p className="font-medium">
-              Email: support@waselapp.qa
+              Email: waselapp.qa@gmail.com
             </p>
           </section>
         </div>

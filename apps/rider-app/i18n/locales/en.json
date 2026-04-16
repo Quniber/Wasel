@@ -21,7 +21,9 @@
     "search": "Search",
     "close": "Close",
     "driver": "Driver",
-    "rider": "Rider"
+    "rider": "Rider",
+    "goBack": "Go Back",
+    "or": "OR"
   },
   "auth": {
     "welcome": {
@@ -53,11 +55,14 @@
       "registerTitle": "Create Account",
       "registerSubtitle": "Sign up to get started",
       "email": "Email",
+      "emailPlaceholder": "Enter your email",
       "password": "Password",
+      "passwordPlaceholder": "Enter your password",
       "confirmPassword": "Confirm Password",
       "firstName": "First Name",
       "lastName": "Last Name",
       "phone": "Phone Number",
+      "phonePlaceholder": "Enter your phone number",
       "login": "Log In",
       "register": "Register",
       "forgotPassword": "Forgot Password?",
@@ -102,6 +107,7 @@
     "seats": "{{count}} seats",
     "minutes": "{{count}} min",
     "requestRide": "Request Ride",
+    "payAndRequest": "Pay & Request Ride",
     "scheduleLater": "Schedule Later",
     "distance": "Distance",
     "time": "Time",
@@ -118,14 +124,22 @@
     },
     "payment": {
       "title": "Payment Method",
+      "selectMethod": "Select Payment Method",
       "cash": "Cash",
+      "cashDesc": "Pay with cash to driver",
+      "wallet": "Wallet",
+      "walletDesc": "Pay from your wallet balance",
+      "card": "Card / Apple Pay",
+      "cardDesc": "Apple Pay or credit/debit card",
+      "applePaySupported": "Apple Pay & Cards supported via SkipCash",
       "change": "Change"
     },
     "coupon": {
       "apply": "Apply Coupon",
       "enter": "Enter promo code",
       "applied": "Coupon Applied",
-      "discount": "You save {{amount}}"
+      "discount": "You save {{amount}}",
+      "invalid": "Invalid or expired coupon"
     }
   },
   "ride": {
@@ -182,6 +196,8 @@
     "title": "My Rides",
     "empty": "No rides yet",
     "emptySubtitle": "Your ride history will appear here",
+    "noRides": "No rides yet",
+    "noRidesDesc": "Your ride history will appear here",
     "completed": "Completed",
     "cancelled": "Cancelled",
     "scheduled": "Scheduled",
@@ -224,6 +240,8 @@
   },
   "places": {
     "title": "Saved Places",
+    "empty": "No saved places",
+    "emptySubtitle": "Add your favorite places for quick access",
     "home": "Home",
     "work": "Work",
     "addNew": "Add New Place",
@@ -272,7 +290,15 @@
   },
   "profile": {
     "title": "Profile",
+    "edit": "Edit Profile",
     "editProfile": "Edit Profile",
+    "logout": "Log Out",
+    "notifications": "Notifications",
+    "paymentMethods": "Payment Methods",
+    "safety": "Safety",
+    "savedPlaces": "Saved Places",
+    "settings": "Settings",
+    "support": "Help & Support",
     "firstName": "First Name",
     "firstNamePlaceholder": "Enter first name",
     "lastName": "Last Name",
@@ -369,6 +395,44 @@
     "settings": "Settings",
     "darkMode": "Dark Mode",
     "logout": "Logout"
+  },
+  "payment": {
+    "title": "Complete Payment",
+    "tryAgain": "Try Again",
+    "payNow": "Pay Now",
+    "payLater": "Pay Later",
+    "securePayment": "Secure payment powered by SkipCash",
+    "processingShort": "Processing...",
+    "processing": {
+      "title": "Processing Payment",
+      "message": "Please wait while we confirm your payment..."
+    },
+    "success": {
+      "title": "Payment Successful!",
+      "message": "Redirecting..."
+    },
+    "error": {
+      "title": "Payment Error",
+      "message": "Something went wrong. Please try again.",
+      "noUrl": "Payment Error",
+      "noUrlMessage": "No payment URL provided. Please try again."
+    },
+    "cancelled": {
+      "title": "Payment Cancelled",
+      "message": "Would you like to try again or cancel the ride?"
+    },
+    "close": {
+      "title": "Close Payment",
+      "message": "Are you sure you want to close? Your payment may not be completed."
+    },
+    "pending": {
+      "title": "Payment Pending",
+      "message": "Please complete your payment to finish the ride."
+    },
+    "required": {
+      "title": "Payment Required",
+      "message": "Please complete payment to finish your ride."
+    }
   },
   "errors": {
     "generic": "Something went wrong",

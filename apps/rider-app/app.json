@@ -2,16 +2,16 @@
   "expo": {
     "name": "Wasel Rider",
     "slug": "rider-app",
-    "version": "1.1.2",
+    "version": "1.1.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "wasel-rider",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#0E2238"
     },
     "ios": {
       "supportsTablet": false,
@@ -25,7 +25,7 @@
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "34"
+      "buildNumber": "36"
     },
     "android": {
       "adaptiveIcon": {
@@ -43,7 +43,8 @@
         "googleMaps": {
           "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
-      }
+      },
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
@@ -54,6 +55,15 @@
       "expo-router",
       "expo-secure-store",
       "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E2238",
+          "image": "./assets/splash.png",
+          "imageWidth": 280,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-location",
         {

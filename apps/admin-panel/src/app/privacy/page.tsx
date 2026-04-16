@@ -107,7 +107,7 @@ export default function PrivacyPage() {
               <li>Withdraw consent for location tracking (note: this may limit App functionality)</li>
             </ul>
             <p>
-              To exercise any of these rights, please contact us at support@waselapp.qa.
+              To exercise any of these rights, please contact us at waselapp.qa@gmail.com.
             </p>
           </section>
 
@@ -138,7 +138,7 @@ export default function PrivacyPage() {
               If you have any questions about this Privacy Policy, please contact us at:
             </p>
             <p className="font-medium">
-              Email: support@waselapp.qa
+              Email: waselapp.qa@gmail.com
             </p>
           </section>
         </div>

@@ -429,6 +429,7 @@
     "logout": "Logout"
   },
   "errors": {
+    "error": "Error",
     "generic": "Something went wrong",
     "network": "Network error. Please check your connection.",
     "invalidCredentials": "Invalid email or password",

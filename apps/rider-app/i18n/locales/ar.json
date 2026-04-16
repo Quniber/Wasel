@@ -21,7 +21,9 @@
     "search": "بحث",
     "close": "إغلاق",
     "driver": "السائق",
-    "rider": "الراكب"
+    "rider": "الراكب",
+    "goBack": "رجوع",
+    "or": "أو"
   },
   "auth": {
     "welcome": {
@@ -53,11 +55,14 @@
       "registerTitle": "إنشاء حساب",
       "registerSubtitle": "سجل للبدء",
       "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل بريدك الإلكتروني",
       "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور",
       "confirmPassword": "تأكيد كلمة المرور",
       "firstName": "الاسم الأول",
       "lastName": "اسم العائلة",
       "phone": "رقم الهاتف",
+      "phonePlaceholder": "أدخل رقم هاتفك",
       "login": "تسجيل الدخول",
       "register": "تسجيل",
       "forgotPassword": "نسيت كلمة المرور؟",
@@ -102,6 +107,7 @@
     "seats": "{{count}} مقاعد",
     "minutes": "{{count}} دقيقة",
     "requestRide": "طلب رحلة",
+    "payAndRequest": "ادفع واطلب الرحلة",
     "scheduleLater": "جدولة لاحقاً",
     "distance": "المسافة",
     "time": "الوقت",
@@ -118,14 +124,22 @@
     },
     "payment": {
       "title": "طريقة الدفع",
+      "selectMethod": "اختر طريقة الدفع",
       "cash": "نقداً",
+      "cashDesc": "ادفع نقداً للسائق",
+      "wallet": "المحفظة",
+      "walletDesc": "ادفع من رصيد محفظتك",
+      "card": "بطاقة / Apple Pay",
+      "cardDesc": "Apple Pay أو بطاقة ائتمان/خصم",
+      "applePaySupported": "Apple Pay والبطاقات مدعومة عبر SkipCash",
       "change": "تغيير"
     },
     "coupon": {
       "apply": "تطبيق كوبون",
       "enter": "أدخل رمز الخصم",
       "applied": "تم تطبيق الكوبون",
-      "discount": "وفرت {{amount}}"
+      "discount": "وفرت {{amount}}",
+      "invalid": "كوبون غير صالح أو منتهي الصلاحية"
     }
   },
   "ride": {
@@ -182,6 +196,8 @@
     "title": "رحلاتي",
     "empty": "لا توجد رحلات بعد",
     "emptySubtitle": "سيظهر سجل رحلاتك هنا",
+    "noRides": "لا توجد رحلات بعد",
+    "noRidesDesc": "سيظهر سجل رحلاتك هنا",
     "completed": "مكتملة",
     "cancelled": "ملغاة",
     "scheduled": "مجدولة",
@@ -224,6 +240,8 @@
   },
   "places": {
     "title": "الأماكن المحفوظة",
+    "empty": "لا توجد أماكن محفوظة",
+    "emptySubtitle": "أضف أماكنك المفضلة للوصول السريع",
     "home": "المنزل",
     "work": "العمل",
     "addNew": "إضافة مكان جديد",
@@ -272,7 +290,15 @@
   },
   "profile": {
     "title": "الملف الشخصي",
+    "edit": "تعديل الملف الشخصي",
     "editProfile": "تعديل الملف الشخصي",
+    "logout": "تسجيل الخروج",
+    "notifications": "الإشعارات",
+    "paymentMethods": "طرق الدفع",
+    "safety": "الأمان",
+    "savedPlaces": "الأماكن المحفوظة",
+    "settings": "الإعدادات",
+    "support": "المساعدة والدعم",
     "firstName": "الاسم الأول",
     "firstNamePlaceholder": "أدخل الاسم الأول",
     "lastName": "اسم العائلة",
@@ -369,6 +395,44 @@
     "settings": "الإعدادات",
     "darkMode": "الوضع الداكن",
     "logout": "تسجيل الخروج"
+  },
+  "payment": {
+    "title": "إتمام الدفع",
+    "tryAgain": "حاول مرة أخرى",
+    "payNow": "ادفع الآن",
+    "payLater": "ادفع لاحقاً",
+    "securePayment": "دفع آمن بواسطة SkipCash",
+    "processingShort": "جاري المعالجة...",
+    "processing": {
+      "title": "جاري معالجة الدفع",
+      "message": "يرجى الانتظار حتى نؤكد عملية الدفع..."
+    },
+    "success": {
+      "title": "تم الدفع بنجاح!",
+      "message": "جاري إعادة التوجيه..."
+    },
+    "error": {
+      "title": "خطأ في الدفع",
+      "message": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+      "noUrl": "خطأ في الدفع",
+      "noUrlMessage": "لم يتم توفير رابط الدفع. يرجى المحاولة مرة أخرى."
+    },
+    "cancelled": {
+      "title": "تم إلغاء الدفع",
+      "message": "هل تريد المحاولة مرة أخرى أم إلغاء الرحلة؟"
+    },
+    "close": {
+      "title": "إغلاق الدفع",
+      "message": "هل أنت متأكد من الإغلاق؟ قد لا يكتمل الدفع."
+    },
+    "pending": {
+      "title": "الدفع معلق",
+      "message": "يرجى إكمال الدفع لإنهاء الرحلة."
+    },
+    "required": {
+      "title": "الدفع مطلوب",
+      "message": "يرجى إكمال الدفع لإنهاء رحلتك."
+    }
   },
   "errors": {
     "generic": "حدث خطأ ما",

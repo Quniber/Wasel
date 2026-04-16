@@ -370,7 +370,7 @@ export default function SelectServiceScreen() {
               <>
                 <ActivityIndicator color="#FFFFFF" size="small" />
                 <Text className="text-white text-lg font-semibold ml-2">
-                  {t('payment.processing', { defaultValue: 'Processing...' })}
+                  {t('payment.processingShort', { defaultValue: 'Processing...' })}
                 </Text>
               </>
             ) : (
