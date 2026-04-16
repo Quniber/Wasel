@@ -140,7 +140,9 @@
       "applied": "Coupon Applied",
       "discount": "You save {{amount}}",
       "invalid": "Invalid or expired coupon"
-    }
+    },
+    "selectService": "Choose a ride",
+    "routePreview": "Trip preview"
   },
   "ride": {
     "findingDriver": "Finding Driver",

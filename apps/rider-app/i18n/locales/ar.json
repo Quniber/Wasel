@@ -140,7 +140,9 @@
       "applied": "تم تطبيق الكوبون",
       "discount": "وفرت {{amount}}",
       "invalid": "كوبون غير صالح أو منتهي الصلاحية"
-    }
+    },
+    "selectService": "اختر الرحلة",
+    "routePreview": "معاينة الرحلة"
   },
   "ride": {
     "findingDriver": "جاري البحث عن سائق",

@@ -245,14 +245,14 @@ export default function SelectServiceScreen() {
         </MapView>
 
         {/* Back button */}
-        <SafeAreaView className="absolute top-0 left-0" edges={['top']}>
+        <SafeAreaView className="absolute top-0 left-0 z-10" edges={['top']}>
           <TouchableOpacity
             onPress={() => router.back()}
-            className={`m-4 w-10 h-10 rounded-full items-center justify-center shadow-lg ${
-              isDark ? 'bg-background-dark' : 'bg-white'
+            className={`m-2 w-9 h-9 rounded-full items-center justify-center shadow-md ${
+              isDark ? 'bg-background-dark border border-border-dark' : 'bg-white border border-border'
             }`}
           >
-            <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+            <Ionicons name="chevron-back" size={20} color={isDark ? '#FAFAFA' : '#212121'} />
           </TouchableOpacity>
         </SafeAreaView>
       </View>

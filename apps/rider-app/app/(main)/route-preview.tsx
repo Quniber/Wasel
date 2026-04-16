@@ -86,6 +86,7 @@ export default function RoutePreviewScreen() {
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; distanceValue: number; durationValue: number } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
 
   const getPaymentLabel = (method: PaymentMethod) => {
     switch (method) {
@@ -395,37 +396,32 @@ export default function RoutePreviewScreen() {
         </MapView>
 
         {/* Back button */}
-        <SafeAreaView className="absolute top-0 left-0" edges={['top']}>
+        <SafeAreaView className="absolute top-0 left-0 z-10" edges={['top']}>
           <TouchableOpacity
             onPress={() => router.back()}
-            className={`m-4 w-12 h-12 rounded-full items-center justify-center shadow-lg ${
-              isDark ? 'bg-background-dark' : 'bg-white'
+            className={`m-2 w-9 h-9 rounded-full items-center justify-center shadow-md ${
+              isDark ? 'bg-background-dark border border-border-dark' : 'bg-white border border-border'
             }`}
           >
-            <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
+            <Ionicons name="chevron-back" size={20} color={isDark ? '#FAFAFA' : '#212121'} />
           </TouchableOpacity>
         </SafeAreaView>
 
-        {/* Route Info Card */}
+        {/* Route Info Card - compact pill, horizontally centered */}
         {routeInfo && (
-          <View className="absolute top-20 left-4 right-4">
-            <View className={`flex-row rounded-xl shadow-lg p-4 ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-              <View className="flex-1 items-center border-r border-border dark:border-border-dark">
-                <Ionicons name="navigate" size={24} color="#4CAF50" />
-                <Text className={`text-lg font-bold mt-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {routeInfo.distance}
-                </Text>
-                <Text className="text-xs text-muted-foreground">{t('booking.distance')}</Text>
-              </View>
-              <View className="flex-1 items-center">
-                <Ionicons name="time" size={24} color="#2196F3" />
-                <Text className={`text-lg font-bold mt-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {routeInfo.duration}
-                </Text>
-                <Text className="text-xs text-muted-foreground">{t('booking.time')}</Text>
-              </View>
+          <SafeAreaView className="absolute top-0 left-0 right-0 items-center z-0" edges={['top']} pointerEvents="box-none">
+            <View className={`flex-row mt-2 rounded-full shadow-md px-4 py-1.5 items-center ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
+              <Ionicons name="navigate" size={14} color="#4CAF50" />
+              <Text className={`ml-1 text-sm font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {routeInfo.distance}
+              </Text>
+              <View className="w-px h-4 bg-border dark:bg-border-dark mx-3" />
+              <Ionicons name="time" size={14} color="#2196F3" />
+              <Text className={`ml-1 text-sm font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+                {routeInfo.duration}
+              </Text>
             </View>
-          </View>
+          </SafeAreaView>
         )}
       </View>
 
@@ -434,9 +430,21 @@ export default function RoutePreviewScreen() {
         edges={['bottom']}
         className={`rounded-t-3xl shadow-lg ${isDark ? 'bg-background-dark' : 'bg-white'}`}
       >
-        <View className="px-4 pt-4 pb-2">
-          {/* Drag Handle */}
-          <View className="w-12 h-1 bg-muted dark:bg-muted-dark rounded-full self-center mb-4" />
+        <View className="px-4 pt-2 pb-2">
+          {/* Drag Handle - tap to collapse/expand */}
+          <TouchableOpacity
+            onPress={() => setSheetCollapsed(!sheetCollapsed)}
+            activeOpacity={0.7}
+            className="py-2 items-center"
+          >
+            <View className="w-12 h-1 bg-muted dark:bg-muted-dark rounded-full" />
+            <Ionicons
+              name={sheetCollapsed ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color="#9ca3af"
+              style={{ marginTop: 2 }}
+            />
+          </TouchableOpacity>
 
           {/* Route Summary */}
           <View className="flex-row items-center mb-4">
@@ -451,6 +459,9 @@ export default function RoutePreviewScreen() {
             </Text>
           </View>
 
+          {/* Collapsible content */}
+          {!sheetCollapsed && (
+            <>
           {/* Services */}
           {isLoading ? (
             <View className="py-8 items-center">
@@ -542,6 +553,8 @@ export default function RoutePreviewScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#757575" />
           </TouchableOpacity>
+            </>
+          )}
 
           {/* Request Ride Button */}
           <TouchableOpacity
