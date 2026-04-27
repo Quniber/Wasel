@@ -513,6 +513,14 @@ class ApiClient {
     return response.data;
   }
 
+  async refundOrder(orderId: number, amount: number, reason: string) {
+    const response = await this.client.post<RefundResult>(
+      `/payments/orders/${orderId}/refund`,
+      { amount, reason },
+    );
+    return response.data;
+  }
+
   // Support / Complaints
   async getComplaints(params?: { page?: number; limit?: number; status?: string }) {
     const response = await this.client.get<PaginatedResponse<Complaint>>('/complaints', { params });
@@ -1103,6 +1111,17 @@ export interface Transaction {
   createdAt: string;
   customer?: Customer;
   driver?: Driver;
+  order?: { id: number; pickupAddress?: string; dropoffAddress?: string };
+}
+
+export interface RefundResult {
+  type: 'gateway_refund' | 'wallet_refund';
+  status?: string;
+  refundId?: string;
+  amount?: number;
+  message?: string;
+  transaction?: { id: number; amount: number; description: string };
+  customerNewBalance?: number;
 }
 
 export interface Pagination {
