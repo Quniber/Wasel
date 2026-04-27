@@ -733,6 +733,12 @@ model Order {
   savedPaymentMethod  SavedPaymentMethod? @relation(fields: [savedPaymentMethodId], references: [id])
   paymentGatewayRef   String?        @db.VarChar(100) // External payment reference (e.g., SkipCash payment ID)
 
+  // Refund tracking (set when an admin initiates a refund via SkipCash)
+  refundId            String?        @db.VarChar(100)
+  refundStatus        String?        @db.VarChar(20)  // pending | completed | failed
+  refundedAmount      Decimal?       @db.Decimal(10, 2)
+  refundedAt          DateTime?
+
   // Cancel
   cancelReasonId      Int?
   cancelReason        OrderCancelReason? @relation(fields: [cancelReasonId], references: [id])

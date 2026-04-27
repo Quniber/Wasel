@@ -431,6 +431,10 @@ export class SkipCashService {
         return this.handleRefundedEvent(order, payload);
 
       case SkipCashStatus.PendingRefund:
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { refundStatus: 'pending' },
+        });
         await this.prisma.orderActivity.create({
           data: {
             orderId: order.id,
@@ -444,6 +448,10 @@ export class SkipCashService {
         this.logger.error(
           `SkipCash refund FAILED for order #${order.id} (${payload.PaymentId})`,
         );
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { refundStatus: 'failed' },
+        });
         await this.prisma.orderActivity.create({
           data: {
             orderId: order.id,
@@ -615,6 +623,15 @@ export class SkipCashService {
         amount: refundAmount,
         description: `SkipCash refund for order #${order.id}`,
         reference: payload.PaymentId,
+      },
+    });
+
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        refundStatus: 'completed',
+        refundedAt: new Date(),
+        refundedAmount: refundAmount,
       },
     });
 

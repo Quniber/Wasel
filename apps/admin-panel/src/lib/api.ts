@@ -1111,7 +1111,15 @@ export interface Transaction {
   createdAt: string;
   customer?: Customer;
   driver?: Driver;
-  order?: { id: number; pickupAddress?: string; dropoffAddress?: string };
+  order?: {
+    id: number;
+    pickupAddress?: string;
+    dropoffAddress?: string;
+    refundId?: string | null;
+    refundStatus?: 'pending' | 'completed' | 'failed' | null;
+    refundedAmount?: number | null;
+    refundedAt?: string | null;
+  };
 }
 
 export interface RefundResult {

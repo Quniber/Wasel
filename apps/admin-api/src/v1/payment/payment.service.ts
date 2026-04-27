@@ -144,7 +144,15 @@ export class PaymentService {
             select: { id: true, firstName: true, lastName: true, mobileNumber: true },
           },
           order: {
-            select: { id: true, pickupAddress: true, dropoffAddress: true },
+            select: {
+              id: true,
+              pickupAddress: true,
+              dropoffAddress: true,
+              refundId: true,
+              refundStatus: true,
+              refundedAmount: true,
+              refundedAt: true,
+            },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -163,7 +171,20 @@ export class PaymentService {
         currency: t.currency,
         description: t.description,
         customer: t.customer,
-        order: t.order,
+        order: t.order
+          ? {
+              id: t.order.id,
+              pickupAddress: t.order.pickupAddress,
+              dropoffAddress: t.order.dropoffAddress,
+              refundId: t.order.refundId,
+              refundStatus: t.order.refundStatus,
+              refundedAmount:
+                t.order.refundedAmount !== null && t.order.refundedAmount !== undefined
+                  ? Number(t.order.refundedAmount)
+                  : null,
+              refundedAt: t.order.refundedAt,
+            }
+          : null,
         createdAt: t.createdAt,
       })),
       pagination: {
@@ -433,6 +454,17 @@ export class PaymentService {
     if (!result.success) {
       throw new BadRequestException(result.error || 'Gateway refund failed');
     }
+
+    // Mark the order as having a pending refund so the UI can hide the button
+    // and show a "Refund pending" badge until the SkipCash webhook confirms.
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        refundId: result.refundId,
+        refundStatus: 'pending',
+        refundedAmount: amount,
+      },
+    });
 
     await this.prisma.orderActivity.create({
       data: {

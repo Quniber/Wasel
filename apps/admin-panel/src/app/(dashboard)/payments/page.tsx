@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getErrorMessage } from '@/lib/api';
 import { formatDateTime, formatCurrency } from '@/lib/utils';
-import { ArrowUpRight, ArrowDownLeft, RotateCcw, X } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, RotateCcw, X, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 type RefundTarget = {
   orderId: number;
@@ -135,11 +135,14 @@ export default function PaymentsPage() {
               </tr>
             ) : (
               transactions.map((txn: any) => {
+                const refundStatus: 'pending' | 'completed' | 'failed' | undefined =
+                  txn.order?.refundStatus ?? undefined;
                 const isRefundable =
                   tab === 'customers' &&
                   txn.type === 'debit' &&
                   txn.action === 'ride_payment' &&
-                  txn.order?.id;
+                  txn.order?.id &&
+                  !refundStatus;
                 return (
                   <tr key={txn.id} className="border-b hover:bg-muted/50">
                     <td className="px-6 py-4 font-mono text-sm">#{txn.id}</td>
@@ -186,7 +189,26 @@ export default function PaymentsPage() {
                     </td>
                     {tab === 'customers' && (
                       <td className="px-6 py-4 text-right">
-                        {isRefundable ? (
+                        {refundStatus === 'pending' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-medium text-orange-700" title={`Refund pending — refundId ${txn.order.refundId}`}>
+                            <Clock className="h-3 w-3" />
+                            Refund pending
+                          </span>
+                        )}
+                        {refundStatus === 'completed' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Refunded
+                            {txn.order.refundedAmount ? ` ${formatCurrency(txn.order.refundedAmount)}` : ''}
+                          </span>
+                        )}
+                        {refundStatus === 'failed' && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
+                            <XCircle className="h-3 w-3" />
+                            Refund failed
+                          </span>
+                        )}
+                        {isRefundable && (
                           <button
                             onClick={() =>
                               setRefundTarget({
@@ -203,7 +225,7 @@ export default function PaymentsPage() {
                             <RotateCcw className="h-3 w-3" />
                             Refund
                           </button>
-                        ) : null}
+                        )}
                       </td>
                     )}
                   </tr>
