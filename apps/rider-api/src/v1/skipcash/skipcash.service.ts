@@ -22,16 +22,7 @@ export interface SkipCashPrePaymentRequest {
   phone?: string;
   transactionId: string;
   customerId: number;
-  bookingDetails: {
-    serviceId: number;
-    pickupAddress: string;
-    pickupLatitude: number;
-    pickupLongitude: number;
-    dropoffAddress: string;
-    dropoffLatitude: number;
-    dropoffLongitude: number;
-    amount: number;
-  };
+  orderId: number;
 }
 
 export interface SkipCashPaymentResponse {
@@ -41,18 +32,43 @@ export interface SkipCashPaymentResponse {
   error?: string;
 }
 
+/**
+ * SkipCash webhook payload — fields are PascalCase per the SkipCash spec.
+ * StatusId values: 0=new, 1=pending, 2=paid, 3=canceled, 4=failed,
+ *                  5=rejected, 6=refunded, 7=pendingrefund, 8=refundfailed
+ */
 export interface SkipCashWebhookPayload {
-  id: string;
-  statusId: number;
-  status: string;
-  amount: string;
-  transactionId: string;
-  custom1?: string;
-  custom2?: string;
-  finishedDate?: string;
-  cardType?: string;
-  cardNumber?: string;
-  tokenId?: string;
+  PaymentId: string;
+  Amount: string;
+  StatusId: number;
+  TransactionId?: string;
+  Custom1?: string;
+  Custom2?: string;
+  Custom3?: string;
+  Custom4?: string;
+  Custom5?: string;
+  Custom6?: string;
+  Custom7?: string;
+  Custom8?: string;
+  Custom9?: string;
+  Custom10?: string;
+  VisaId?: string;
+  TokenId?: string;
+  CardType?: string;
+  CardNubmer?: string; // sic - SkipCash spells it this way
+  RecurringSubscriptionId?: string;
+}
+
+export enum SkipCashStatus {
+  New = 0,
+  Pending = 1,
+  Paid = 2,
+  Canceled = 3,
+  Failed = 4,
+  Rejected = 5,
+  Refunded = 6,
+  PendingRefund = 7,
+  RefundFailed = 8,
 }
 
 @Injectable()
@@ -61,6 +77,7 @@ export class SkipCashService {
   private readonly baseUrl: string;
   private readonly keyId: string;
   private readonly secretKey: string;
+  private readonly webhookKey: string;
   private readonly webhookUrl: string;
   private readonly returnUrl: string;
 
@@ -75,19 +92,14 @@ export class SkipCashService {
 
     this.keyId = this.configService.get<string>('SKIPCASH_KEY_ID', '');
     this.secretKey = this.configService.get<string>('SKIPCASH_SECRET_KEY', '');
+    this.webhookKey = this.configService.get<string>('SKIPCASH_WEBHOOK_KEY', '');
     this.webhookUrl = this.configService.get<string>('SKIPCASH_WEBHOOK_URL', '');
     this.returnUrl = this.configService.get<string>('SKIPCASH_RETURN_URL', '');
 
-    // Debug logging to verify .env loading
-    this.logger.warn(`=== SKIPCASH CONFIG ===`);
-    this.logger.warn(`Environment: ${environment}`);
-    this.logger.warn(`KeyId: ${this.keyId}`);
-    this.logger.warn(`SecretKey (first 20 chars): "${this.secretKey?.substring(0, 20)}"`);
-    this.logger.warn(`SecretKey length: ${this.secretKey?.length}`);
-    this.logger.warn(`SecretKey hex (first 40): ${this.secretKey ? Buffer.from(this.secretKey.substring(0, 20)).toString('hex') : 'N/A'}`);
-    this.logger.warn(`WebhookUrl: ${this.webhookUrl}`);
-    this.logger.warn(`ReturnUrl: ${this.returnUrl}`);
-    this.logger.warn(`========================`);
+    this.logger.log(
+      `SkipCash config loaded — env=${environment}, keyId=${this.keyId ? 'set' : 'MISSING'}, ` +
+      `secretKey=${this.secretKey ? 'set' : 'MISSING'}, webhookKey=${this.webhookKey ? 'set' : 'MISSING'}`,
+    );
   }
 
   /**
@@ -211,7 +223,8 @@ export class SkipCashService {
   }
 
   /**
-   * Create a pre-payment request (before order creation) for card/Apple Pay
+   * Create a pre-payment link for an order that's been pre-created with WaitingForPrePay status.
+   * On webhook (StatusId=2), the webhook handler flips the order to Requested and dispatches.
    */
   async createPrePayment(request: SkipCashPrePaymentRequest): Promise<SkipCashPaymentResponse> {
     if (!this.keyId || !this.secretKey) {
@@ -231,8 +244,8 @@ export class SkipCashService {
       TransactionId: request.transactionId,
       Custom1: JSON.stringify({
         type: 'prepay',
+        orderId: request.orderId,
         customerId: request.customerId,
-        bookingDetails: request.bookingDetails,
       }),
     };
 
@@ -296,15 +309,17 @@ export class SkipCashService {
   }
 
   /**
-   * Simulate pre-payment for development/testing
+   * Simulate pre-payment for development/testing.
+   * Returns a fake payUrl pointing at our return endpoint with simulated=true so handleReturn
+   * can drive the success path locally without a real SkipCash transaction.
    */
   private simulatePrePayment(request: SkipCashPrePaymentRequest): SkipCashPaymentResponse {
     const paymentId = `sim_prepay_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-
     this.logger.log(`Simulated SkipCash pre-payment created: ${paymentId}`);
 
-    // Return a simulated payment URL that will auto-complete
-    const returnUrl = `${this.returnUrl}?type=prepay&simulated=true&paymentId=${paymentId}&customerId=${request.customerId}&bookingDetails=${encodeURIComponent(JSON.stringify(request.bookingDetails))}`;
+    const returnUrl =
+      `${this.returnUrl}?type=prepay&simulated=true&paymentId=${paymentId}` +
+      `&orderId=${request.orderId}&amount=${request.amount}`;
 
     return {
       success: true,
@@ -338,54 +353,154 @@ export class SkipCashService {
   }
 
   /**
-   * Verify webhook signature (if SkipCash provides one)
+   * Build the comma-separated key=value string SkipCash signs for webhooks.
+   * Field order is fixed: PaymentId, Amount, StatusId, TransactionId, Custom1, VisaId.
+   * Empty/missing fields are omitted (per SkipCash spec).
    */
-  verifyWebhookSignature(payload: string, signature: string): boolean {
-    if (!this.secretKey) {
-      return true; // Skip verification in simulation mode
+  private buildWebhookSignaturePayload(payload: SkipCashWebhookPayload): string {
+    const parts: string[] = [];
+    if (payload.PaymentId) parts.push(`PaymentId=${payload.PaymentId}`);
+    if (payload.Amount) parts.push(`Amount=${payload.Amount}`);
+    if (payload.StatusId !== undefined && payload.StatusId !== null) {
+      parts.push(`StatusId=${payload.StatusId}`);
     }
-
-    const expectedSignature = crypto.createHmac('sha256', this.secretKey)
-      .update(payload)
-      .digest('base64');
-
-    return signature === expectedSignature;
+    if (payload.TransactionId) parts.push(`TransactionId=${payload.TransactionId}`);
+    if (payload.Custom1) parts.push(`Custom1=${payload.Custom1}`);
+    if (payload.VisaId) parts.push(`VisaId=${payload.VisaId}`);
+    return parts.join(',');
   }
 
   /**
-   * Process webhook callback from SkipCash
+   * Verify the SkipCash webhook Authorization header.
+   * Signature is HMAC-SHA256 of the comma-separated payload, using the WEBHOOK key
+   * (not the secret key), encoded as base64.
    */
-  async processWebhook(payload: SkipCashWebhookPayload): Promise<{ success: boolean; orderId?: number }> {
-    this.logger.log(`Processing SkipCash webhook: paymentId=${payload.id}, status=${payload.status}`);
+  verifyWebhookSignature(payload: SkipCashWebhookPayload, signature: string | undefined): boolean {
+    if (!this.webhookKey) {
+      this.logger.warn('SKIPCASH_WEBHOOK_KEY not configured — rejecting webhook');
+      return false;
+    }
+    if (!signature) {
+      return false;
+    }
 
-    // Find the order by payment gateway reference or transaction ID
+    const data = this.buildWebhookSignaturePayload(payload);
+    const expected = crypto
+      .createHmac('sha256', this.webhookKey)
+      .update(data)
+      .digest('base64');
+
+    const expectedBuf = Buffer.from(expected);
+    const receivedBuf = Buffer.from(signature);
+    if (expectedBuf.length !== receivedBuf.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+  }
+
+  /**
+   * Process webhook callback from SkipCash.
+   * Idempotent: same payload can arrive multiple times (per SkipCash spec) and we
+   * never downgrade a Finished order back to a failed/cancelled state.
+   */
+  async processWebhook(
+    payload: SkipCashWebhookPayload,
+  ): Promise<{ success: boolean; orderId?: number; shouldDispatch?: boolean }> {
+    this.logger.log(
+      `SkipCash webhook: PaymentId=${payload.PaymentId}, StatusId=${payload.StatusId}, ` +
+      `TransactionId=${payload.TransactionId}`,
+    );
+
     const order = await this.prisma.order.findFirst({
-      where: {
-        OR: [
-          { paymentGatewayRef: payload.id },
-          { id: payload.transactionId ? parseInt(payload.transactionId) : -1 },
-        ],
-      },
-      include: {
-        customer: true,
-        driver: true,
-      },
+      where: { paymentGatewayRef: payload.PaymentId },
+      include: { customer: true, driver: true },
     });
 
     if (!order) {
-      this.logger.warn(`Order not found for payment: ${payload.id}`);
+      this.logger.warn(`Order not found for SkipCash PaymentId=${payload.PaymentId}`);
       return { success: false };
     }
 
-    // Check payment status (statusId: 2 = paid, 3 = failed, etc.)
-    const isPaid = payload.status === 'paid' || payload.statusId === 2;
+    const status = payload.StatusId as SkipCashStatus;
 
-    if (isPaid && order.status === 'WaitingForPostPay') {
-      const amount = Number(order.costAfterCoupon || order.costBest);
-      const tipAmount = Number(order.tipAmount || 0);
-      const totalAmount = amount + tipAmount;
+    switch (status) {
+      case SkipCashStatus.Paid:
+        return this.handlePaidEvent(order, payload);
 
-      // Update order status
+      case SkipCashStatus.Refunded:
+        return this.handleRefundedEvent(order, payload);
+
+      case SkipCashStatus.PendingRefund:
+        await this.prisma.orderActivity.create({
+          data: {
+            orderId: order.id,
+            status: order.status,
+            note: `SkipCash refund pending (${payload.PaymentId})`,
+          },
+        });
+        return { success: true, orderId: order.id };
+
+      case SkipCashStatus.RefundFailed:
+        this.logger.error(
+          `SkipCash refund FAILED for order #${order.id} (${payload.PaymentId})`,
+        );
+        await this.prisma.orderActivity.create({
+          data: {
+            orderId: order.id,
+            status: order.status,
+            note: `SkipCash refund FAILED (${payload.PaymentId})`,
+          },
+        });
+        return { success: true, orderId: order.id };
+
+      case SkipCashStatus.Failed:
+      case SkipCashStatus.Rejected:
+      case SkipCashStatus.Canceled:
+        // Never downgrade a Finished order — multiple webhooks can arrive out of order.
+        if (order.status === 'Finished') {
+          this.logger.warn(
+            `Ignoring StatusId=${status} for already-Finished order #${order.id}`,
+          );
+          return { success: true, orderId: order.id };
+        }
+        // Prepay never completed — release the slot so it doesn't sit forever.
+        if (order.status === 'WaitingForPrePay') {
+          await this.prisma.order.update({
+            where: { id: order.id },
+            data: { status: 'Expired' },
+          });
+        }
+        await this.prisma.orderActivity.create({
+          data: {
+            orderId: order.id,
+            status: order.status === 'WaitingForPrePay' ? 'Expired' : order.status,
+            note: `SkipCash payment ${SkipCashStatus[status]} (${payload.PaymentId})`,
+          },
+        });
+        return { success: true, orderId: order.id };
+
+      default:
+        // New / Pending / unknown — just acknowledge.
+        return { success: true, orderId: order.id };
+    }
+  }
+
+  private async handlePaidEvent(
+    order: any,
+    payload: SkipCashWebhookPayload,
+  ): Promise<{ success: boolean; orderId: number; shouldDispatch?: boolean }> {
+    // Idempotency: if already Finished, don't reprocess.
+    if (order.status === 'Finished') {
+      this.logger.log(`Order #${order.id} already Finished — skipping duplicate Paid webhook`);
+      return { success: true, orderId: order.id };
+    }
+
+    const amount = Number(order.costAfterCoupon || order.costBest);
+    const tipAmount = Number(order.tipAmount || 0);
+    const totalAmount = amount + tipAmount;
+
+    // POST-PAY: rider pays after the ride finishes.
+    if (order.status === 'WaitingForPostPay') {
       await this.prisma.order.update({
         where: { id: order.id },
         data: {
@@ -395,7 +510,6 @@ export class SkipCashService {
         },
       });
 
-      // Create customer transaction
       await this.prisma.customerTransaction.create({
         data: {
           customerId: order.customerId,
@@ -404,27 +518,108 @@ export class SkipCashService {
           action: 'ride_payment',
           amount: totalAmount,
           description: `SkipCash payment for order #${order.id}`,
+          reference: payload.PaymentId,
         },
       });
 
-      // Create order activity
       await this.prisma.orderActivity.create({
         data: {
           orderId: order.id,
           status: 'Finished',
-          note: `Payment completed via SkipCash (${payload.id})`,
+          note: `Payment completed via SkipCash (${payload.PaymentId})`,
         },
       });
 
-      // Credit driver earnings if driver exists
       if (order.driverId) {
         await this.creditDriverEarnings(order.driverId, order.id, amount, tipAmount);
       }
 
-      this.logger.log(`Order #${order.id} payment completed via SkipCash`);
+      this.logger.log(`Order #${order.id} post-pay completed via SkipCash`);
       return { success: true, orderId: order.id };
     }
 
+    // PRE-PAY: rider paid before the ride; flip to Requested so dispatch runs.
+    if (order.status === 'WaitingForPrePay') {
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'Requested',
+          paidAmount: totalAmount,
+        },
+      });
+
+      await this.prisma.customerTransaction.create({
+        data: {
+          customerId: order.customerId,
+          orderId: order.id,
+          type: 'debit',
+          action: 'ride_payment',
+          amount: totalAmount,
+          description: `SkipCash pre-payment for order #${order.id}`,
+          reference: payload.PaymentId,
+        },
+      });
+
+      await this.prisma.orderActivity.create({
+        data: {
+          orderId: order.id,
+          status: 'Requested',
+          note: `Pre-payment captured via SkipCash (${payload.PaymentId}) — dispatching`,
+        },
+      });
+
+      this.logger.log(`Order #${order.id} pre-pay captured — flipped to Requested`);
+      return { success: true, orderId: order.id, shouldDispatch: true };
+    }
+
+    // Paid event for an order in some other state — log and acknowledge but do nothing.
+    this.logger.warn(
+      `Paid webhook for order #${order.id} in unexpected state ${order.status} — no-op`,
+    );
+    return { success: true, orderId: order.id };
+  }
+
+  private async handleRefundedEvent(
+    order: any,
+    payload: SkipCashWebhookPayload,
+  ): Promise<{ success: boolean; orderId: number }> {
+    // Was a refund we initiated already recorded? Skip duplicates.
+    const existing = await this.prisma.customerTransaction.findFirst({
+      where: {
+        orderId: order.id,
+        action: 'refund',
+        reference: payload.PaymentId,
+      },
+    });
+
+    if (existing) {
+      this.logger.log(`Refund already recorded for order #${order.id} — skipping`);
+      return { success: true, orderId: order.id };
+    }
+
+    const refundAmount = Number(payload.Amount) || Number(order.paidAmount) || 0;
+
+    await this.prisma.customerTransaction.create({
+      data: {
+        customerId: order.customerId,
+        orderId: order.id,
+        type: 'credit',
+        action: 'refund',
+        amount: refundAmount,
+        description: `SkipCash refund for order #${order.id}`,
+        reference: payload.PaymentId,
+      },
+    });
+
+    await this.prisma.orderActivity.create({
+      data: {
+        orderId: order.id,
+        status: order.status,
+        note: `SkipCash refund completed (${payload.PaymentId}, amount ${refundAmount})`,
+      },
+    });
+
+    this.logger.log(`Refund recorded for order #${order.id} (amount ${refundAmount})`);
     return { success: true, orderId: order.id };
   }
 
@@ -497,6 +692,63 @@ export class SkipCashService {
       where: { id: orderId },
       data: { providerShare: platformCommission + fleetCommission },
     });
+  }
+
+  /**
+   * Refund a SkipCash payment via POST /api/v1/payments/refund.
+   * Per spec: HMAC signature is built from `Id={paymentId},KeyId={keyId}` (amount NOT included).
+   * Refund is asynchronous — SkipCash returns a refundId immediately and processes in ~1 day,
+   * sending a webhook with StatusId=6 (refunded), 7 (pending), or 8 (failed).
+   */
+  async refund(
+    paymentId: string,
+    amount?: number,
+  ): Promise<{ success: boolean; refundId?: string; error?: string }> {
+    if (!this.keyId || !this.secretKey) {
+      this.logger.warn('SkipCash credentials not configured — cannot refund');
+      return { success: false, error: 'Payment gateway not configured' };
+    }
+
+    const signatureString = `Id=${paymentId},KeyId=${this.keyId}`;
+    const signature = crypto
+      .createHmac('sha256', this.secretKey)
+      .update(signatureString)
+      .digest('base64');
+
+    const body: Record<string, string> = {
+      id: paymentId,
+      keyId: this.keyId,
+    };
+    if (amount !== undefined && amount !== null) {
+      body.amount = amount.toFixed(2);
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/payments/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: signature,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      this.logger.debug(`SkipCash refund response: ${JSON.stringify(data)}`);
+
+      if (data.returnCode === 200 && data.resultObj) {
+        const refundId = data.resultObj.id || data.resultObj.refundId;
+        this.logger.log(`SkipCash refund created: ${refundId} for payment ${paymentId}`);
+        return { success: true, refundId };
+      }
+
+      const error = data.errorMessage || 'Refund failed';
+      this.logger.error(`SkipCash refund failed for ${paymentId}: ${error}`);
+      return { success: false, error };
+    } catch (err: any) {
+      this.logger.error(`SkipCash refund API error: ${err.message}`);
+      return { success: false, error: err.message };
+    }
   }
 
   /**

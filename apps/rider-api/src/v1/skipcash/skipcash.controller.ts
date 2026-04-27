@@ -28,8 +28,9 @@ export class SkipCashController {
   ) {}
 
   /**
-   * Create a pre-payment link for card/Apple Pay before creating order
-   * This is called when user selects Card payment and taps "Request Ride"
+   * Create a pre-payment link for card/Apple Pay.
+   * Creates the Order with status=WaitingForPrePay first so the webhook can find it.
+   * Once SkipCash sends StatusId=2 (paid), the webhook flips it to Requested and dispatches.
    */
   @Post('prepay')
   @UseGuards(JwtAuthGuard)
@@ -37,30 +38,56 @@ export class SkipCashController {
     @Request() req: any,
     @Body() dto: CreatePrePaymentDto,
   ) {
-    this.logger.log(`createPrePayment - req.user: ${JSON.stringify(req.user)}`);
-
-    // Try id first, then sub (depending on JWT payload structure)
     const customerId = req.user.id || req.user.sub;
-
     if (!customerId) {
       throw new BadRequestException('Customer ID not found in token');
     }
 
-    this.logger.log(`createPrePayment - customerId: ${customerId}`);
-
-    // Get customer details
     const customer = await this.prisma.customer.findUnique({
       where: { id: Number(customerId) },
       select: { id: true, firstName: true, lastName: true, email: true, mobileNumber: true },
     });
-
     if (!customer) {
       throw new BadRequestException('Customer not found');
     }
 
-    const transactionId = `prepay_${customerId}_${Date.now()}`;
+    const addresses = JSON.stringify([
+      {
+        type: 'pickup',
+        address: dto.pickupAddress,
+        latitude: dto.pickupLatitude,
+        longitude: dto.pickupLongitude,
+      },
+      {
+        type: 'dropoff',
+        address: dto.dropoffAddress,
+        latitude: dto.dropoffLatitude,
+        longitude: dto.dropoffLongitude,
+      },
+    ]);
 
-    // Create SkipCash payment (without order - we'll create order after payment)
+    const order = await this.prisma.order.create({
+      data: {
+        customerId: Number(customerId),
+        serviceId: dto.serviceId,
+        addresses,
+        points: '[]',
+        pickupAddress: dto.pickupAddress,
+        pickupLatitude: dto.pickupLatitude,
+        pickupLongitude: dto.pickupLongitude,
+        dropoffAddress: dto.dropoffAddress,
+        dropoffLatitude: dto.dropoffLatitude,
+        dropoffLongitude: dto.dropoffLongitude,
+        serviceCost: dto.amount,
+        costBest: dto.amount,
+        currency: 'QAR',
+        paymentMode: 'payment_gateway',
+        status: 'WaitingForPrePay',
+      },
+    });
+
+    const transactionId = `order_${order.id}`;
+
     const result = await this.skipCashService.createPrePayment({
       amount: dto.amount,
       firstName: customer.firstName || 'Customer',
@@ -68,32 +95,34 @@ export class SkipCashController {
       email: customer.email || `customer${customerId}@wasel.app`,
       phone: customer.mobileNumber || undefined,
       transactionId,
-      customerId,
-      // Store booking details in custom field for order creation after payment
-      bookingDetails: {
-        serviceId: dto.serviceId,
-        pickupAddress: dto.pickupAddress,
-        pickupLatitude: dto.pickupLatitude,
-        pickupLongitude: dto.pickupLongitude,
-        dropoffAddress: dto.dropoffAddress,
-        dropoffLatitude: dto.dropoffLatitude,
-        dropoffLongitude: dto.dropoffLongitude,
-        amount: dto.amount,
-      },
+      customerId: Number(customerId),
+      orderId: order.id,
     });
 
-    if (result.success) {
-      return {
-        success: true,
-        paymentId: result.paymentId,
-        payUrl: result.payUrl,
-        transactionId,
-        amount: dto.amount,
-        currency: 'QAR',
-      };
-    } else {
+    if (!result.success) {
+      // SkipCash refused — release the order slot.
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'Expired' },
+      });
       throw new BadRequestException(result.error || 'Failed to create payment');
     }
+
+    // Store the SkipCash PaymentId so the webhook can find this order by paymentGatewayRef.
+    await this.prisma.order.update({
+      where: { id: order.id },
+      data: { paymentGatewayRef: result.paymentId },
+    });
+
+    return {
+      success: true,
+      orderId: order.id,
+      paymentId: result.paymentId,
+      payUrl: result.payUrl,
+      transactionId,
+      amount: dto.amount,
+      currency: 'QAR',
+    };
   }
 
   /**
@@ -160,31 +189,32 @@ export class SkipCashController {
   }
 
   /**
-   * Webhook endpoint for SkipCash payment notifications
-   * This is called by SkipCash when a payment status changes
+   * Webhook endpoint for SkipCash payment notifications.
+   * Always returns 200 — failure response would cause SkipCash to retry up to 3 times.
+   * Per SkipCash spec: signature is in the `Authorization` header, signed with the WEBHOOK key.
    */
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
     @Body() payload: SkipCashWebhookPayload,
-    @Headers('x-skipcash-signature') signature?: string,
+    @Headers('authorization') signature?: string,
   ) {
     this.logger.log(`Received SkipCash webhook: ${JSON.stringify(payload)}`);
 
-    // Verify signature if provided
-    if (signature) {
-      const isValid = this.skipCashService.verifyWebhookSignature(
-        JSON.stringify(payload),
-        signature,
+    const isValid = this.skipCashService.verifyWebhookSignature(payload, signature);
+    if (!isValid) {
+      this.logger.warn(
+        `Rejecting SkipCash webhook with invalid signature (PaymentId=${payload?.PaymentId})`,
       );
-      if (!isValid) {
-        this.logger.warn('Invalid webhook signature');
-        return { success: false, error: 'Invalid signature' };
-      }
+      return { success: false, error: 'Invalid signature' };
     }
 
-    // Process the webhook
     const result = await this.skipCashService.processWebhook(payload);
+
+    // Prepay flipped from WaitingForPrePay → Requested. Trigger dispatch.
+    if (result.shouldDispatch && result.orderId) {
+      await this.dispatchOrder(result.orderId);
+    }
 
     return {
       success: result.success,
@@ -192,9 +222,25 @@ export class SkipCashController {
     };
   }
 
+  private async dispatchOrder(orderId: number): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${this.ADMIN_API_URL}/api/internal/orders/${orderId}/dispatch`),
+      );
+      this.logger.log(`Order ${orderId} dispatched`);
+    } catch (err: any) {
+      this.logger.error(`Failed to dispatch order ${orderId}: ${err.message}`);
+      // Don't throw — order is paid and in Requested state, dispatch can be retried.
+    }
+  }
+
   /**
-   * Return URL handler - where users are redirected after payment
-   * This can update the order status and redirect to the app
+   * Return URL handler — UX only.
+   * The webhook is the source of truth for order state. This endpoint just checks status
+   * and returns a deep link so the WebView can redirect back into the app.
+   *
+   * Simulation: when ?simulated=true, fires processWebhook directly with a synthetic
+   * Paid payload so local development can drive the success path without real SkipCash.
    */
   @Get('return')
   async handleReturn(
@@ -202,137 +248,62 @@ export class SkipCashController {
     @Query('orderId') orderId?: string,
     @Query('paymentId') paymentId?: string,
     @Query('simulated') simulated?: string,
-    @Query('customerId') customerId?: string,
-    @Query('bookingDetails') bookingDetailsJson?: string,
+    @Query('amount') amount?: string,
   ) {
-    this.logger.log(`Payment return: type=${type}, orderId=${orderId}, paymentId=${paymentId}`);
+    this.logger.log(
+      `Payment return: type=${type}, orderId=${orderId}, paymentId=${paymentId}, simulated=${simulated}`,
+    );
 
-    // Handle pre-payment returns (payment before order creation)
-    if (type === 'prepay') {
-      // For simulated pre-payments
-      if (simulated === 'true' && paymentId && customerId && bookingDetailsJson) {
-        try {
-          const bookingDetails = JSON.parse(decodeURIComponent(bookingDetailsJson));
-
-          // Build addresses JSON array (required field)
-          const addresses = JSON.stringify([
-            {
-              type: 'pickup',
-              address: bookingDetails.pickupAddress,
-              latitude: bookingDetails.pickupLatitude,
-              longitude: bookingDetails.pickupLongitude,
-            },
-            {
-              type: 'dropoff',
-              address: bookingDetails.dropoffAddress,
-              latitude: bookingDetails.dropoffLatitude,
-              longitude: bookingDetails.dropoffLongitude,
-            },
-          ]);
-
-          // Create the order now that payment is complete
-          const order = await this.prisma.order.create({
-            data: {
-              customerId: parseInt(customerId),
-              serviceId: bookingDetails.serviceId,
-              addresses,
-              points: '[]',
-              pickupAddress: bookingDetails.pickupAddress,
-              pickupLatitude: bookingDetails.pickupLatitude,
-              pickupLongitude: bookingDetails.pickupLongitude,
-              dropoffAddress: bookingDetails.dropoffAddress,
-              dropoffLatitude: bookingDetails.dropoffLatitude,
-              dropoffLongitude: bookingDetails.dropoffLongitude,
-              serviceCost: bookingDetails.amount,
-              costBest: bookingDetails.amount,
-              currency: 'QAR',
-              paymentMode: 'payment_gateway',
-              paymentGatewayRef: paymentId,
-              status: 'Requested',
-            },
-          });
-
-          this.logger.log(`Pre-payment order created: ${order.id}`);
-
-          // Dispatch order to drivers via admin-api
-          try {
-            await firstValueFrom(
-              this.httpService.post(`${this.ADMIN_API_URL}/api/internal/orders/${order.id}/dispatch`),
-            );
-            this.logger.log(`Order ${order.id} dispatched successfully`);
-          } catch (dispatchError: any) {
-            this.logger.error(`Failed to dispatch order ${order.id}:`, dispatchError.message);
-            // Don't fail - order is created, dispatch can be retried
-          }
-
-          return {
-            success: true,
-            message: 'Payment completed, order created',
-            orderId: order.id,
-            redirect: `waselrider://payment-success?orderId=${order.id}&paymentId=${paymentId}`,
-          };
-        } catch (error) {
-          this.logger.error(`Error creating order from pre-payment: ${error.message}`);
-          return {
-            success: false,
-            message: 'Payment successful but order creation failed',
-            redirect: `waselrider://payment-failed?error=order_creation`,
-          };
-        }
+    // Simulated mode: fire a synthetic Paid webhook so local dev can drive the success path.
+    if (simulated === 'true' && paymentId && orderId) {
+      const order = await this.prisma.order.findUnique({ where: { id: Number(orderId) } });
+      if (order && !order.paymentGatewayRef) {
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { paymentGatewayRef: paymentId },
+        });
       }
-
-      // For real pre-payments, check status and create order
-      if (paymentId) {
-        const status = await this.skipCashService.getPaymentStatus(paymentId);
-        if (status.paid) {
-          return {
-            success: true,
-            status: status.status,
-            message: 'Pre-payment successful',
-            redirect: `waselrider://payment-success?paymentId=${paymentId}`,
-          };
-        } else {
-          return {
-            success: false,
-            status: status.status,
-            redirect: `waselrider://payment-failed?paymentId=${paymentId}`,
-          };
-        }
-      }
-    }
-
-    // Handle post-ride payment returns (existing flow)
-    if (simulated === 'true' && orderId && paymentId) {
-      await this.skipCashService.processWebhook({
-        id: paymentId,
-        statusId: 2,
-        status: 'paid',
-        amount: '0',
-        transactionId: orderId,
+      const result = await this.skipCashService.processWebhook({
+        PaymentId: paymentId,
+        Amount: amount || '0',
+        StatusId: 2,
+        TransactionId: `order_${orderId}`,
       });
-
+      if (result.shouldDispatch && result.orderId) {
+        await this.dispatchOrder(result.orderId);
+      }
+      const redirect =
+        type === 'prepay'
+          ? `waselrider://payment-success?orderId=${orderId}&paymentId=${paymentId}`
+          : `waselrider://payment-complete?orderId=${orderId}`;
       return {
         success: true,
         message: 'Payment completed (simulated)',
-        redirect: `waselrider://payment-complete?orderId=${orderId}`,
+        orderId: Number(orderId),
+        redirect,
       };
     }
 
-    // For real payments, check status
-    if (paymentId) {
-      const status = await this.skipCashService.getPaymentStatus(paymentId);
-      return {
-        success: status.paid,
-        status: status.status,
-        redirect: status.paid
-          ? `waselrider://payment-complete?orderId=${orderId}`
-          : `waselrider://payment-failed?orderId=${orderId}`,
-      };
+    if (!paymentId) {
+      return { success: false, message: 'Missing payment information' };
     }
+
+    // Real flow: check current status from SkipCash. The webhook will (or already did)
+    // update order state; this just gives the WebView a redirect URL.
+    const status = await this.skipCashService.getPaymentStatus(paymentId);
+    const successPath =
+      type === 'prepay'
+        ? `waselrider://payment-success?orderId=${orderId}&paymentId=${paymentId}`
+        : `waselrider://payment-complete?orderId=${orderId}`;
+    const failPath =
+      type === 'prepay'
+        ? `waselrider://payment-failed?orderId=${orderId}&paymentId=${paymentId}`
+        : `waselrider://payment-failed?orderId=${orderId}`;
 
     return {
-      success: false,
-      message: 'Missing payment information',
+      success: status.paid,
+      status: status.status,
+      redirect: status.paid ? successPath : failPath,
     };
   }
 }

@@ -1,10 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TransactionType, TransactionAction, PaymentGatewayType } from 'database';
 
 @Injectable()
 export class PaymentService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(PaymentService.name);
+  private readonly RIDER_API_URL = process.env.RIDER_API_URL || 'http://localhost:3001';
+  private readonly INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
+
+  constructor(
+    private prisma: PrismaService,
+    private httpService: HttpService,
+  ) {}
 
   // =====================
   // Payment Gateways
@@ -340,6 +349,14 @@ export class PaymentService {
   // Refunds
   // =====================
 
+  /**
+   * Refund an order.
+   * - If paid via SkipCash (paymentMode=payment_gateway and paymentGatewayRef exists):
+   *   triggers an asynchronous gateway refund. The customer's CARD is credited (~1 day).
+   *   The customer transaction is recorded by the rider-api webhook handler when SkipCash
+   *   confirms (StatusId=6). Wallet balance is NOT touched.
+   * - Otherwise (cash, wallet, etc): credits the customer's in-app wallet immediately.
+   */
   async processRefund(
     orderId: number,
     amount: number,
@@ -356,30 +373,94 @@ export class PaymentService {
     }
 
     const maxRefund = Number(order.paidAmount || order.costAfterCoupon || 0);
+    if (amount <= 0) {
+      throw new BadRequestException('Refund amount must be greater than zero');
+    }
     if (amount > maxRefund) {
       throw new BadRequestException(
-        `Refund amount cannot exceed paid amount ($${maxRefund.toFixed(2)})`,
+        `Refund amount cannot exceed paid amount (${maxRefund.toFixed(2)})`,
       );
     }
 
-    // Add refund to customer wallet
+    const isGatewayPaid =
+      order.paymentMode === 'payment_gateway' && !!order.paymentGatewayRef;
+
+    if (isGatewayPaid) {
+      return this.processGatewayRefund(order, amount, reason, operatorId);
+    }
+
+    return this.processWalletRefund(order, amount, reason);
+  }
+
+  private async processGatewayRefund(
+    order: any,
+    amount: number,
+    reason: string,
+    operatorId: number,
+  ) {
+    if (!this.INTERNAL_API_KEY) {
+      throw new BadRequestException(
+        'INTERNAL_API_KEY not configured — cannot trigger gateway refund',
+      );
+    }
+
+    let result: { success: boolean; refundId?: string; error?: string };
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.RIDER_API_URL}/api/internal/skipcash/refund`,
+          { paymentId: order.paymentGatewayRef, amount },
+          { headers: { 'X-Internal-Key': this.INTERNAL_API_KEY } },
+        ),
+      );
+      result = response.data;
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to call rider-api refund for order #${order.id}: ${err.message}`,
+      );
+      throw new BadRequestException(
+        err.response?.data?.message || `Refund call failed: ${err.message}`,
+      );
+    }
+
+    if (!result.success) {
+      throw new BadRequestException(result.error || 'Gateway refund failed');
+    }
+
+    await this.prisma.orderActivity.create({
+      data: {
+        orderId: order.id,
+        status: order.status,
+        note: `Refund initiated by operator #${operatorId}: ${amount.toFixed(2)} ${order.currency} — ${reason} (refundId=${result.refundId})`,
+      },
+    });
+
+    return {
+      type: 'gateway_refund',
+      status: 'pending',
+      refundId: result.refundId,
+      amount,
+      message:
+        'Refund initiated. SkipCash will process within ~1 day; the customer transaction will be recorded automatically when confirmed.',
+    };
+  }
+
+  private async processWalletRefund(order: any, amount: number, reason: string) {
     const transaction = await this.prisma.customerTransaction.create({
       data: {
         customerId: order.customerId,
-        orderId,
+        orderId: order.id,
         amount,
-        currency: 'USD',
+        currency: order.currency || 'QAR',
         type: TransactionType.credit,
         action: TransactionAction.refund,
-        description: `Refund for order #${orderId}: ${reason}`,
+        description: `Refund for order #${order.id}: ${reason}`,
       },
     });
 
     await this.prisma.customer.update({
       where: { id: order.customerId },
-      data: {
-        walletBalance: { increment: amount },
-      },
+      data: { walletBalance: { increment: amount } },
     });
 
     const customer = await this.prisma.customer.findUnique({
@@ -388,6 +469,7 @@ export class PaymentService {
     });
 
     return {
+      type: 'wallet_refund',
       transaction: {
         id: transaction.id,
         amount: Number(transaction.amount),
