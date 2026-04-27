@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Wasel Driver</string>
+    <string>WaselGo Driver</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.2</string>
+    <string>1.1.6</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>30</string>
+    <string>34</string>
     <key>GMSApiKey</key>
     <string>AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE</string>
     <key>ITSAppUsesNonExemptEncryption</key>
@@ -56,11 +56,11 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Wasel Driver needs access to your camera so you can take photos of your driver documents for verification. For example, you can photograph your driver's license to upload for account approval.</string>
+    <string>WaselGo Driver needs access to your camera so you can take photos of your driver documents for verification. For example, you can photograph your driver's license to upload for account approval.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow Wasel Driver to use your location to receive nearby ride requests and navigate to passengers.</string>
+    <string>Allow WaselGo Driver to use your location to receive nearby ride requests and navigate to passengers.</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>We need your location to track your position during rides and receive nearby requests.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
@@ -68,7 +68,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Wasel Driver needs access to your photo library so you can select photos of your driver documents for verification. For example, you can choose a photo of your driver's license from your library to upload for account approval.</string>
+    <string>WaselGo Driver needs access to your photo library so you can select photos of your driver documents for verification. For example, you can choose a photo of your driver's license from your library to upload for account approval.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

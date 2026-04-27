@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Wasel Driver",
+    "name": "WaselGo Driver",
     "slug": "driver-app",
-    "version": "1.1.2",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "wasel-driver",
@@ -30,7 +30,7 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "30"
+      "buildNumber": "34"
     },
     "android": {
       "adaptiveIcon": {
@@ -51,7 +51,7 @@
           "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
       },
-      "versionCode": 2
+      "versionCode": 4
     },
     "web": {
       "bundler": "metro",
@@ -74,7 +74,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Wasel Driver to use your location to receive nearby ride requests and navigate to passengers.",
+          "locationAlwaysAndWhenInUsePermission": "Allow WaselGo Driver to use your location to receive nearby ride requests and navigate to passengers.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
@@ -82,8 +82,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Wasel Driver needs access to your photo library so you can select photos of your driver documents for verification. For example, you can choose a photo of your driver's license from your library to upload for account approval.",
-          "cameraPermission": "Wasel Driver needs access to your camera so you can take photos of your driver documents for verification. For example, you can photograph your driver's license to upload for account approval."
+          "photosPermission": "WaselGo Driver needs access to your photo library so you can select photos of your driver documents for verification. For example, you can choose a photo of your driver's license from your library to upload for account approval.",
+          "cameraPermission": "WaselGo Driver needs access to your camera so you can take photos of your driver documents for verification. For example, you can photograph your driver's license to upload for account approval."
         }
       ],
       "./plugins/iphone-only"
