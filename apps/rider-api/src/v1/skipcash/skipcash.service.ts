@@ -411,8 +411,16 @@ export class SkipCashService {
       `TransactionId=${payload.TransactionId}`,
     );
 
+    // Look up by paymentGatewayRef first (the original payment's SkipCash ID).
+    // Fallback: SkipCash docs don't specify whether refund webhooks use the
+    // original PaymentId or the new refundId, so we also try refundId.
     const order = await this.prisma.order.findFirst({
-      where: { paymentGatewayRef: payload.PaymentId },
+      where: {
+        OR: [
+          { paymentGatewayRef: payload.PaymentId },
+          { refundId: payload.PaymentId },
+        ],
+      },
       include: { customer: true, driver: true },
     });
 
