@@ -372,7 +372,14 @@ export class PaymentService {
       throw new NotFoundException('Order not found');
     }
 
-    const maxRefund = Number(order.paidAmount || order.costAfterCoupon || 0);
+    // Decimal objects from Prisma are always truthy at 0, so don't chain with ||.
+    const paidAmount = Number(order.paidAmount ?? 0);
+    const couponAmount = Number(order.costAfterCoupon ?? 0);
+    const bestAmount = Number(order.costBest ?? 0);
+    const maxRefund = paidAmount > 0
+      ? paidAmount
+      : (couponAmount > 0 ? couponAmount : bestAmount);
+
     if (amount <= 0) {
       throw new BadRequestException('Refund amount must be greater than zero');
     }

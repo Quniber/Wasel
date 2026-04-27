@@ -495,8 +495,15 @@ export class SkipCashService {
       return { success: true, orderId: order.id };
     }
 
-    const amount = Number(order.costAfterCoupon || order.costBest);
-    const tipAmount = Number(order.tipAmount || 0);
+    // Decimal objects from Prisma are always truthy even at 0, so don't use ||.
+    // Prefer the webhook's Amount (authoritative — it's what was actually charged),
+    // then fall back to costAfterCoupon if non-zero, else costBest.
+    const couponAmount = Number(order.costAfterCoupon ?? 0);
+    const bestAmount = Number(order.costBest ?? 0);
+    const orderAmount = couponAmount > 0 ? couponAmount : bestAmount;
+    const webhookAmount = Number(payload.Amount) || 0;
+    const amount = webhookAmount > 0 ? webhookAmount : orderAmount;
+    const tipAmount = Number(order.tipAmount ?? 0);
     const totalAmount = amount + tipAmount;
 
     // POST-PAY: rider pays after the ride finishes.
