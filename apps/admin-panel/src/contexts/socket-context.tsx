@@ -5,7 +5,10 @@ import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Socket API URL - centralized socket service
-const SOCKET_API_URL = process.env.NEXT_PUBLIC_SOCKET_API_URL || 'https://wasel.shafrah.qa';
+const SOCKET_API_URL =
+  process.env.NEXT_PUBLIC_SOCKET_API_URL ||
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  'https://api.waselapp.qa';
 
 interface DriverLocationUpdate {
   driverId: number;
