@@ -1,3 +1,8 @@
+import { join } from 'path';
+// Load env from monorepo-root/.env with override:true so values always win
+// over PM2's stale cached env (PM2 doesn't unset vars on --update-env).
+require('dotenv').config({ path: join(__dirname, '..', '..', '..', '.env'), override: true });
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { AppModule } from './app.module';

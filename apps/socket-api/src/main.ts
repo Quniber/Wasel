@@ -1,3 +1,6 @@
+import { join } from 'path';
+require('dotenv').config({ path: join(__dirname, '..', '..', '..', '.env'), override: true });
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
