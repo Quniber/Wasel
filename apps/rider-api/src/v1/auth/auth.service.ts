@@ -44,10 +44,22 @@ export class AuthService {
 
   private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
     if (this.isTestNumber(mobileNumber)) return code === TEST_OTP_CODE;
-    const check = await this.twilio.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
-      .verificationChecks.create({ to: mobileNumber, code });
-    return check.status === 'approved';
+    try {
+      const check = await this.twilio.verify.v2
+        .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
+        .verificationChecks.create({ to: mobileNumber, code });
+      return check.status === 'approved';
+    } catch (err: any) {
+      // Twilio returns 404 when the verification has expired, been approved
+      // already, or hit the max-attempts limit (~5). Surface that as a clean
+      // BadRequest so the client shows "code expired, request a new one".
+      if (err?.status === 404 || err?.code === 20404) {
+        throw new BadRequestException(
+          'Verification code expired or too many attempts. Please request a new code.',
+        );
+      }
+      throw err;
+    }
   }
 
   // Pre-verify OTP and issue a short-lived registration token.

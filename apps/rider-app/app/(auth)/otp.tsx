@@ -20,9 +20,12 @@ const BASE_W = 393;
 
 const formatPhoneDisplay = (phone: string | undefined) => {
   if (!phone) return '';
-  // +97450123456 → +974 5012 3456
-  const m = phone.match(/^(\+\d{1,4})(\d{4})(\d+)$/);
-  return m ? `${m[1]} ${m[2]} ${m[3]}` : phone;
+  // Qatar country code is always +974 (3 digits after +).
+  // +97471327489 → +974 7132 7489
+  const cc = phone.slice(0, 4);
+  const rest = phone.slice(4);
+  const grouped = rest.replace(/(\d{4})(\d+)/, '$1 $2');
+  return `${cc} ${grouped}`;
 };
 
 const formatCountdown = (s: number) => {
