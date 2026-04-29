@@ -1,80 +1,143 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Platform, Animated, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  Easing,
+  useWindowDimensions,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { MapView, MapMarker as Marker, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
-const Circle = ({ center, radius, ...props }: any) => null; // Web placeholder
-import { useThemeStore } from '@/stores/theme-store';
+import {
+  MapView,
+  MapMarker as Marker,
+  MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE,
+} from '@/components/maps/MapView';
 import { useBookingStore } from '@/stores/booking-store';
 import { orderApi } from '@/lib/api';
 import { socketService } from '@/lib/socket';
+import AlertModal from '@/components/AlertModal';
+
+const BASE_W = 393;
+
+// Three pulsing dots indicator (used in the top pill)
+function DotsIndicator({ size = 6, gap = 4 }: { size?: number; gap?: number }) {
+  const a1 = useRef(new Animated.Value(0.3)).current;
+  const a2 = useRef(new Animated.Value(0.3)).current;
+  const a3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const seq = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, {
+            toValue: 1,
+            duration: 350,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(val, {
+            toValue: 0.3,
+            duration: 350,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    const l1 = seq(a1, 0);
+    const l2 = seq(a2, 150);
+    const l3 = seq(a3, 300);
+    l1.start();
+    l2.start();
+    l3.start();
+    return () => {
+      l1.stop();
+      l2.stop();
+      l3.stop();
+    };
+  }, []);
+
+  const Dot = ({ value }: { value: Animated.Value }) => (
+    <Animated.View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: '#0366FB',
+        opacity: value,
+      }}
+    />
+  );
+  return (
+    <View style={{ flexDirection: 'row', gap, alignItems: 'center' }}>
+      <Dot value={a1} />
+      <Dot value={a2} />
+      <Dot value={a3} />
+    </View>
+  );
+}
 
 export default function FindingDriverScreen() {
-  console.log('[FindingDriver] Component rendering...');
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const { pickup, dropoff, selectedService, paymentMethod, setActiveOrder, resetBooking } = useBookingStore();
-  console.log('[FindingDriver] After hooks - pickup:', !!pickup, 'dropoff:', !!dropoff, 'service:', !!selectedService);
-  const isDark = resolvedTheme === 'dark';
+  const { t, i18n } = useTranslation();
+  const {
+    pickup,
+    dropoff,
+    selectedService,
+    paymentMethod,
+    setActiveOrder,
+    resetBooking,
+  } = useBookingStore();
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   const mapRef = useRef<MapView>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [status, setStatus] = useState<'searching' | 'not_found'>('searching');
   const [searchRadius, setSearchRadius] = useState(500);
 
-  // Store cleanup function ref
   const cleanupRef = useRef<(() => void) | null>(null);
-  // Track if cancel has been triggered to prevent loops
   const isCancellingRef = useRef(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [confirmCancelVisible, setConfirmCancelVisible] = useState(false);
+  const [cancelErrorMsg, setCancelErrorMsg] = useState<string | null>(null);
 
-  // Use useFocusEffect instead of useEffect to handle screen re-focus
-  // This ensures order creation runs every time the screen comes into focus,
-  // not just on initial mount (which doesn't re-run with Expo Router's Drawer)
   useFocusEffect(
     useCallback(() => {
-      console.log('[FindingDriver] Screen focused, starting order flow...');
       startPulseAnimation();
 
-      // Log current state for debugging
       const currentState = useBookingStore.getState();
-      console.log('[FindingDriver] Focus state:', {
-        hasPickup: !!currentState.pickup,
-        hasDropoff: !!currentState.dropoff,
-        hasSelectedService: !!currentState.selectedService,
-        activeOrderId: currentState.activeOrder?.id,
-        activeOrderStatus: currentState.activeOrder?.status,
-      });
-
-      // Check if we already have an order from pre-payment
       const existingOrder = currentState.activeOrder;
 
-      // If order is already finished, go directly to ride-complete
-      if (existingOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)) {
-        console.log('[FindingDriver] Order already finished, redirecting to ride-complete');
+      if (
+        existingOrder?.id &&
+        ['Finished', 'finished', 'Completed', 'completed'].includes(existingOrder.status)
+      ) {
         router.replace('/(main)/ride-complete');
         return;
       }
-
-      // If order has a driver (DriverAccepted or later status), go to ride-active
-      if (existingOrder?.id && existingOrder.driver && ['DriverAccepted', 'Arrived', 'Started'].includes(existingOrder.status)) {
-        console.log('[FindingDriver] Order has driver, redirecting to ride-active');
+      if (
+        existingOrder?.id &&
+        existingOrder.driver &&
+        ['DriverAccepted', 'Arrived', 'Started'].includes(existingOrder.status)
+      ) {
         router.replace('/(main)/ride-active');
         return;
       }
-
       if (existingOrder?.id && existingOrder.status === 'Requested') {
-        console.log('[FindingDriver] Using existing pre-paid order:', existingOrder.id);
         waitForDriver(Number(existingOrder.id));
       } else {
         createOrder();
       }
 
       return () => {
-        // Cleanup socket listeners when losing focus
-        console.log('[FindingDriver] Screen losing focus, cleaning up...');
         if (cleanupRef.current) {
           cleanupRef.current();
           cleanupRef.current = null;
@@ -84,70 +147,53 @@ export default function FindingDriverScreen() {
   );
 
   const startPulseAnimation = () => {
+    pulseAnim.setValue(0);
     Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ])
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      })
     ).start();
   };
 
-  // Wait for driver assignment when order already exists (from pre-payment)
+  const buildDriverObject = (driverData: any, fallbackLat: number, fallbackLng: number) => {
+    if (!driverData) return null;
+    return {
+      id: String(driverData.id || ''),
+      firstName: driverData.firstName || 'Driver',
+      lastName: driverData.lastName || '',
+      mobileNumber: driverData.mobileNumber || '',
+      rating: driverData.rating || 5.0,
+      reviewCount: driverData.reviewCount || 0,
+      carModel:
+        typeof driverData.carModel === 'string'
+          ? driverData.carModel
+          : driverData.carModel
+          ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+          : '',
+      carColor:
+        typeof driverData.carColor === 'string'
+          ? driverData.carColor
+          : driverData.carColor?.name || '',
+      carPlate: driverData.carPlate || '',
+      latitude: driverData.latitude || fallbackLat,
+      longitude: driverData.longitude || fallbackLng,
+    };
+  };
+
   const waitForDriver = async (orderId: number) => {
     try {
-      // Ensure socket is connected before joining room
       await socketService.connect();
-      console.log('[FindingDriver] Socket connected, joining order room:', orderId);
-
-      // Join order room for real-time updates
       socketService.joinOrderRoom(orderId);
 
-      // Listen for driver acceptance
       const unsubscribe = socketService.on('order:status', async (data) => {
-        console.log('[FindingDriver] Received order:status:', data);
         if (data.status === 'DriverAccepted') {
-          // Build driver object with proper fallbacks
-          const buildDriverObject = (driverData: any) => {
-            if (!driverData) return null;
-            return {
-              id: String(driverData.id || ''),
-              firstName: driverData.firstName || 'Driver',
-              lastName: driverData.lastName || '',
-              mobileNumber: driverData.mobileNumber || '',
-              rating: driverData.rating || 5.0,
-              reviewCount: driverData.reviewCount || 0,
-              carModel: typeof driverData.carModel === 'string'
-                ? driverData.carModel
-                : driverData.carModel
-                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
-                  : '',
-              carColor: typeof driverData.carColor === 'string'
-                ? driverData.carColor
-                : driverData.carColor?.name || '',
-              carPlate: driverData.carPlate || '',
-              latitude: driverData.latitude || pickup?.latitude,
-              longitude: driverData.longitude || pickup?.longitude,
-            };
-          };
-
           try {
-            // Fetch full order details including driver info
             const orderDetails = await orderApi.getOrderDetails(String(orderId));
             const fullOrder = orderDetails.data;
-            console.log('[FindingDriver] Fetched order details:', fullOrder);
-
-            // Use fetched driver data, or socket data as fallback
             const driverData = fullOrder.driver || data.driver;
-
             setActiveOrder({
               id: fullOrder.id?.toString() || orderId.toString(),
               status: 'DriverAccepted',
@@ -155,18 +201,13 @@ export default function FindingDriverScreen() {
               dropoff: dropoff!,
               service: selectedService!,
               fare: data.fare || parseFloat(fullOrder.costBest) || 15,
-              driver: buildDriverObject(driverData),
+              driver: buildDriverObject(driverData, pickup?.latitude || 0, pickup?.longitude || 0),
               createdAt: fullOrder.createdAt || new Date().toISOString(),
             });
-            // Clean up before navigating
-            if (cleanupRef.current) {
-              cleanupRef.current();
-              cleanupRef.current = null;
-            }
+            cleanupRef.current?.();
+            cleanupRef.current = null;
             router.replace('/(main)/ride-active');
-          } catch (err) {
-            console.error('[FindingDriver] Error fetching order details:', err);
-            // Fallback with socket driver data
+          } catch {
             setActiveOrder({
               id: data.orderId?.toString() || orderId.toString(),
               status: 'DriverAccepted',
@@ -174,278 +215,188 @@ export default function FindingDriverScreen() {
               dropoff: dropoff!,
               service: selectedService!,
               fare: data.fare || 15,
-              driver: buildDriverObject(data.driver) || {
-                id: String(data.driverId || ''),
-                firstName: 'Driver',
-                lastName: '',
-                mobileNumber: '',
-                rating: 5.0,
-                reviewCount: 0,
-                carModel: '',
-                carColor: '',
-                carPlate: '',
-                latitude: pickup?.latitude || 0,
-                longitude: pickup?.longitude || 0,
-              },
+              driver: buildDriverObject(data.driver, pickup?.latitude || 0, pickup?.longitude || 0),
               createdAt: new Date().toISOString(),
             });
-            // Clean up before navigating
-            if (cleanupRef.current) {
-              cleanupRef.current();
-              cleanupRef.current = null;
-            }
+            cleanupRef.current?.();
+            cleanupRef.current = null;
             router.replace('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
         } else if (data.status === 'Finished' || data.status === 'finished') {
-          // Ride already completed, go to ride-complete
-          console.log('[FindingDriver] Order already finished, going to ride-complete');
-          // Clean up before navigating
-          if (cleanupRef.current) {
-            cleanupRef.current();
-            cleanupRef.current = null;
-          }
+          cleanupRef.current?.();
+          cleanupRef.current = null;
           router.replace('/(main)/ride-complete');
         }
       });
 
-      // Timeout after 60 seconds if no driver found
-      const timeout = setTimeout(() => {
-        setStatus('not_found');
-      }, 60000);
-
-      // Store cleanup function
+      const timeout = setTimeout(() => setStatus('not_found'), 60000);
       cleanupRef.current = () => {
         unsubscribe?.();
         clearTimeout(timeout);
       };
-    } catch (error) {
-      console.error('[FindingDriver] Error waiting for driver:', error);
+    } catch {
       setStatus('not_found');
     }
   };
 
   const createOrder = async () => {
-    // Read latest values from store to avoid stale closure issues
-    const { pickup: currentPickup, dropoff: currentDropoff, selectedService: currentService, paymentMethod: currentPaymentMethod } = useBookingStore.getState();
-
-    if (!currentPickup || !currentDropoff || !currentService) {
-      console.log('[FindingDriver] Cannot create order - missing data:', {
-        hasPickup: !!currentPickup,
-        hasDropoff: !!currentDropoff,
-        hasSelectedService: !!currentService,
-      });
+    const {
+      pickup: cp,
+      dropoff: cd,
+      selectedService: cs,
+      paymentMethod: cm,
+    } = useBookingStore.getState();
+    if (!cp || !cd || !cs) {
       setStatus('not_found');
       return;
     }
-
     try {
-      // Map payment method to API format
       const paymentModeMap: Record<string, string> = {
         cash: 'cash',
         wallet: 'wallet',
         card: 'payment_gateway',
       };
-
-      // Create order via API
       const response = await orderApi.createOrder({
-        serviceId: parseInt(currentService.id, 10),
-        pickupAddress: currentPickup.address,
-        pickupLatitude: currentPickup.latitude,
-        pickupLongitude: currentPickup.longitude,
-        dropoffAddress: currentDropoff.address,
-        dropoffLatitude: currentDropoff.latitude,
-        dropoffLongitude: currentDropoff.longitude,
-        paymentMode: paymentModeMap[currentPaymentMethod] || 'cash',
+        serviceId: parseInt(cs.id, 10),
+        pickupAddress: cp.address,
+        pickupLatitude: cp.latitude,
+        pickupLongitude: cp.longitude,
+        dropoffAddress: cd.address,
+        dropoffLatitude: cd.latitude,
+        dropoffLongitude: cd.longitude,
+        paymentMode: paymentModeMap[cm] || 'cash',
       });
-
       const order = response.data;
-      console.log('[FindingDriver] Order created:', order.id);
 
-      // Ensure socket is connected before joining room
       await socketService.connect();
-      console.log('[FindingDriver] Socket connected, joining order room:', order.id);
-
-      // Join order room for real-time updates
       socketService.joinOrderRoom(order.id);
 
-      // Listen for driver acceptance
       const unsubscribe = socketService.on('order:status', async (data) => {
-        console.log('[FindingDriver] Received order:status:', data);
         if (data.status === 'DriverAccepted') {
-          // Build driver object with proper fallbacks
-          const buildDriverObject = (driverData: any) => {
-            if (!driverData) return null;
-            return {
-              id: String(driverData.id || ''),
-              firstName: driverData.firstName || 'Driver',
-              lastName: driverData.lastName || '',
-              mobileNumber: driverData.mobileNumber || '',
-              rating: driverData.rating || 5.0,
-              reviewCount: driverData.reviewCount || 0,
-              carModel: typeof driverData.carModel === 'string'
-                ? driverData.carModel
-                : driverData.carModel
-                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
-                  : '',
-              carColor: typeof driverData.carColor === 'string'
-                ? driverData.carColor
-                : driverData.carColor?.name || '',
-              carPlate: driverData.carPlate || '',
-              latitude: driverData.latitude || currentPickup.latitude,
-              longitude: driverData.longitude || currentPickup.longitude,
-            };
-          };
-
           try {
-            // Fetch full order details including driver info
             const orderDetails = await orderApi.getOrderDetails(order.id);
             const fullOrder = orderDetails.data;
-            console.log('[FindingDriver] Fetched order details:', fullOrder);
-
-            // Use fetched driver data, or socket data as fallback
             const driverData = fullOrder.driver || data.driver;
-
             setActiveOrder({
               id: fullOrder.id?.toString() || order.id.toString(),
               status: 'DriverAccepted',
-              pickup: currentPickup,
-              dropoff: currentDropoff,
-              service: currentService,
+              pickup: cp,
+              dropoff: cd,
+              service: cs,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
-              driver: buildDriverObject(driverData),
+              driver: buildDriverObject(driverData, cp.latitude, cp.longitude),
               createdAt: order.createdAt || new Date().toISOString(),
             });
-            // Clean up before navigating
-            if (cleanupRef.current) {
-              cleanupRef.current();
-              cleanupRef.current = null;
-            }
+            cleanupRef.current?.();
+            cleanupRef.current = null;
             router.replace('/(main)/ride-active');
-          } catch (err) {
-            console.error('[FindingDriver] Error fetching order details:', err);
-            // Fallback with socket driver data
+          } catch {
             setActiveOrder({
               id: data.orderId?.toString() || order.id.toString(),
               status: 'DriverAccepted',
-              pickup: currentPickup,
-              dropoff: currentDropoff,
-              service: currentService,
+              pickup: cp,
+              dropoff: cd,
+              service: cs,
               fare: data.fare || parseFloat(order.serviceCost) || 15,
-              driver: buildDriverObject(data.driver) || {
-                id: String(data.driverId || ''),
-                firstName: 'Driver',
-                lastName: '',
-                mobileNumber: '',
-                rating: 5.0,
-                reviewCount: 0,
-                carModel: '',
-                carColor: '',
-                carPlate: '',
-                latitude: currentPickup.latitude,
-                longitude: currentPickup.longitude,
-              },
+              driver: buildDriverObject(data.driver, cp.latitude, cp.longitude),
               createdAt: order.createdAt || new Date().toISOString(),
             });
-            // Clean up before navigating
-            if (cleanupRef.current) {
-              cleanupRef.current();
-              cleanupRef.current = null;
-            }
+            cleanupRef.current?.();
+            cleanupRef.current = null;
             router.replace('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
         } else if (data.status === 'Finished' || data.status === 'finished') {
-          // Ride already completed, go to ride-complete
-          console.log('[FindingDriver] Order already finished, going to ride-complete');
-          // Clean up before navigating
-          if (cleanupRef.current) {
-            cleanupRef.current();
-            cleanupRef.current = null;
-          }
+          cleanupRef.current?.();
+          cleanupRef.current = null;
           router.replace('/(main)/ride-complete');
         }
       });
 
-      // Set initial active order with pending status
       setActiveOrder({
         id: order.id.toString(),
         status: 'searching',
-        pickup: currentPickup,
-        dropoff: currentDropoff,
-        service: currentService,
+        pickup: cp,
+        dropoff: cd,
+        service: cs,
         fare: parseFloat(order.fare) || 15,
         driver: null,
         createdAt: order.createdAt || new Date().toISOString(),
       });
 
-      // Timeout after 60 seconds if no driver found
-      const timeout = setTimeout(() => {
-        setStatus('not_found');
-      }, 60000);
-
-      // Store cleanup function
+      const timeout = setTimeout(() => setStatus('not_found'), 60000);
       cleanupRef.current = () => {
         unsubscribe?.();
         clearTimeout(timeout);
       };
-    } catch (error) {
-      console.error('Error creating order:', error);
+    } catch {
       setStatus('not_found');
     }
   };
 
-  const handleCancel = async () => {
-    // Prevent multiple cancel calls
-    if (isCancellingRef.current) {
-      console.log('[FindingDriver] Cancel already in progress, ignoring');
-      return;
-    }
+  const performCancel = async () => {
+    if (isCancellingRef.current) return;
     isCancellingRef.current = true;
+    setIsCancelling(true);
 
     const { activeOrder } = useBookingStore.getState();
-    console.log('[FindingDriver] handleCancel called, activeOrder:', activeOrder?.id, 'status:', activeOrder?.status);
 
-    // If order is already finished, just go to ride-complete instead of home
-    if (activeOrder?.id && ['Finished', 'finished', 'Completed', 'completed'].includes(activeOrder.status)) {
-      console.log('[FindingDriver] Order already finished, going to ride-complete');
+    if (
+      activeOrder?.id &&
+      ['Finished', 'finished', 'Completed', 'completed'].includes(activeOrder.status)
+    ) {
       router.replace('/(main)/ride-complete');
       isCancellingRef.current = false;
+      setIsCancelling(false);
       return;
     }
 
-    // Cancel the order in the database if we have an order ID
     if (activeOrder?.id) {
       try {
-        console.log('[FindingDriver] About to call cancelOrder API for order:', activeOrder.id);
-        const cancelResponse = await orderApi.cancelOrder(activeOrder.id);
-        console.log('[FindingDriver] cancelOrder API response:', JSON.stringify(cancelResponse?.data));
+        await orderApi.cancelOrder(activeOrder.id);
         socketService.leaveOrderRoom(Number(activeOrder.id));
-        console.log('[FindingDriver] Left order room:', activeOrder.id);
-      } catch (error: any) {
-        console.error('[FindingDriver] Error cancelling order:', error?.message);
-        console.error('[FindingDriver] Error response:', JSON.stringify(error?.response?.data));
-        console.error('[FindingDriver] Error status:', error?.response?.status);
-        // If order can't be cancelled (already finished/cancelled), just clear state and go home
-        console.log('[FindingDriver] Proceeding with cleanup despite error');
+      } catch (err: any) {
+        // Surface the backend error so the user understands why cancel didn't go through.
+        const msg =
+          err?.response?.data?.message ||
+          t('ride.cancelFailed', 'Could not cancel the ride. Please try again.');
+        setIsCancelling(false);
+        isCancellingRef.current = false;
+        setCancelErrorMsg(msg);
+        return;
       }
-    } else {
-      console.log('[FindingDriver] No activeOrder.id, skipping API cancel');
     }
 
-    // Cleanup socket listeners
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
+    // Defensive: sweep any other stale active orders the server still knows
+    // about. The cancel endpoint already does this server-side now, but if a
+    // race left one behind we don't want home to bounce us back here.
+    for (let i = 0; i < 3; i++) {
+      try {
+        const cur = await orderApi.getCurrentOrder();
+        const stale = cur?.data;
+        if (stale?.id && String(stale.id) !== String(activeOrder?.id)) {
+          await orderApi.cancelOrder(String(stale.id));
+          continue;
+        }
+        break;
+      } catch {
+        break;
+      }
     }
 
-    // Reset local state
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     resetBooking();
     router.replace('/(main)');
     isCancellingRef.current = false;
+    setIsCancelling(false);
   };
+
+  // Confirm prompt is shown via AlertModal first, then performCancel runs on confirm.
+  const handleCancel = () => setConfirmCancelVisible(true);
 
   const handleRetry = () => {
     setStatus('searching');
@@ -454,27 +405,18 @@ export default function FindingDriverScreen() {
   };
 
   if (!pickup) {
-    console.log('[FindingDriver] No pickup data, showing error view');
     return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <Text className="text-muted-foreground">{t('errors.generic')}</Text>
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#6B7380' }}>{t('errors.generic')}</Text>
       </SafeAreaView>
     );
   }
 
-  const pulseScale = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 2],
-  });
-
-  const pulseOpacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 0],
-  });
+  const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 2.4] });
+  const pulseOpacity = pulseAnim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.45, 0] });
 
   return (
-    <View className="flex-1">
-      {/* Map */}
+    <View style={{ flex: 1, backgroundColor: '#EBF0F7' }}>
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
@@ -485,122 +427,372 @@ export default function FindingDriverScreen() {
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         }}
-        showsUserLocation
+        showsUserLocation={false}
+        showsMyLocationButton={false}
       >
-        <Circle
-          center={{ latitude: pickup.latitude, longitude: pickup.longitude }}
-          radius={searchRadius}
-          fillColor="rgba(76, 175, 80, 0.1)"
-          strokeColor="rgba(76, 175, 80, 0.3)"
-          strokeWidth={1}
-        />
-        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}>
-          <View className="items-center">
-            <View className="w-6 h-6 rounded-full bg-primary border-3 border-white" />
+        <Marker
+          coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={status === 'searching'}
+        >
+          {/* Concentric pulse rings + center dot — anchored to GPS coordinate */}
+          <View
+            style={{
+              width: 220 * s,
+              height: 220 * s,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {/* Animated outer pulse — expands and fades */}
+            {status === 'searching' && (
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: 90 * s,
+                  height: 90 * s,
+                  borderRadius: 45 * s,
+                  backgroundColor: 'rgba(3, 102, 251, 0.4)',
+                  opacity: pulseOpacity,
+                  transform: [{ scale: pulseScale }],
+                }}
+              />
+            )}
+
+            {/* Static halo rings (Figma look) */}
+            {[
+              { size: 200, opacity: 0.08 },
+              { size: 150, opacity: 0.12 },
+              { size: 100, opacity: 0.18 },
+              { size: 60, opacity: 0.28 },
+            ].map((c) => (
+              <View
+                key={c.size}
+                style={{
+                  position: 'absolute',
+                  width: c.size * s,
+                  height: c.size * s,
+                  borderRadius: (c.size * s) / 2,
+                  backgroundColor: `rgba(3, 102, 251, ${c.opacity})`,
+                }}
+              />
+            ))}
+
+            {/* Center dot */}
+            <View
+              style={{
+                width: 18 * s,
+                height: 18 * s,
+                borderRadius: 9 * s,
+                backgroundColor: '#0366FB',
+                borderWidth: 3,
+                borderColor: '#FFFFFF',
+              }}
+            />
           </View>
         </Marker>
       </MapView>
 
-      {/* Header */}
-      <SafeAreaView className="absolute top-0 left-0 right-0 items-center" edges={['top']}>
-        <View className={`mx-4 mt-4 px-6 py-3 rounded-full shadow-lg ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-          <Text className={`text-lg font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            {t('ride.findingDriver')}
-          </Text>
+      {/* Top status pill */}
+      <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0 }} pointerEvents="box-none">
+        <View style={{ alignItems: 'center', marginTop: 8 * s }}>
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8 * s,
+              paddingHorizontal: 16 * s,
+              paddingVertical: 10 * s,
+              borderRadius: 999,
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 14,
+              elevation: 6,
+            }}
+          >
+            <DotsIndicator size={6 * s} gap={4 * s} />
+            <Text
+              style={{
+                color: '#111111',
+                fontSize: 14 * s,
+                fontWeight: '600',
+              }}
+            >
+              {status === 'searching'
+                ? t('ride.findingDriver', 'Finding nearby drivers')
+                : t('ride.noDrivers', 'No drivers nearby')}
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
 
-      {/* Bottom Sheet */}
+      {/* Bottom sheet */}
       <SafeAreaView
         edges={['bottom']}
-        className={`absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-lg ${
-          isDark ? 'bg-background-dark' : 'bg-white'
-        }`}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: 28 * s,
+          borderTopRightRadius: 28 * s,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 24,
+          elevation: 12,
+        }}
       >
-        <View className="px-6 py-6 items-center">
+        <View
+          style={{
+            paddingTop: 18 * s,
+            paddingHorizontal: 20 * s,
+            paddingBottom: 20 * s,
+            gap: 16 * s,
+          }}
+        >
           {status === 'searching' ? (
             <>
-              {/* Pulse Animation */}
-              <View className="items-center mb-6">
-                <Animated.View
+              {/* Title */}
+              <View style={{ alignItems: 'center', gap: 4 * s }}>
+                <Text
                   style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 40,
-                    backgroundColor: '#4CAF50',
-                    opacity: pulseOpacity,
-                    transform: [{ scale: pulseScale }],
-                    position: 'absolute',
+                    color: '#111111',
+                    fontSize: 22 * s,
+                    fontWeight: '700',
+                    letterSpacing: -0.6,
+                    textAlign: 'center',
                   }}
-                />
-                <View className="w-20 h-20 rounded-full bg-primary items-center justify-center">
-                  <Ionicons name="search" size={36} color="#FFFFFF" />
-                </View>
-              </View>
-
-              <Text className={`text-lg font-semibold mb-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {t('ride.lookingForDriver')}
-              </Text>
-
-              {/* Trip Summary */}
-              <View className={`w-full p-4 rounded-xl mt-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-                <Text className="text-primary font-semibold">
-                  {selectedService?.name} • QAR {(selectedService as any)?.fare || '15.50'}
+                >
+                  {t('ride.lookingForDriver', 'Looking for your driver…')}
                 </Text>
-                <View className="flex-row items-center mt-2">
-                  <View className="w-2 h-2 rounded-full bg-primary" />
-                  <Text className="text-sm text-muted-foreground ml-2 flex-1" numberOfLines={1}>
-                    {pickup.address}
-                  </Text>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 14 * s,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t('ride.lookingSubtitle', "We'll notify you once a driver accepts")}
+                </Text>
+              </View>
+
+              {/* Trip card */}
+              <View
+                style={{
+                  backgroundColor: '#F5F7FC',
+                  borderWidth: 1,
+                  borderColor: '#E5EBF2',
+                  borderRadius: 14 * s,
+                  paddingHorizontal: 14 * s,
+                  paddingVertical: 12 * s,
+                  gap: 10 * s,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 12 * s,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 10 * s,
+                      height: 10 * s,
+                      borderRadius: 5 * s,
+                      backgroundColor: '#0366FB',
+                    }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: '#6B7380',
+                        fontSize: 11 * s,
+                        fontWeight: '500',
+                        textAlign,
+                        writingDirection,
+                      }}
+                    >
+                      {t('booking.pickup', 'PICKUP').toUpperCase()}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: '#111111',
+                        fontSize: 14 * s,
+                        fontWeight: '600',
+                        textAlign,
+                        writingDirection,
+                      }}
+                    >
+                      {pickup.address || t('home.currentLocation')}
+                    </Text>
+                  </View>
                 </View>
-                <View className="flex-row items-center mt-1">
-                  <View className="w-2 h-2 rounded-full bg-destructive" />
-                  <Text className="text-sm text-muted-foreground ml-2 flex-1" numberOfLines={1}>
-                    {dropoff?.address}
-                  </Text>
+
+                <View style={{ height: 1, backgroundColor: '#E5EBF2' }} />
+
+                <View
+                  style={{
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 12 * s,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 10 * s,
+                      height: 10 * s,
+                      borderRadius: 2 * s,
+                      backgroundColor: '#ED4557',
+                    }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: '#6B7380',
+                        fontSize: 11 * s,
+                        fontWeight: '500',
+                        textAlign,
+                        writingDirection,
+                      }}
+                    >
+                      {t('booking.dropoff', 'DROP-OFF').toUpperCase()}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: '#111111',
+                        fontSize: 14 * s,
+                        fontWeight: '600',
+                        textAlign,
+                        writingDirection,
+                      }}
+                    >
+                      {dropoff?.address || ''}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
+              {/* Cancel button (white with border) */}
               <TouchableOpacity
+                activeOpacity={0.85}
                 onPress={handleCancel}
-                className="w-full mt-6 py-4 rounded-xl items-center border-2 border-destructive"
+                disabled={isCancelling}
+                style={{
+                  height: 56 * s,
+                  borderRadius: 14 * s,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: '#E5EBF2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isCancelling ? 0.6 : 1,
+                }}
               >
-                <Text className="text-destructive text-lg font-semibold">
-                  {t('ride.cancelSearch')}
+                <Text style={{ color: '#111111', fontSize: 17 * s, fontWeight: '600' }}>
+                  {isCancelling
+                    ? t('common.loading', 'Loading…')
+                    : t('ride.cancelSearch', 'Cancel ride')}
                 </Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <View className="w-20 h-20 rounded-full bg-destructive/10 items-center justify-center mb-4">
-                <Ionicons name="car" size={40} color="#F44336" />
+              {/* No drivers */}
+              <View style={{ alignItems: 'center', gap: 8 * s }}>
+                <Text
+                  style={{
+                    color: '#111111',
+                    fontSize: 22 * s,
+                    fontWeight: '700',
+                    letterSpacing: -0.6,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t('ride.noDrivers', 'No drivers nearby')}
+                </Text>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 14 * s,
+                    textAlign: 'center',
+                  }}
+                >
+                  {t('errors.noDrivers', 'Please try again in a moment.')}
+                </Text>
               </View>
-
-              <Text className={`text-lg font-semibold mb-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {t('ride.noDrivers')}
-              </Text>
-              <Text className="text-muted-foreground text-center mb-6">
-                {t('errors.noDrivers')}
-              </Text>
-
               <TouchableOpacity
+                activeOpacity={0.9}
                 onPress={handleRetry}
-                className="w-full py-4 rounded-xl items-center bg-primary mb-3"
+                style={{
+                  height: 56 * s,
+                  borderRadius: 14 * s,
+                  backgroundColor: '#101969',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Text className="text-white text-lg font-semibold">
-                  {t('ride.tryAgain')}
+                <Text style={{ color: '#FFFFFF', fontSize: 17 * s, fontWeight: '600' }}>
+                  {t('ride.tryAgain', 'Try again')}
                 </Text>
               </TouchableOpacity>
-
-              <TouchableOpacity onPress={handleCancel}>
-                <Text className="text-muted-foreground">
-                  {t('common.cancel')}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleCancel}
+                style={{
+                  height: 56 * s,
+                  borderRadius: 14 * s,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: '#E5EBF2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: '#111111', fontSize: 17 * s, fontWeight: '600' }}>
+                  {t('common.cancel', 'Cancel')}
                 </Text>
               </TouchableOpacity>
             </>
           )}
         </View>
       </SafeAreaView>
+
+      {/* Confirm cancel */}
+      <AlertModal
+        visible={confirmCancelVisible}
+        variant="warning"
+        title={t('ride.confirmCancelTitle', 'Cancel this ride?')}
+        message={t(
+          'ride.confirmCancelMsg',
+          'You can request a new ride at any time.'
+        )}
+        primaryLabel={t('ride.cancelSearch', 'Cancel ride')}
+        onPrimaryPress={() => {
+          setConfirmCancelVisible(false);
+          performCancel();
+        }}
+        secondaryLabel={t('common.back', 'Back')}
+        onSecondaryPress={() => setConfirmCancelVisible(false)}
+        onRequestClose={() => setConfirmCancelVisible(false)}
+      />
+
+      {/* Cancel error */}
+      <AlertModal
+        visible={!!cancelErrorMsg}
+        variant="error"
+        title={t('common.error', 'Error')}
+        message={cancelErrorMsg || ''}
+        primaryLabel={t('common.ok', 'OK')}
+        onPrimaryPress={() => setCancelErrorMsg(null)}
+        onRequestClose={() => setCancelErrorMsg(null)}
+      />
     </View>
   );
 }

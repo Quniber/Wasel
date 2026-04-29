@@ -557,6 +557,37 @@ export class OrdersService {
       customerId,
     });
 
+    // Sweep any other stale Requested/Booked orders this customer still has open
+    // (e.g. orphaned orders from prior crashes). Without this, getCurrentOrder
+    // can return one of them and the app will bounce the rider back to
+    // finding-driver after they just cancelled.
+    try {
+      const stale = await this.prisma.order.findMany({
+        where: {
+          customerId,
+          id: { not: orderId },
+          status: { in: [OrderStatus.Requested, OrderStatus.Booked] },
+        },
+        select: { id: true },
+      });
+      if (stale.length > 0) {
+        const ids = stale.map((o) => o.id);
+        this.logger.log(
+          `[Cancel] Sweeping ${stale.length} stale order(s) for customer ${customerId}: ${ids.join(', ')}`,
+        );
+        await this.prisma.order.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            status: OrderStatus.RiderCanceled,
+            canceledAt: new Date(),
+            cancelReasonNote: 'Auto-cancelled during cancel sweep',
+          },
+        });
+      }
+    } catch (err: any) {
+      this.logger.error(`[Cancel] Stale-order sweep failed: ${err.message}`);
+    }
+
     return updatedOrder;
   }
 
