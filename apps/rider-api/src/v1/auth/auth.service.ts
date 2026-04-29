@@ -10,6 +10,15 @@ import { Gender } from 'database';
 const TEST_PHONE_NUMBER = '55555555';
 const TEST_OTP_CODE = '123456';
 
+// In-memory store for password-reset codes.
+// NOTE: not durable across restarts — adequate for testing & low-volume use.
+// Move to a DB-backed table + real email provider before scaling.
+const passwordResetCodes = new Map<
+  string,
+  { code: string; expiresAt: number }
+>();
+const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
+
 @Injectable()
 export class AuthService {
   private _twilio?: ReturnType<typeof Twilio>;
@@ -295,6 +304,61 @@ export class AuthService {
     });
 
     return this.generateTokenWithSession(customer, deviceInfo, ipAddress, userAgent);
+  }
+
+  // ========== Forgot password (email-based) ==========
+
+  // Step 1: send a 6-digit code to the user's email
+  async forgotPasswordSend(email: string) {
+    const e = email.toLowerCase().trim();
+    const customer = await this.prisma.customer.findFirst({ where: { email: e } });
+    // Don't leak whether the email is registered.
+    if (!customer) {
+      return { message: 'If that email is registered, a reset code has been sent.' };
+    }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    passwordResetCodes.set(e, { code, expiresAt: Date.now() + PASSWORD_RESET_TTL_MS });
+    // TODO: replace with real email send (SES / SendGrid / Postmark).
+    console.log(`[ForgotPw] Email=${e} Code=${code}`);
+    return { message: 'Reset code sent.' };
+  }
+
+  // Step 2: verify the code, return a short-lived JWT to use at reset time.
+  async forgotPasswordVerify(email: string, code: string) {
+    const e = email.toLowerCase().trim();
+    const record = passwordResetCodes.get(e);
+    if (!record || record.expiresAt < Date.now() || record.code !== code) {
+      throw new BadRequestException('Invalid or expired code');
+    }
+    passwordResetCodes.delete(e);
+    const resetToken = await this.jwtService.signAsync(
+      { email: e, purpose: 'password-reset' },
+      { expiresIn: '10m' },
+    );
+    return { resetToken };
+  }
+
+  // Step 3: set the new password using the reset token.
+  async forgotPasswordReset(email: string, resetToken: string, newPassword: string) {
+    const e = email.toLowerCase().trim();
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(resetToken);
+    } catch {
+      throw new BadRequestException('Reset link expired. Please request a new code.');
+    }
+    if (payload?.purpose !== 'password-reset' || payload?.email !== e) {
+      throw new BadRequestException('Invalid reset token');
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const result = await this.prisma.customer.updateMany({
+      where: { email: e },
+      data: { password: hashedPassword },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Account not found');
+    }
+    return { message: 'Password reset successfully' };
   }
 
   // Resend OTP

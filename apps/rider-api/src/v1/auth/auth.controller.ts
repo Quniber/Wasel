@@ -77,6 +77,25 @@ export class AuthController {
     return this.authService.resendOtp(body.mobileNumber);
   }
 
+  // ========== Forgot password (email-based) ==========
+
+  @Post('forgot-password/send')
+  forgotPasswordSend(@Body() body: { email: string }) {
+    return this.authService.forgotPasswordSend(body.email);
+  }
+
+  @Post('forgot-password/verify')
+  forgotPasswordVerify(@Body() body: { email: string; code: string }) {
+    return this.authService.forgotPasswordVerify(body.email, body.code);
+  }
+
+  @Post('forgot-password/reset')
+  forgotPasswordReset(
+    @Body() body: { email: string; resetToken: string; password: string },
+  ) {
+    return this.authService.forgotPasswordReset(body.email, body.resetToken, body.password);
+  }
+
   // ========== Legacy Email/Password Auth ==========
 
   @Post('register/email')

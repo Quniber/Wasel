@@ -179,6 +179,14 @@ export const authApi = {
   resendOtp: (mobileNumber: string) =>
     api.post('/auth/resend-otp', { mobileNumber }),
 
+  // Email-based forgot password (3-step)
+  forgotPasswordSend: (email: string) =>
+    api.post('/auth/forgot-password/send', { email }),
+  forgotPasswordVerify: (email: string, code: string) =>
+    api.post<{ resetToken: string }>('/auth/forgot-password/verify', { email, code }),
+  forgotPasswordReset: (email: string, resetToken: string, password: string) =>
+    api.post('/auth/forgot-password/reset', { email, resetToken, password }),
+
   // Email-based registration
   registerWithEmail: (data: {
     firstName: string;
