@@ -150,13 +150,21 @@ export const authApi = {
   registerWithPhone: (mobileNumber: string) =>
     api.post('/auth/register', { mobileNumber }),
 
-  // Phone-based OTP registration - Step 2: Verify OTP and complete registration
+  // Phone-based OTP registration - Step 1.5 (optional): pre-verify OTP, get token
+  checkOtp: (data: { mobileNumber: string; otp: string }) =>
+    api.post<{ registrationToken: string }>('/auth/verify-otp-check', data),
+
+  // Phone-based OTP registration - Step 2: Verify OTP and complete registration.
+  // Pass `registrationToken` if you already pre-verified via checkOtp,
+  // otherwise pass raw `otp`.
   verifyOtpAndRegister: (data: {
     mobileNumber: string;
-    otp: string;
+    otp?: string;
+    registrationToken?: string;
     firstName: string;
     lastName: string;
     email?: string;
+    password?: string;
   }) => api.post('/auth/verify-otp', data),
 
   // Phone-based login - Request OTP

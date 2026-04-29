@@ -50,6 +50,35 @@ export class AuthService {
     return check.status === 'approved';
   }
 
+  // Pre-verify OTP and issue a short-lived registration token.
+  // Used by phone-signup flow so the OTP can be checked at the OTP screen
+  // (and the token used later when completing the profile form).
+  async verifyOtpCheck(mobileNumber: string, otp: string) {
+    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    if (!valid) {
+      throw new BadRequestException('Invalid OTP');
+    }
+    const registrationToken = await this.jwtService.signAsync(
+      { mobileNumber, purpose: 'phone-register' },
+      { expiresIn: '10m' },
+    );
+    return { registrationToken };
+  }
+
+  // Verify a registration token (issued by verifyOtpCheck) for a given phone.
+  // Throws if the token is invalid, expired, wrong purpose, or phone mismatch.
+  private async verifyRegistrationToken(mobileNumber: string, token: string) {
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(token);
+    } catch {
+      throw new BadRequestException('Registration token expired. Please request a new code.');
+    }
+    if (payload?.purpose !== 'phone-register' || payload?.mobileNumber !== mobileNumber) {
+      throw new BadRequestException('Invalid registration token');
+    }
+  }
+
   // Step 1: Register with phone - sends OTP
   async registerWithPhone(mobileNumber: string) {
     // Check if phone already registered
@@ -113,23 +142,33 @@ export class AuthService {
     return this.generateToken(customer);
   }
 
-  // Step 2: Verify OTP and complete registration (with session)
+  // Step 2: Verify OTP and complete registration (with session).
+  // Accepts EITHER raw `otp` (legacy single-shot path) OR a `registrationToken`
+  // previously issued by verifyOtpCheck (preferred two-step path).
   async verifyOtpAndRegisterWithSession(
     data: {
       mobileNumber: string;
-      otp: string;
+      otp?: string;
+      registrationToken?: string;
       firstName: string;
       lastName: string;
       email?: string;
+      password?: string;
     },
     deviceInfo: DeviceInfo,
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
-    if (!valid) {
-      throw new BadRequestException('Invalid OTP');
+    if (data.registrationToken) {
+      await this.verifyRegistrationToken(data.mobileNumber, data.registrationToken);
+    } else if (data.otp) {
+      const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+      if (!valid) throw new BadRequestException('Invalid OTP');
+    } else {
+      throw new BadRequestException('OTP or registration token is required');
     }
+
+    const hashedPassword = data.password ? await bcrypt.hash(data.password, 10) : undefined;
 
     // Check for existing customer
     let customer = await this.prisma.customer.findFirst({
@@ -137,24 +176,24 @@ export class AuthService {
     });
 
     if (customer) {
-      // Update existing customer
       customer = await this.prisma.customer.update({
         where: { id: customer.id },
         data: {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
+          ...(hashedPassword ? { password: hashedPassword } : {}),
           status: 'enabled',
         },
       });
     } else {
-      // Create new customer
       customer = await this.prisma.customer.create({
         data: {
           mobileNumber: data.mobileNumber,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
+          ...(hashedPassword ? { password: hashedPassword } : {}),
           status: 'enabled',
         },
       });

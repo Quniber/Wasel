@@ -15,7 +15,16 @@ export class AuthController {
     return this.authService.registerWithPhone(body.mobileNumber);
   }
 
-  // Step 2: Verify OTP and complete registration (with session)
+  // Step 1.5 (optional): pre-verify OTP and get a short-lived registration token.
+  // Lets the OTP screen catch wrong codes immediately, so the profile form is
+  // only shown after the OTP is known to be valid.
+  @Post('verify-otp-check')
+  verifyOtpCheck(@Body() body: { mobileNumber: string; otp: string }) {
+    return this.authService.verifyOtpCheck(body.mobileNumber, body.otp);
+  }
+
+  // Step 2: Verify OTP and complete registration (with session).
+  // Accepts EITHER `otp` (one-shot) OR `registrationToken` (two-step).
   @Post('verify-otp')
   verifyOtpAndRegister(
     @Req() req: any,
@@ -23,10 +32,12 @@ export class AuthController {
     @Body()
     body: {
       mobileNumber: string;
-      otp: string;
+      otp?: string;
+      registrationToken?: string;
       firstName: string;
       lastName: string;
       email?: string;
+      password?: string;
       deviceInfo?: DeviceInfo;
     },
   ) {

@@ -1,26 +1,52 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
+  ActivityIndicator,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { getColors } from '@/constants/Colors';
 import { authApi } from '@/lib/api';
 
-export default function OTPScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const { setSession } = useAuthStore();
-  const isDark = resolvedTheme === 'dark';
-  const colors = getColors(isDark);
-  const { phone, mode } = useLocalSearchParams<{ phone: string; mode: string }>();
+const BASE_W = 393;
 
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+const formatPhoneDisplay = (phone: string | undefined) => {
+  if (!phone) return '';
+  // +97450123456 → +974 5012 3456
+  const m = phone.match(/^(\+\d{1,4})(\d{4})(\d+)$/);
+  return m ? `${m[1]} ${m[2]} ${m[3]}` : phone;
+};
+
+const formatCountdown = (s: number) => {
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
+};
+
+export default function OTPScreen() {
+  const { t, i18n } = useTranslation();
+  const { setSession } = useAuthStore();
+  const { phone, mode } = useLocalSearchParams<{ phone: string; mode: string }>();
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
+
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -32,41 +58,40 @@ export default function OTPScreen() {
 
   useEffect(() => {
     const code = otp.join('');
-    if (code.length === 6) {
-      handleVerify(code);
-    }
+    if (code.length === 6) handleVerify(code);
   }, [otp]);
 
   const handleOtpChange = (value: string, index: number) => {
     const digits = value.replace(/[^0-9]/g, '');
 
-    // Handle paste / autofill — spread digits across all boxes
     if (digits.length > 1) {
-      const newOtp = [...otp];
+      // Paste / autofill — distribute across boxes
+      const next = [...otp];
       const chars = digits.slice(0, 6).split('');
-      chars.forEach((char, i) => {
-        if (index + i < 6) newOtp[index + i] = char;
+      chars.forEach((c, i) => {
+        if (index + i < 6) next[index + i] = c;
       });
-      setOtp(newOtp);
-
-      const nextIndex = Math.min(index + chars.length, 5);
-      inputRefs.current[nextIndex]?.focus();
+      setOtp(next);
+      const focusIdx = Math.min(index + chars.length, 5);
+      inputRefs.current[focusIdx]?.focus();
+      setActiveIndex(focusIdx);
       return;
     }
 
-    const newOtp = [...otp];
-    newOtp[index] = digits;
-    setOtp(newOtp);
+    const next = [...otp];
+    next[index] = digits;
+    setOtp(next);
 
-    // Move to next input
     if (digits && index < 5) {
       inputRefs.current[index + 1]?.focus();
+      setActiveIndex(index + 1);
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
     if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
+      setActiveIndex(index - 1);
     }
   };
 
@@ -76,45 +101,46 @@ export default function OTPScreen() {
 
     try {
       if (mode === 'register') {
-        // For new users, go to profile setup with OTP
-        router.push({
-          pathname: '/(auth)/profile-setup',
-          params: { phone, otp: code },
-        });
-        return;
-      } else {
-        // For existing users, verify OTP and login
-        const response = await authApi.verifyOtpLogin({
+        // Pre-verify OTP so wrong codes are caught here, not at profile submit.
+        const checkResp = await authApi.checkOtp({
           mobileNumber: phone || '',
           otp: code,
         });
-
-        // Save session with tokens (for persistence)
-        await setSession(
-          {
-            accessToken: response.data.accessToken,
-            refreshToken: response.data.refreshToken,
-            expiresIn: response.data.expiresIn || 3600,
-          },
-          {
-            id: response.data.customer.id.toString(),
-            firstName: response.data.customer.firstName || '',
-            lastName: response.data.customer.lastName || '',
-            email: response.data.customer.email || '',
-            mobileNumber: response.data.customer.mobileNumber,
-            gender: response.data.customer.gender,
-            walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
-          }
-        );
-
-        router.replace('/(main)');
+        router.push({
+          pathname: '/(auth)/profile-setup',
+          params: { phone, registrationToken: checkResp.data.registrationToken },
+        });
         return;
       }
+
+      const response = await authApi.verifyOtpLogin({
+        mobileNumber: phone || '',
+        otp: code,
+      });
+
+      await setSession(
+        {
+          accessToken: response.data.accessToken,
+          refreshToken: response.data.refreshToken,
+          expiresIn: response.data.expiresIn || 3600,
+        },
+        {
+          id: response.data.customer.id.toString(),
+          firstName: response.data.customer.firstName || '',
+          lastName: response.data.customer.lastName || '',
+          email: response.data.customer.email || '',
+          mobileNumber: response.data.customer.mobileNumber,
+          gender: response.data.customer.gender,
+          walletBalance: parseFloat(response.data.customer.walletBalance) || 0,
+        }
+      );
+
+      router.replace('/(main)');
     } catch (err: any) {
-      console.error(err);
       setError(err.response?.data?.message || t('errors.invalidOtp'));
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
+      setActiveIndex(0);
     } finally {
       setIsLoading(false);
     }
@@ -124,7 +150,6 @@ export default function OTPScreen() {
     if (countdown > 0) return;
     setCountdown(60);
     setError('');
-
     try {
       await authApi.resendOtp(phone || '');
     } catch (err: any) {
@@ -132,87 +157,216 @@ export default function OTPScreen() {
     }
   };
 
+  const boxW = 48 * s;
+  const boxH = 60 * s;
+  const totalBoxes = 6;
+  const containerW = (345 - 0) * s;
+  const gap = (containerW - totalBoxes * boxW) / (totalBoxes - 1);
+
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={{ flex: 1 }}
       >
-        <View className="flex-1 px-6">
-          {/* Back Button */}
+        <View style={{ flex: 1, paddingHorizontal: 24 * s }}>
+          {/* Back button */}
           <TouchableOpacity
+            activeOpacity={0.8}
             onPress={() => router.back()}
-            className="w-10 h-10 items-center justify-center mt-2"
+            style={{
+              width: 40 * s,
+              height: 40 * s,
+              borderRadius: 12 * s,
+              backgroundColor: '#F5F7FC',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 10 * s,
+              alignSelf: isRTL ? 'flex-end' : 'flex-start',
+            }}
           >
             <Ionicons
-              name="arrow-back"
-              size={24}
-              color={isDark ? '#FAFAFA' : '#212121'}
+              name={isRTL ? 'chevron-forward' : 'chevron-back'}
+              size={20 * s}
+              color="#111111"
             />
           </TouchableOpacity>
 
           {/* Title */}
-          <View className="mt-8">
-            <Text className={`text-2xl font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {t('auth.otp.title')}
+          <View style={{ marginTop: 32 * s }}>
+            <Text
+              style={{
+                color: '#111111',
+                fontSize: 32 * s,
+                fontWeight: '700',
+                letterSpacing: -0.8,
+                lineHeight: 38 * s,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {t('auth.otp.titleLine1')}
             </Text>
-            <Text className={`text-base mt-2 ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-              {t('auth.otp.subtitle')} {phone?.replace(/^(\+\d{3})/, '$1 ')}
+            <Text
+              style={{
+                color: '#111111',
+                fontSize: 32 * s,
+                fontWeight: '700',
+                letterSpacing: -0.8,
+                lineHeight: 38 * s,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {t('auth.otp.titleLine2')}
+            </Text>
+
+            <Text
+              style={{
+                marginTop: 12 * s,
+                color: '#6B7380',
+                fontSize: 16 * s,
+                lineHeight: 24 * s,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {t('auth.otp.subtitle')}
+            </Text>
+            <Text
+              style={{
+                marginTop: 4 * s,
+                color: '#111111',
+                fontSize: 16 * s,
+                fontWeight: '600',
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {formatPhoneDisplay(phone)}
             </Text>
           </View>
 
-          {/* OTP Input */}
-          <View className="flex-row justify-between mt-8 gap-2">
-            {otp.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => (inputRefs.current[index] = ref)}
-                className={`w-12 h-14 text-center text-2xl font-bold rounded-xl ${
-                  isDark
-                    ? 'bg-muted-dark text-foreground-dark border-border-dark'
-                    : 'bg-muted text-foreground border-border'
-                } ${digit ? 'border-2 border-primary' : 'border border-transparent'}`}
-                value={digit}
-                onChangeText={(value) => handleOtpChange(value, index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                autoFocus={index === 0}
-              />
-            ))}
+          {/* Error */}
+          {!!error && (
+            <View
+              style={{
+                marginTop: 16 * s,
+                padding: 12 * s,
+                borderRadius: 12 * s,
+                backgroundColor: '#FEE2E2',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons name="alert-circle" size={18 * s} color="#DC2626" />
+              <Text
+                style={{
+                  color: '#DC2626',
+                  fontSize: 13 * s,
+                  marginLeft: isRTL ? 0 : 8 * s,
+                  marginRight: isRTL ? 8 * s : 0,
+                  flex: 1,
+                  textAlign,
+                  writingDirection,
+                }}
+              >
+                {error}
+              </Text>
+            </View>
+          )}
+
+          {/* OTP boxes */}
+          <View
+            style={{
+              marginTop: 36 * s,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              height: boxH,
+            }}
+          >
+            {otp.map((digit, i) => {
+              const filled = digit !== '';
+              const isActive = activeIndex === i && !filled;
+              return (
+                <View
+                  key={i}
+                  style={{
+                    width: boxW,
+                    height: boxH,
+                    borderRadius: 14 * s,
+                    backgroundColor: filled || isActive ? '#FFFFFF' : '#F5F7FC',
+                    borderWidth: filled || isActive ? 1.8 : 1,
+                    borderColor: filled || isActive ? '#101969' : '#E5EBF2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <TextInput
+                    ref={(ref) => {
+                      inputRefs.current[i] = ref;
+                    }}
+                    value={digit}
+                    onChangeText={(v) => handleOtpChange(v, i)}
+                    onKeyPress={(e) => handleKeyPress(e, i)}
+                    onFocus={() => setActiveIndex(i)}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoFocus={i === 0}
+                    maxLength={6}
+                    selectionColor="#101969"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      textAlign: 'center',
+                      fontSize: 28 * s,
+                      fontWeight: '700',
+                      color: '#111111',
+                      padding: 0,
+                    }}
+                  />
+                </View>
+              );
+            })}
           </View>
 
           {/* Resend */}
-          <View className="mt-6 items-center">
+          <View style={{ marginTop: 32 * s, alignItems: 'center' }}>
             {countdown > 0 ? (
-              <Text className={`text-base ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                {t('auth.otp.resendIn', { seconds: countdown })}
+              <Text
+                style={{
+                  color: '#6B7380',
+                  fontSize: 15 * s,
+                  fontWeight: '600',
+                }}
+              >
+                {t('auth.otp.resendIn', { time: formatCountdown(countdown) })}
               </Text>
             ) : (
-              <TouchableOpacity onPress={handleResend}>
-                <Text className="text-primary text-base font-medium">
+              <TouchableOpacity activeOpacity={0.8} onPress={handleResend}>
+                <Text style={{ color: '#101969', fontSize: 15 * s, fontWeight: '600' }}>
                   {t('auth.otp.resend')}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Change Number */}
+          {/* Change number */}
           <TouchableOpacity
+            activeOpacity={0.8}
             onPress={() => router.back()}
-            className="mt-4 items-center"
+            style={{ marginTop: 12 * s, alignItems: 'center', paddingVertical: 8 * s }}
           >
-            <Text className="text-primary text-base font-medium">
+            <Text style={{ color: '#101969', fontSize: 15 * s, fontWeight: '600' }}>
               {t('auth.otp.changeNumber')}
             </Text>
           </TouchableOpacity>
 
-          {/* Loading indicator */}
           {isLoading && (
-            <View className="mt-8 items-center">
-              <Text className={`text-base ${isDark ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
-                {t('common.loading')}
-              </Text>
+            <View style={{ marginTop: 24 * s, alignItems: 'center' }}>
+              <ActivityIndicator color="#101969" />
             </View>
           )}
         </View>
