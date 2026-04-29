@@ -10,6 +10,7 @@ import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
 import { orderApi } from '@/lib/api';
 import { getColors } from '@/constants/Colors';
+import AlertModal from '@/components/AlertModal';
 
 type RideStatus = 'driver_on_way' | 'driver_arrived' | 'trip_started';
 
@@ -25,6 +26,8 @@ export default function RideActiveScreen() {
   const [eta, setEta] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [confirmCancelVisible, setConfirmCancelVisible] = useState(false);
+  const [cancelErrorMsg, setCancelErrorMsg] = useState<string | null>(null);
 
   // Fetch order details from server if driver info is missing
   useEffect(() => {
@@ -252,42 +255,22 @@ export default function RideActiveScreen() {
     router.push('/(main)/chat');
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!activeOrder?.id) return;
+    setConfirmCancelVisible(true);
+  };
 
-    // Show confirmation dialog
-    Alert.alert(
-      t('ride.cancel.title'),
-      t('ride.cancel.confirm'),
-      [
-        {
-          text: t('common.cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('common.ok'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[RideActive] Rider cancelling order:', activeOrder.id);
-
-              // Cancel order via API - this will notify driver via socket
-              await orderApi.cancelOrder(activeOrder.id);
-
-              // Leave socket room
-              socketService.leaveOrderRoom(Number(activeOrder.id));
-
-              // Reset local state
-              resetBooking();
-              router.replace('/(main)');
-            } catch (error) {
-              console.error('[RideActive] Error cancelling order:', error);
-              Alert.alert(t('common.error'), t('errors.generic'));
-            }
-          },
-        },
-      ]
-    );
+  const performCancel = async () => {
+    if (!activeOrder?.id) return;
+    setConfirmCancelVisible(false);
+    try {
+      await orderApi.cancelOrder(activeOrder.id);
+      socketService.leaveOrderRoom(Number(activeOrder.id));
+      resetBooking();
+      router.replace('/(main)');
+    } catch (err: any) {
+      setCancelErrorMsg(err?.response?.data?.message || t('errors.generic'));
+    }
   };
 
   // Show loading while hydrating, fetching order details, or if no active order
@@ -501,6 +484,33 @@ export default function RideActiveScreen() {
           )}
         </View>
       </SafeAreaView>
+
+      <AlertModal
+        visible={confirmCancelVisible}
+        variant="error"
+        icon="warning"
+        title={t('ride.cancel.title', 'Cancel ride?')}
+        message={t(
+          'ride.cancel.confirm',
+          'Your driver is already on the way. A QAR 5 cancellation fee may apply.'
+        )}
+        primaryLabel={t('ride.cancel.yesCancel', 'Yes, cancel')}
+        primaryColor="#ED4557"
+        onPrimaryPress={performCancel}
+        secondaryLabel={t('ride.cancel.keep', 'Keep ride')}
+        onSecondaryPress={() => setConfirmCancelVisible(false)}
+        onRequestClose={() => setConfirmCancelVisible(false)}
+      />
+
+      <AlertModal
+        visible={!!cancelErrorMsg}
+        variant="error"
+        title={t('common.error', 'Error')}
+        message={cancelErrorMsg || ''}
+        primaryLabel={t('common.ok', 'OK')}
+        onPrimaryPress={() => setCancelErrorMsg(null)}
+        onRequestClose={() => setCancelErrorMsg(null)}
+      />
     </View>
   );
 }

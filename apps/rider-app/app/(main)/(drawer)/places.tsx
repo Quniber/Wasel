@@ -1,316 +1,215 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Alert, TextInput, Modal, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { useThemeStore } from '@/stores/theme-store';
+import { useCallback } from 'react';
 import { addressApi } from '@/lib/api';
+import ScreenHeader from '@/components/ScreenHeader';
 
-interface SavedPlace {
+const BASE_W = 393;
+
+interface Place {
   id: string;
-  name: string;
-  address: string;
   type: 'home' | 'work' | 'other';
-  latitude: number;
-  longitude: number;
+  title: string;
+  address: string;
 }
 
+const iconForType = (t: string): keyof typeof Ionicons.glyphMap => {
+  if (t === 'home') return 'home';
+  if (t === 'work') return 'briefcase';
+  return 'star';
+};
+
 export default function PlacesScreen() {
-  const { t } = useTranslation();
-  const navigation = useNavigation();
-  const { resolvedTheme } = useThemeStore();
-  const isDark = resolvedTheme === 'dark';
+  const { t, i18n } = useTranslation();
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
+  const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [places, setPlaces] = useState<SavedPlace[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editingPlace, setEditingPlace] = useState<SavedPlace | null>(null);
-  const [placeName, setPlaceName] = useState('');
-  const [placeAddress, setPlaceAddress] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    loadPlaces();
-  }, []);
-
-  const loadPlaces = async () => {
+  const load = async () => {
     try {
-      const response = await addressApi.getAddresses();
-      const addresses = response.data || [];
-
-      // Transform API data to display format
-      const transformedPlaces = addresses.map((addr: any) => ({
-        id: addr.id.toString(),
-        name: addr.title || addr.type || 'Place',
-        address: addr.address || '',
-        type: addr.type || 'other',
-        latitude: parseFloat(addr.latitude) || 0,
-        longitude: parseFloat(addr.longitude) || 0,
+      const res = await addressApi.getAddresses();
+      const arr = (res.data || []).map((a: any) => ({
+        id: a.id?.toString() || String(Math.random()),
+        type: (a.type?.toLowerCase() || 'other') as 'home' | 'work' | 'other',
+        title: a.title || a.type || 'Saved place',
+        address: a.address || '',
       }));
-
-      setPlaces(transformedPlaces);
-    } catch (error) {
-      console.error('Error loading places:', error);
-      setPlaces([]);
+      setPlaces(arr);
+    } catch {
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case 'home':
-        return 'home';
-      case 'work':
-        return 'briefcase';
-      default:
-        return 'star';
-    }
-  };
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleEdit = (place: SavedPlace) => {
-    setEditingPlace(place);
-    setPlaceName(place.name);
-    setPlaceAddress(place.address);
-    setShowModal(true);
-  };
-
-  const handleDelete = (id: string) => {
-    const place = places.find((p) => p.id === id);
-
-    Alert.alert(
-      t('places.deleteTitle'),
-      t('places.deleteConfirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await addressApi.deleteAddress(id);
-              setPlaces(places.filter((p) => p.id !== id));
-            } catch (error) {
-              console.error('Error deleting place:', error);
-              Alert.alert(t('common.error'), t('errors.generic'));
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleSave = async () => {
-    if (!placeName.trim() || !placeAddress.trim()) {
-      Alert.alert(t('common.error'), t('places.fillFields'));
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      if (editingPlace) {
-        // Update existing place
-        await addressApi.updateAddress(editingPlace.id, {
-          title: placeName,
-          address: placeAddress,
-        });
-        setPlaces(
-          places.map((p) =>
-            p.id === editingPlace.id ? { ...p, name: placeName, address: placeAddress } : p
-          )
-        );
-      } else {
-        // Create new place
-        const response = await addressApi.createAddress({
-          title: placeName,
-          address: placeAddress,
-          latitude: 0,
-          longitude: 0,
-          type: 'other',
-        });
-
-        const newPlace: SavedPlace = {
-          id: response.data.id.toString(),
-          name: placeName,
-          address: placeAddress,
-          type: 'other',
-          latitude: 0,
-          longitude: 0,
-        };
-        setPlaces([...places, newPlace]);
-      }
-
-      setShowModal(false);
-      setEditingPlace(null);
-      setPlaceName('');
-      setPlaceAddress('');
-    } catch (error) {
-      console.error('Error saving place:', error);
-      Alert.alert(t('common.error'), t('errors.generic'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleAddNew = () => {
-    setEditingPlace(null);
-    setPlaceName('');
-    setPlaceAddress('');
-    setShowModal(true);
-  };
-
-  const renderPlaceItem = ({ item }: { item: SavedPlace }) => (
-    <View
-      className={`mx-4 mb-3 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'} shadow-sm`}
-    >
-      <View className="flex-row items-start">
-        <View className={`w-10 h-10 rounded-full items-center justify-center ${item.type === 'home' ? 'bg-primary/10' : item.type === 'work' ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
-          <Ionicons
-            name={getPlaceIcon(item.type)}
-            size={20}
-            color={item.type === 'home' ? '#4CAF50' : item.type === 'work' ? '#2196F3' : '#FFB300'}
-          />
-        </View>
-        <View className="flex-1 ml-3">
-          <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            {item.name}
-          </Text>
-          {item.address ? (
-            <Text className="text-muted-foreground text-sm mt-1" numberOfLines={2}>
-              {item.address}
-            </Text>
-          ) : (
-            <Text className="text-muted-foreground text-sm mt-1 italic">
-              {t('places.notSet')}
-            </Text>
-          )}
-        </View>
-        <View className="flex-row">
-          <TouchableOpacity
-            onPress={() => handleEdit(item)}
-            className="w-10 h-10 items-center justify-center"
-          >
-            <Ionicons name="pencil" size={18} color={isDark ? '#FAFAFA' : '#757575'} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleDelete(item.id)}
-            className="w-10 h-10 items-center justify-center"
-          >
-            <Ionicons name="trash" size={18} color="#EF5350" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
   );
 
-  if (isLoading) {
-    return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-4">
-        <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="menu" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
-        </TouchableOpacity>
-        <Text className={`flex-1 text-xl font-semibold text-center mr-10 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          {t('places.title')}
-        </Text>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
+      <ScreenHeader title={t('places.title', 'Saved places')} />
 
-      {/* Places List */}
-      <FlatList
-        data={places}
-        renderItem={renderPlaceItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingVertical: 8 }}
-        ListEmptyComponent={() => (
-          <View className="flex-1 items-center justify-center py-20">
-            <Ionicons name="location-outline" size={64} color={isDark ? '#333' : '#E0E0E0'} />
-            <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {t('places.empty')}
-            </Text>
-            <Text className="text-muted-foreground mt-2 text-center px-8">
-              {t('places.emptySubtitle')}
-            </Text>
-          </View>
-        )}
-        ListFooterComponent={() => (
-          <TouchableOpacity
-            onPress={handleAddNew}
-            className={`mx-4 mb-3 p-4 rounded-xl border-2 border-dashed ${isDark ? 'border-border-dark' : 'border-border'}`}
-          >
-            <View className="flex-row items-center justify-center">
-              <Ionicons name="add-circle" size={24} color="#4CAF50" />
-              <Text className="text-primary font-semibold ml-2">{t('places.addNew')}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-
-      {/* Edit/Add Modal */}
-      <Modal visible={showModal} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1"
+      {isLoading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#101969" />
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 120 * s }}
+          showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 justify-end bg-black/50">
-            <View className={`rounded-t-3xl p-6 ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-              <View className="flex-row items-center justify-between mb-6">
-                <Text className={`text-xl font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {editingPlace ? t('places.editPlace') : t('places.addPlace')}
-                </Text>
-                <TouchableOpacity onPress={() => setShowModal(false)}>
-                  <Ionicons name="close" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-muted-foreground text-sm mb-2">{t('places.nameLabel')}</Text>
-              <TextInput
-                className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
-                placeholder={t('places.namePlaceholder')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-                value={placeName}
-                onChangeText={setPlaceName}
-              />
-
-              <Text className="text-muted-foreground text-sm mb-2">{t('places.addressLabel')}</Text>
-              <TextInput
-                className={`p-4 rounded-xl mb-6 ${isDark ? 'bg-muted-dark text-foreground-dark' : 'bg-muted text-foreground'}`}
-                placeholder={t('places.addressPlaceholder')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-                value={placeAddress}
-                onChangeText={setPlaceAddress}
-                multiline
-              />
-
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={isSaving}
-                className="bg-primary py-4 rounded-xl items-center mb-4"
+          {places.length === 0 ? (
+            <View
+              style={{
+                paddingHorizontal: 32 * s,
+                paddingVertical: 80 * s,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons name="location-outline" size={48 * s} color="#6B7380" />
+              <Text
+                style={{
+                  marginTop: 16 * s,
+                  color: '#111111',
+                  fontSize: 16 * s,
+                  fontWeight: '600',
+                  textAlign: 'center',
+                }}
               >
-                <Text className="text-white text-lg font-semibold">
-                  {isSaving ? t('common.loading') : t('common.save')}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setShowModal(false)}
-                className="py-3 items-center"
+                {t('places.empty', 'No saved places yet')}
+              </Text>
+              <Text
+                style={{
+                  marginTop: 6 * s,
+                  color: '#6B7380',
+                  fontSize: 13 * s,
+                  textAlign: 'center',
+                }}
               >
-                <Text className="text-muted-foreground">{t('common.cancel')}</Text>
-              </TouchableOpacity>
+                {t(
+                  'places.emptySubtitle',
+                  'Save your home, work, and favorites for one-tap booking.'
+                )}
+              </Text>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          ) : (
+            places.map((p, idx) => (
+              <View key={p.id}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push({ pathname: '/(main)/add-place' as any, params: { id: p.id } })
+                  }
+                  style={{
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 14 * s,
+                    paddingHorizontal: 20 * s,
+                    paddingVertical: 14 * s,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 48 * s,
+                      height: 48 * s,
+                      borderRadius: 24 * s,
+                      backgroundColor: '#E0F0FF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name={iconForType(p.type)} size={22 * s} color="#0366FB" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: '#111111', fontSize: 15 * s, fontWeight: '600', textAlign }}
+                    >
+                      {p.title}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        marginTop: 4 * s,
+                        color: '#6B7380',
+                        fontSize: 13 * s,
+                        textAlign,
+                      }}
+                    >
+                      {p.address}
+                    </Text>
+                  </View>
+                  <TouchableOpacity activeOpacity={0.7} hitSlop={8}>
+                    <Ionicons name="ellipsis-horizontal" size={18 * s} color="#6B7380" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+                {idx < places.length - 1 && (
+                  <View
+                    style={{ height: 1, backgroundColor: '#E5EBF2', marginHorizontal: 20 * s }}
+                  />
+                )}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 40 * s,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+        }}
+      >
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push('/(main)/add-place' as any)}
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            gap: 8 * s,
+            paddingLeft: 16 * s,
+            paddingRight: 18 * s,
+            paddingVertical: 14 * s,
+            borderRadius: 999,
+            backgroundColor: '#101969',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.16,
+            shadowRadius: 20,
+            elevation: 8,
+          }}
+        >
+          <Ionicons name="add" size={18 * s} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 15 * s, fontWeight: '600' }}>
+            {t('places.addNew', 'Add new place')}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }

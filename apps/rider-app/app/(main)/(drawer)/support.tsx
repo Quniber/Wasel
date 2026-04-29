@@ -1,156 +1,239 @@
-import { View, Text, TouchableOpacity, Linking, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Linking,
+  useWindowDimensions,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { useThemeStore } from '@/stores/theme-store';
+import ScreenHeader from '@/components/ScreenHeader';
+
+const BASE_W = 393;
+
+const SUPPORT_PHONE = '+97440409999';
+const SUPPORT_EMAIL = 'support@waselapp.qa';
 
 export default function SupportScreen() {
-  const { t } = useTranslation();
-  const navigation = useNavigation();
-  const { resolvedTheme } = useThemeStore();
-  const isDark = resolvedTheme === 'dark';
+  const { t, i18n } = useTranslation();
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
-  const supportOptions = [
+  const faqs = [
     {
-      icon: 'document-text',
-      title: t('support.recentTrips'),
-      description: t('support.recentTripsDesc'),
-      onPress: () => router.push('/(main)/(drawer)/history'),
+      q: t('support.q1', 'How do I report a problem with a trip?'),
+      a: t(
+        'support.a1',
+        "Open the app, find your trip in History and tap 'Get help' to start a refund or report an issue."
+      ),
     },
     {
-      icon: 'help-circle',
-      title: t('support.faq'),
-      description: t('support.faqDesc'),
-      onPress: () => {
-        // Open FAQ page or modal
-      },
+      q: t('support.q2', 'Why was my card charged twice?'),
+      a: t(
+        'support.a2',
+        'The first charge is usually a temporary authorization that disappears within a few business days. If both stay, contact support and we will refund.'
+      ),
     },
     {
-      icon: 'call',
-      title: t('support.callUs'),
-      description: t('support.callUsDesc'),
-      onPress: () => Linking.openURL('tel:+1234567890'),
+      q: t('support.q3', 'How do I update my payment method?'),
+      a: t(
+        'support.a3',
+        'Open Profile → Wallet & payments to change your default method. You can switch payment per ride right before confirming.'
+      ),
     },
     {
-      icon: 'mail',
-      title: t('support.emailUs'),
-      description: t('support.emailUsDesc'),
-      onPress: () => Linking.openURL('mailto:support@wasel.com'),
-    },
-    {
-      icon: 'chatbubble-ellipses',
-      title: t('support.liveChat'),
-      description: t('support.liveChatDesc'),
-      onPress: () => {
-        // Open live chat
-      },
+      q: t('support.q4', 'Can I schedule a ride in advance?'),
+      a: t(
+        'support.a4',
+        'Yes — on Home, tap the "Now" pill next to the search bar to pick a date and time at least 30 minutes in advance.'
+      ),
     },
   ];
 
-  const faqItems = [
-    {
-      question: t('support.faqQuestions.q1'),
-      answer: t('support.faqAnswers.a1'),
-    },
-    {
-      question: t('support.faqQuestions.q2'),
-      answer: t('support.faqAnswers.a2'),
-    },
-    {
-      question: t('support.faqQuestions.q3'),
-      answer: t('support.faqAnswers.a3'),
-    },
-  ];
+  const [expanded, setExpanded] = useState<number | null>(0);
+
+  const Card = ({
+    icon,
+    title,
+    sub,
+    onPress,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    sub: string;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={{
+        flex: 1,
+        height: 130 * s,
+        padding: 14 * s,
+        borderRadius: 16 * s,
+        borderWidth: 1,
+        borderColor: '#E5EBF2',
+        backgroundColor: '#F5F7FC',
+        gap: 10 * s,
+      }}
+    >
+      <View
+        style={{
+          width: 40 * s,
+          height: 40 * s,
+          borderRadius: 20 * s,
+          backgroundColor: '#E0F0FF',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name={icon} size={20 * s} color="#0366FB" />
+      </View>
+      <Text style={{ color: '#111111', fontSize: 15 * s, fontWeight: '700', textAlign }}>
+        {title}
+      </Text>
+      <Text
+        numberOfLines={2}
+        style={{ color: '#6B7380', fontSize: 12 * s, lineHeight: 17 * s, textAlign }}
+      >
+        {sub}
+      </Text>
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-4">
-        <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="menu" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
-        </TouchableOpacity>
-        <Text className={`flex-1 text-xl font-semibold text-center mr-10 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          {t('support.title')}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
+      <ScreenHeader title={t('support.title', 'Support')} />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 24 * s }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Heading */}
+        <View style={{ paddingHorizontal: 20 * s, paddingVertical: 8 * s, gap: 4 * s }}>
+          <Text
+            style={{
+              color: '#111111',
+              fontSize: 26 * s,
+              fontWeight: '700',
+              letterSpacing: -0.6,
+              textAlign,
+            }}
+          >
+            {t('support.howCanWeHelp', 'How can we help?')}
+          </Text>
+          <Text style={{ color: '#6B7380', fontSize: 14 * s, lineHeight: 20 * s, textAlign }}>
+            {t('support.subtitle', "We're available 24/7. Choose how you want to reach us.")}
+          </Text>
+        </View>
+
+        {/* Contact cards */}
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            gap: 10 * s,
+            paddingHorizontal: 20 * s,
+            marginTop: 8 * s,
+          }}
+        >
+          <Card
+            icon="call-outline"
+            title={t('support.callUs', 'Call us')}
+            sub="+974 4040 9999"
+            onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}
+          />
+          <Card
+            icon="mail-outline"
+            title={t('support.email', 'Email')}
+            sub={SUPPORT_EMAIL}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+          />
+          <Card
+            icon="chatbubbles-outline"
+            title={t('support.liveChat', 'Live chat')}
+            sub={t('support.liveChatSub', 'Get help in seconds')}
+            onPress={() => {
+              // TODO: open live chat
+            }}
+          />
+        </View>
+
+        {/* FAQ */}
+        <Text
+          style={{
+            marginTop: 24 * s,
+            marginHorizontal: 20 * s,
+            color: '#6B7380',
+            fontSize: 11 * s,
+            fontWeight: '600',
+            letterSpacing: 1.2,
+            textAlign,
+          }}
+        >
+          {t('support.faqHeader', 'FREQUENTLY ASKED')}
         </Text>
-      </View>
 
-      <ScrollView className="flex-1 px-4">
-        {/* Hero Section */}
-        <View className="items-center py-6">
-          <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-4">
-            <Ionicons name="headset" size={40} color="#4CAF50" />
-          </View>
-          <Text className={`text-xl font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            {t('support.howCanWeHelp')}
-          </Text>
-          <Text className="text-muted-foreground mt-2 text-center">
-            {t('support.subtitle')}
-          </Text>
-        </View>
-
-        {/* Support Options */}
-        <View className={`rounded-xl overflow-hidden ${isDark ? 'bg-card-dark' : 'bg-card'} mb-6`}>
-          {supportOptions.map((option, index) => (
-            <TouchableOpacity
-              key={option.title}
-              onPress={option.onPress}
-              className={`flex-row items-center px-4 py-4 ${
-                index < supportOptions.length - 1
-                  ? `border-b ${isDark ? 'border-border-dark' : 'border-border'}`
-                  : ''
-              }`}
-            >
-              <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-                <Ionicons name={option.icon as any} size={20} color="#4CAF50" />
+        <View style={{ marginHorizontal: 20 * s }}>
+          {faqs.map((f, i) => {
+            const open = expanded === i;
+            return (
+              <View key={i}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setExpanded(open ? null : i)}
+                  style={{
+                    paddingVertical: 14 * s,
+                    flexDirection: 'column',
+                    gap: 8 * s,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      gap: 12 * s,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        flex: 1,
+                        color: '#111111',
+                        fontSize: 14 * s,
+                        fontWeight: '600',
+                        textAlign,
+                      }}
+                    >
+                      {f.q}
+                    </Text>
+                    <Ionicons
+                      name={open ? 'chevron-up' : 'chevron-down'}
+                      size={18 * s}
+                      color="#6B7380"
+                    />
+                  </View>
+                  {open && (
+                    <Text
+                      style={{
+                        color: '#6B7380',
+                        fontSize: 13 * s,
+                        lineHeight: 19 * s,
+                        textAlign,
+                      }}
+                    >
+                      {f.a}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <View style={{ height: 1, backgroundColor: '#E5EBF2' }} />
               </View>
-              <View className="flex-1 ml-3">
-                <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {option.title}
-                </Text>
-                <Text className="text-muted-foreground text-sm">{option.description}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={isDark ? '#757575' : '#9E9E9E'} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* FAQ Section */}
-        <Text className="text-muted-foreground text-sm font-semibold mb-2 mt-2">
-          {t('support.frequentQuestions')}
-        </Text>
-        <View className={`rounded-xl overflow-hidden ${isDark ? 'bg-card-dark' : 'bg-card'} mb-6`}>
-          {faqItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              className={`px-4 py-4 ${
-                index < faqItems.length - 1
-                  ? `border-b ${isDark ? 'border-border-dark' : 'border-border'}`
-                  : ''
-              }`}
-            >
-              <View className="flex-row items-start">
-                <Ionicons name="help-circle" size={20} color="#4CAF50" />
-                <View className="flex-1 ml-3">
-                  <Text className={`font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                    {item.question}
-                  </Text>
-                  <Text className="text-muted-foreground text-sm mt-1">{item.answer}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Contact Info */}
-        <View className={`rounded-xl p-4 mb-8 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-          <Text className="text-muted-foreground text-center text-sm">
-            {t('support.available')}
-          </Text>
-          <Text className={`text-center font-semibold mt-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            {t('support.hours')}
-          </Text>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>

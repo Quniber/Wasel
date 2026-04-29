@@ -1,6 +1,108 @@
 {
+  "places": {
+    "title": "Saved places",
+    "addNew": "Add new place",
+    "empty": "No saved places yet",
+    "emptySubtitle": "Save your home, work, and favorites for one-tap booking."
+  },
+  "promotions": {
+    "title": "Promotions",
+    "available": "AVAILABLE OFFERS",
+    "useNow": "Use now",
+    "recurring": "Recurring · No expiry",
+    "appliedMsg": "${target} is now active for your next ride."
+  },
+  "scheduled": {
+    "title": "Scheduled rides",
+    "schedule": "Schedule a ride",
+    "empty": "No scheduled rides",
+    "emptySubtitle": "Plan a ride for later — we'll have a driver ready when you need one.",
+    "confirmCancelTitle": "Cancel scheduled ride?",
+    "confirmCancelMsg": "You can schedule a new ride at any time.",
+    "yesCancel": "Yes, cancel",
+    "keep": "Keep ride"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "ACCOUNT",
+    "preferences": "PREFERENCES",
+    "support": "SUPPORT",
+    "actions": "ACCOUNT ACTIONS",
+    "profile": "Profile",
+    "profileSub": "Edit your name, photo, email",
+    "security": "Security",
+    "securitySub": "Password, sign-in history",
+    "notifications": "Notifications",
+    "appearance": "Appearance",
+    "system": "System",
+    "helpCenter": "Help center",
+    "helpCenterSub": "FAQs, contact support",
+    "terms": "Terms & Privacy",
+    "deleteAccount": "Delete account",
+    "deleteAccountConfirm": "This will permanently delete your account and all data. Are you sure?",
+    "deleteAccountError": "Could not delete your account. Please try again."
+  },
+  "support": {
+    "title": "Support",
+    "howCanWeHelp": "How can we help?",
+    "subtitle": "We're available 24/7. Choose how you want to reach us.",
+    "callUs": "Call us",
+    "email": "Email",
+    "liveChat": "Live chat",
+    "liveChatSub": "Get help in seconds",
+    "faqHeader": "FREQUENTLY ASKED",
+    "q1": "How do I report a problem with a trip?",
+    "a1": "Open the app, find your trip in History and tap 'Get help' to start a refund or report an issue.",
+    "q2": "Why was my card charged twice?",
+    "a2": "The first charge is usually a temporary authorization that disappears within a few business days. If both stay, contact support and we will refund.",
+    "q3": "How do I update my payment method?",
+    "a3": "Open Profile → Wallet & payments to change your default method. You can switch payment per ride right before confirming.",
+    "q4": "Can I schedule a ride in advance?",
+    "a4": "Yes — on Home, tap the 'Now' pill next to the search bar to pick a date and time at least 30 minutes in advance."
+  },
+  "profile": {
+    "title": "My profile",
+    "memberSince": "Member since",
+    "walletBalance": "Wallet balance",
+    "topUp": "Top up",
+    "firstName": "FIRST NAME",
+    "lastName": "LAST NAME",
+    "email": "EMAIL",
+    "phone": "PHONE"
+  },
+  "addPlace": {
+    "title": "Save a new place",
+    "dragHint": "Drag map to set point",
+    "typeRequired": "TYPE  ·  REQUIRED",
+    "nameRequired": "NAME  ·  REQUIRED",
+    "namePlaceholder": "Mom's house",
+    "addressOptional": "ADDRESS  ·  OPTIONAL",
+    "autoFilled": "Auto-filled from map",
+    "save": "Save place",
+    "other": "Other"
+  },
+  "ride": {
+    "cancel": {
+      "title": "Cancel ride?",
+      "confirm": "Your driver is already on the way. A QAR 5 cancellation fee may apply.",
+      "yesCancel": "Yes, cancel",
+      "keep": "Keep ride"
+    },
+    "lookingForDriver": "Looking for your driver…",
+    "lookingSubtitle": "We'll notify you once a driver accepts",
+    "findingDriver": "Finding nearby drivers",
+    "noDrivers": "No drivers nearby",
+    "tryAgain": "Try again",
+    "cancelSearch": "Cancel ride",
+    "confirmCancelTitle": "Cancel this ride?",
+    "confirmCancelMsg": "You can request a new ride at any time.",
+    "cancelFailed": "Could not cancel the ride. Please try again."
+  },
   "common": {
     "continue": "Continue",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "save": "Save",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "save": "Save",

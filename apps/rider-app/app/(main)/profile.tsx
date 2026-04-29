@@ -1,301 +1,315 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Image } from 'react-native';
-import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useThemeStore } from '@/stores/theme-store';
+import ScreenHeader from '@/components/ScreenHeader';
 import { useAuthStore } from '@/stores/auth-store';
 import { authApi } from '@/lib/api';
-import { socketService } from '@/lib/socket';
+
+const BASE_W = 393;
 
 export default function ProfileScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const { user, setUser, logout } = useAuthStore();
-  const isDark = resolvedTheme === 'dark';
+  const { t, i18n } = useTranslation();
+  const { user, setUser } = useAuthStore() as any;
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(user?.avatar || null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const handleSave = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert(t('common.error'), t('profile.nameRequired'));
-      return;
-    }
+  const [avatarUri, setAvatarUri] = useState<string | null>((user as any)?.avatar || null);
 
-    setIsSaving(true);
-    try {
-      await authApi.updateProfile({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim() || undefined,
-      });
-
-      setUser({
-        ...user!,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-      });
-
-      setIsEditing(false);
-      Alert.alert(t('common.success'), t('profile.updateSuccess'));
-    } catch (error: any) {
-      console.error('Profile update error:', error?.response?.data || error?.message || error);
-      Alert.alert(t('common.error'), error?.response?.data?.message || t('profile.updateError'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
+  useEffect(() => {
     setFirstName(user?.firstName || '');
     setLastName(user?.lastName || '');
     setEmail(user?.email || '');
-    setIsEditing(false);
+    setAvatarUri((user as any)?.avatar || null);
+  }, [user]);
+
+  const handleAvatarPress = async () => {
+    if (!editing) return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!res.canceled && res.assets[0]) setAvatarUri(res.assets[0].uri);
+    } catch {}
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      t('settings.deleteAccount'),
-      t('settings.deleteAccountConfirm'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('settings.deleteAccount'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await authApi.deleteAccount();
-              socketService.disconnect();
-              await logout();
-              router.replace('/(auth)/welcome');
-            } catch (error) {
-              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
-            }
-          },
-        },
-      ]
-    );
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = (await (authApi as any).updateProfile?.({ firstName, lastName, email })) || null;
+      if (res?.data) setUser?.({ ...user, firstName, lastName, email });
+      setEditing(false);
+    } catch {
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleChangePhoto = () => {
-    Alert.alert(
-      t('profile.changePhoto'),
-      t('profile.chooseOption'),
-      [
-        {
-          text: t('profile.takePhoto'),
-          onPress: async () => {
-            try {
-              const { status } = await ImagePicker.requestCameraPermissionsAsync();
-              if (status !== 'granted') {
-                Alert.alert(t('common.error'), 'Please allow camera access in Settings.');
-                return;
-              }
-              const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-                presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
-              });
-              if (!result.canceled && result.assets[0]) {
-                const uri = result.assets[0].uri;
-                setProfileImage(uri);
-                setUser({ ...user!, avatar: uri });
-              }
-            } catch (err) {
-              console.error('Camera error:', err);
-            }
-          },
-        },
-        {
-          text: t('profile.chooseLibrary'),
-          onPress: async () => {
-            try {
-              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (status !== 'granted') {
-                Alert.alert(t('common.error'), 'Please allow photo access in Settings.');
-                return;
-              }
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-                presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
-              });
-              if (!result.canceled && result.assets[0]) {
-                const uri = result.assets[0].uri;
-                setProfileImage(uri);
-                setUser({ ...user!, avatar: uri });
-              }
-            } catch (err) {
-              console.error('Image picker error:', err);
-            }
-          },
-        },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]
-    );
-  };
+  const memberSince = (user as any)?.createdAt
+    ? new Date((user as any).createdAt).getFullYear()
+    : new Date().getFullYear();
+
+  const Field = ({
+    label,
+    value,
+    onChange,
+    keyboardType,
+    autoCapitalize,
+    editable = true,
+  }: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    keyboardType?: any;
+    autoCapitalize?: any;
+    editable?: boolean;
+  }) => (
+    <View style={{ gap: 8 * s }}>
+      <Text
+        style={{
+          color: '#6B7380',
+          fontSize: 12 * s,
+          fontWeight: '600',
+          letterSpacing: 0.4,
+          textAlign,
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={{
+          height: 56 * s,
+          paddingHorizontal: 16 * s,
+          borderRadius: 14 * s,
+          borderWidth: 1,
+          borderColor: '#E5EBF2',
+          backgroundColor: '#F5F7FC',
+          justifyContent: 'center',
+        }}
+      >
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          editable={editing && editable}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          style={{
+            fontSize: 15 * s,
+            fontWeight: '600',
+            color: '#111111',
+            padding: 0,
+            textAlign,
+          }}
+        />
+      </View>
+    </View>
+  );
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-4">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
-        </TouchableOpacity>
-        <Text className={`flex-1 text-xl font-semibold text-center ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          {t('profile.title')}
-        </Text>
-        {!isEditing ? (
-          <TouchableOpacity onPress={() => setIsEditing(true)} className="w-10 h-10 items-center justify-center">
-            <Ionicons name="pencil" size={20} color="#4CAF50" />
-          </TouchableOpacity>
-        ) : (
-          <View className="w-10" />
-        )}
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
+      <ScreenHeader
+        title={t('profile.title', 'My profile')}
+        rightLabel={
+          editing
+            ? saving
+              ? undefined
+              : t('common.save', 'Save')
+            : t('common.edit', 'Edit')
+        }
+        onRightPress={editing ? handleSave : () => setEditing(true)}
+      />
 
-      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-6">
-        {/* Avatar */}
-        <View className="items-center my-6">
-          <TouchableOpacity onPress={handleChangePhoto} disabled={!isEditing}>
-            <View className="w-28 h-28 rounded-full bg-primary items-center justify-center overflow-hidden">
-              {profileImage ? (
-                <Image
-                  source={{ uri: profileImage }}
-                  className="w-28 h-28"
-                />
-              ) : user?.avatarUrl ? (
-                <Image
-                  source={{ uri: user.avatarUrl }}
-                  className="w-28 h-28 rounded-full"
-                />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20 * s, paddingBottom: 24 * s }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ alignItems: 'center', marginTop: 16 * s }}>
+          <TouchableOpacity activeOpacity={editing ? 0.85 : 1} onPress={handleAvatarPress}>
+            <View
+              style={{
+                width: 112 * s,
+                height: 112 * s,
+                borderRadius: 56 * s,
+                backgroundColor: '#F5F7FC',
+                borderWidth: 1,
+                borderColor: '#E5EBF2',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={{ width: 112 * s, height: 112 * s }} />
               ) : (
-                <Text className="text-white text-4xl font-bold">
-                  {firstName?.[0]?.toUpperCase()}{lastName?.[0]?.toUpperCase()}
-                </Text>
+                <Ionicons name="person" size={48 * s} color="#6B7380" />
               )}
             </View>
-            {isEditing && (
-              <View className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary items-center justify-center border-2 border-white">
-                <Ionicons name="camera" size={16} color="#FFFFFF" />
+            {editing && (
+              <View
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  bottom: 0,
+                  width: 36 * s,
+                  height: 36 * s,
+                  borderRadius: 18 * s,
+                  backgroundColor: '#101969',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 3,
+                  borderColor: '#FFFFFF',
+                }}
+              >
+                <Ionicons name="camera" size={18 * s} color="#FFFFFF" />
               </View>
             )}
           </TouchableOpacity>
+
+          <Text
+            style={{
+              marginTop: 14 * s,
+              color: '#111111',
+              fontSize: 22 * s,
+              fontWeight: '700',
+              letterSpacing: -0.4,
+            }}
+          >
+            {firstName} {lastName}
+          </Text>
+          <Text
+            style={{
+              marginTop: 4 * s,
+              color: '#6B7380',
+              fontSize: 13 * s,
+              fontWeight: '500',
+            }}
+          >
+            {user?.mobileNumber || ''} · {t('profile.memberSince', 'Member since')} {memberSince}
+          </Text>
         </View>
 
-        {/* Form Fields */}
-        <View className={`rounded-xl overflow-hidden ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-          {/* First Name */}
-          <View className={`px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className="text-muted-foreground text-sm mb-1">{t('profile.firstName')}</Text>
-            {isEditing ? (
-              <TextInput
-                className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder={t('profile.firstNamePlaceholder')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-              />
-            ) : (
-              <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {firstName || '-'}
-              </Text>
-            )}
+        {/* Wallet card */}
+        <View
+          style={{
+            marginTop: 18 * s,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            gap: 14 * s,
+            paddingHorizontal: 18 * s,
+            paddingVertical: 16 * s,
+            borderRadius: 18 * s,
+            backgroundColor: '#101969',
+          }}
+        >
+          <View
+            style={{
+              width: 40 * s,
+              height: 40 * s,
+              borderRadius: 20 * s,
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="wallet" size={20 * s} color="#FFFFFF" />
           </View>
-
-          {/* Last Name */}
-          <View className={`px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className="text-muted-foreground text-sm mb-1">{t('profile.lastName')}</Text>
-            {isEditing ? (
-              <TextInput
-                className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder={t('profile.lastNamePlaceholder')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-              />
-            ) : (
-              <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {lastName || '-'}
-              </Text>
-            )}
-          </View>
-
-          {/* Phone (Read-only) */}
-          <View className={`px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className="text-muted-foreground text-sm mb-1">{t('profile.phone')}</Text>
-            <View className="flex-row items-center">
-              <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {user?.mobileNumber || '-'}
-              </Text>
-              <Ionicons name="lock-closed" size={14} color={isDark ? '#757575' : '#9E9E9E'} className="ml-2" />
-            </View>
-            <Text className="text-muted-foreground text-xs mt-1">
-              {t('profile.phoneChangeNote')}
+          <View style={{ flex: 1, gap: 2 * s }}>
+            <Text
+              style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 * s, fontWeight: '500', textAlign }}
+            >
+              {t('profile.walletBalance', 'Wallet balance')}
+            </Text>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 22 * s,
+                fontWeight: '700',
+                letterSpacing: -0.4,
+                textAlign,
+              }}
+            >
+              QAR {Number((user as any)?.walletBalance || 0).toFixed(2)}
             </Text>
           </View>
-
-          {/* Email */}
-          <View className={`px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className="text-muted-foreground text-sm mb-1">{t('profile.email')}</Text>
-            {isEditing ? (
-              <TextInput
-                className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}
-                value={email}
-                onChangeText={setEmail}
-                placeholder={t('profile.emailPlaceholder')}
-                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            ) : (
-              <Text className={`text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {email || '-'}
-              </Text>
-            )}
-          </View>
-
-        </View>
-
-        {/* Save/Cancel Buttons */}
-        {isEditing && (
-          <View className="mt-6">
-            <TouchableOpacity
-              onPress={handleSave}
-              disabled={isSaving}
-              className="bg-primary py-4 rounded-xl items-center mb-3"
-            >
-              <Text className="text-white text-lg font-semibold">
-                {isSaving ? t('common.loading') : t('common.save')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleCancel} className="py-3 items-center">
-              <Text className="text-muted-foreground">{t('common.cancel')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Delete Account */}
-        {!isEditing && (
           <TouchableOpacity
-            onPress={handleDeleteAccount}
-            className="mt-8 mb-8 py-4 rounded-xl items-center flex-row justify-center border border-destructive/30"
+            activeOpacity={0.85}
+            onPress={() => {}}
+            style={{
+              backgroundColor: '#FFFFFF',
+              paddingHorizontal: 14 * s,
+              paddingVertical: 8 * s,
+              borderRadius: 999,
+            }}
           >
-            <Ionicons name="trash-outline" size={20} color="#F44336" />
-            <Text className="text-destructive font-semibold ml-2">
-              {t('settings.deleteAccount')}
+            <Text style={{ color: '#101969', fontSize: 13 * s, fontWeight: '600' }}>
+              {t('profile.topUp', 'Top up')}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Form */}
+        <View style={{ marginTop: 20 * s, gap: 14 * s }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12 * s }}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label={t('profile.firstName', 'FIRST NAME')}
+                value={firstName}
+                onChange={setFirstName}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field
+                label={t('profile.lastName', 'LAST NAME')}
+                value={lastName}
+                onChange={setLastName}
+              />
+            </View>
+          </View>
+          <Field
+            label={t('profile.email', 'EMAIL')}
+            value={email}
+            onChange={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Field
+            label={t('profile.phone', 'PHONE')}
+            value={user?.mobileNumber || ''}
+            onChange={() => {}}
+            editable={false}
+          />
+        </View>
+
+        {saving && (
+          <View style={{ marginTop: 16 * s, alignItems: 'center' }}>
+            <ActivityIndicator color="#101969" />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
