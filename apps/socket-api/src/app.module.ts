@@ -8,11 +8,7 @@ import { ApiModule } from './api/api.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [
-        '/var/www/Wasel/.env',                      // Server absolute path
-        join(__dirname, '..', '..', '..', '.env'),  // Root .env
-        '.env',                                      // Local fallback
-      ],
+      envFilePath: join(__dirname, '..', '..', '..', '.env'),
     }),
     SocketModule,
     ApiModule,

@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,18 +6,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
 import { Gender } from 'database';
 
-const twilioClient = Twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN,
-);
-const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!;
-
 // Test account bypass - skip Twilio for this number
 const TEST_PHONE_NUMBER = '55555555';
 const TEST_OTP_CODE = '123456';
 
 @Injectable()
 export class AuthService {
+  private _twilio?: ReturnType<typeof Twilio>;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -26,21 +21,31 @@ export class AuthService {
     private sessionsService: SessionsService,
   ) {}
 
+  private get twilio() {
+    if (!this._twilio) {
+      this._twilio = Twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN,
+      );
+    }
+    return this._twilio;
+  }
+
   private isTestNumber(mobileNumber: string): boolean {
     return mobileNumber.replace(/\D/g, '').endsWith(TEST_PHONE_NUMBER);
   }
 
   private async sendTwilioOtp(mobileNumber: string): Promise<void> {
     if (this.isTestNumber(mobileNumber)) return;
-    await twilioClient.verify.v2
-      .services(VERIFY_SID)
+    await this.twilio.verify.v2
+      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
       .verifications.create({ to: mobileNumber, channel: 'sms' });
   }
 
   private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
     if (this.isTestNumber(mobileNumber)) return code === TEST_OTP_CODE;
-    const check = await twilioClient.verify.v2
-      .services(VERIFY_SID)
+    const check = await this.twilio.verify.v2
+      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
       .verificationChecks.create({ to: mobileNumber, code });
     return check.status === 'approved';
   }

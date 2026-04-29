@@ -9,11 +9,7 @@ import { V2Module } from './v2/v2.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [
-        '/var/www/Wasel/.env',                      // Server absolute path
-        join(__dirname, '..', '..', '..', '.env'),  // Root .env
-        '.env',                                      // Local fallback
-      ],
+      envFilePath: join(__dirname, '..', '..', '..', '.env'),
     }),
     PrismaModule,
     V1Module,
