@@ -1,335 +1,428 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
-import { useThemeStore } from '@/stores/theme-store';
 import { orderApi } from '@/lib/api';
 
-interface RideDetails {
-  id: string;
-  date: string;
-  time: string;
-  pickup: {
-    address: string;
-    latitude: number;
-    longitude: number;
-  };
-  dropoff: {
-    address: string;
-    latitude: number;
-    longitude: number;
-  };
-  driver: {
-    name: string;
-    rating: number;
-    carModel: string;
-    carColor: string;
-    carPlate: string;
-  } | null;
-  service: string;
-  fare: {
-    tripFare: number;
-    serviceFee: number;
-    discount: number;
-    total: number;
-  };
-  paymentMethod: string;
-  status: 'completed' | 'cancelled';
-  rating: number | null;
-  duration: string;
-  distance: string;
+const BASE_W = 393;
+
+interface Detail {
+  status: string;
+  createdAt: Date;
+  pickup: string;
+  dropoff: string;
+  distance: number;
+  durationMin: number;
+  payment: string;
+  driverName: string;
+  driverRating: number;
+  carModel: string;
+  carPlate: string;
+  tripFare: number;
+  serviceFee: number;
+  promoDiscount: number;
+  total: number;
+  currency: string;
 }
 
-export default function RideDetailsScreen() {
+export default function HistoryDetailScreen() {
+  const { t, i18n } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const isDark = resolvedTheme === 'dark';
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
 
+  const [d, setD] = useState<Detail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [ride, setRide] = useState<RideDetails | null>(null);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadRideDetails();
+    if (!id) return;
+    (async () => {
+      try {
+        const res = await orderApi.getOrderDetails(String(id));
+        const o = res.data || {};
+        setD({
+          status: o.status || '',
+          createdAt: new Date(o.createdAt || Date.now()),
+          pickup: o.pickupAddress || '',
+          dropoff: o.dropoffAddress || '',
+          distance: parseFloat(o.distance || '0') || 0,
+          durationMin: parseFloat(o.durationMin || o.estimatedDuration || '0') || 0,
+          payment:
+            o.paymentMode === 'card' || o.paymentMode === 'payment_gateway'
+              ? `${t('booking.payment.card', 'Card')} · ${o.cardLast4 || '••'}`.trim()
+              : o.paymentMode === 'wallet'
+              ? t('booking.payment.wallet', 'Wallet')
+              : t('booking.payment.cash', 'Cash'),
+          driverName:
+            [o.driver?.firstName, o.driver?.lastName].filter(Boolean).join(' ') ||
+            t('common.driver', 'Driver'),
+          driverRating: parseFloat(o.driver?.rating || '5') || 5,
+          carModel:
+            typeof o.driver?.carModel === 'string'
+              ? o.driver.carModel
+              : o.driver?.carModel
+              ? `${o.driver.carModel.brand || ''} ${o.driver.carModel.model || ''}`.trim()
+              : '',
+          carPlate: o.driver?.carPlate || '',
+          tripFare: parseFloat(o.serviceCost || '0') || 0,
+          serviceFee: parseFloat(o.serviceFee || '0') || 0,
+          promoDiscount: parseFloat(o.couponAmount || '0') || 0,
+          total: parseFloat(o.costAfterCoupon || o.costBest || o.total || '0') || 0,
+          currency: o.currency || 'QAR',
+        });
+      } catch {
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   }, [id]);
 
-  const loadRideDetails = async () => {
-    if (!id) return;
+  const isCompleted = d && ['Finished', 'finished', 'Completed', 'completed'].includes(d.status);
 
-    try {
-      const response = await orderApi.getOrderDetails(id);
-      const order = response.data;
-
-      // Transform API data to display format
-      const rideDetails: RideDetails = {
-        id: order.id.toString(),
-        date: new Date(order.createdAt).toLocaleDateString(undefined, {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        time: new Date(order.createdAt).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        pickup: {
-          address: order.pickupAddress || 'Unknown',
-          latitude: parseFloat(order.pickupLatitude) || 0,
-          longitude: parseFloat(order.pickupLongitude) || 0,
-        },
-        dropoff: {
-          address: order.dropoffAddress || 'Unknown',
-          latitude: parseFloat(order.dropoffLatitude) || 0,
-          longitude: parseFloat(order.dropoffLongitude) || 0,
-        },
-        driver: order.driver ? {
-          name: `${order.driver.firstName || ''} ${order.driver.lastName || ''}`.trim() || 'Driver',
-          rating: parseFloat(order.driver.rating) || 0,
-          carModel: order.driver.carModel || 'Unknown',
-          carColor: order.driver.carColor || 'Unknown',
-          carPlate: order.driver.carPlate || 'Unknown',
-        } : null,
-        service: order.service?.name || 'Standard',
-        fare: {
-          tripFare: parseFloat(order.fare) || 0,
-          serviceFee: parseFloat(order.serviceFee) || 1.5,
-          discount: parseFloat(order.discount) || 0,
-          total: parseFloat(order.totalFare) || parseFloat(order.fare) || 0,
-        },
-        paymentMethod: order.paymentMode || 'Cash',
-        status: order.status === 'completed' ? 'completed' : 'cancelled',
-        rating: order.customerRating || null,
-        duration: order.duration ? `${Math.round(order.duration)} min` : 'N/A',
-        distance: order.distance ? `${(order.distance / 1000).toFixed(1)} km` : 'N/A',
-      };
-
-      setRide(rideDetails);
-    } catch (err) {
-      console.error('Error loading ride details:', err);
-      setError(t('errors.generic'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleReportIssue = () => {
-    router.push('/(main)/(drawer)/support');
-  };
-
-  if (isLoading) {
+  if (isLoading || !d) {
     return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </SafeAreaView>
-    );
-  }
-
-  if (error || !ride) {
-    return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <Ionicons name="alert-circle" size={64} color={isDark ? '#333' : '#E0E0E0'} />
-        <Text className={`text-lg font-semibold mt-4 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          {error || t('errors.generic')}
-        </Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-primary">{t('common.back')}</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#101969" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-4">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
-          <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
-        </TouchableOpacity>
-        <Text className={`flex-1 text-xl font-semibold text-center mr-10 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-          {t('history.details.title')}
-        </Text>
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      {/* Map preview area */}
+      <View
+        style={{
+          height: 200 * s,
+          backgroundColor: '#EBF0F7',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="map" size={64 * s} color="#C7CDD8" />
       </View>
 
-      <ScrollView className="flex-1">
-        {/* Mini Map */}
-        <View className="h-48 mx-4 rounded-xl overflow-hidden">
-          <MapView
-            provider={PROVIDER_GOOGLE}
-            style={{ flex: 1 }}
-            initialRegion={{
-              latitude: (ride.pickup.latitude + ride.dropoff.latitude) / 2,
-              longitude: (ride.pickup.longitude + ride.dropoff.longitude) / 2,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
-            scrollEnabled={false}
-            zoomEnabled={false}
-          >
-            <Marker coordinate={{ latitude: ride.pickup.latitude, longitude: ride.pickup.longitude }}>
-              <View className="w-4 h-4 rounded-full bg-primary border-2 border-white" />
-            </Marker>
-            <Marker coordinate={{ latitude: ride.dropoff.latitude, longitude: ride.dropoff.longitude }}>
-              <View className="w-4 h-4 rounded-full bg-destructive border-2 border-white" />
-            </Marker>
-            <Polyline
-              coordinates={[
-                { latitude: ride.pickup.latitude, longitude: ride.pickup.longitude },
-                { latitude: ride.dropoff.latitude, longitude: ride.dropoff.longitude },
-              ]}
-              strokeColor="#4CAF50"
-              strokeWidth={3}
-            />
-          </MapView>
-        </View>
-
-        {/* Status Badge */}
-        <View className="items-center mt-4">
-          <View className={`px-4 py-2 rounded-full ${ride.status === 'completed' ? 'bg-primary/10' : 'bg-destructive/10'}`}>
-            <Text className={`font-semibold ${ride.status === 'completed' ? 'text-primary' : 'text-destructive'}`}>
-              {ride.status === 'completed' ? t('history.completed') : t('history.cancelled')}
-            </Text>
-          </View>
-        </View>
-
-        {/* Date & Time */}
-        <View className="items-center mt-2">
-          <Text className="text-muted-foreground">
-            {ride.date} • {ride.time}
-          </Text>
-        </View>
-
-        {/* Route */}
-        <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-          <View className="flex-row items-start mb-3">
-            <View className="w-3 h-3 rounded-full bg-primary mt-1" />
-            <View className="flex-1 ml-3">
-              <Text className="text-muted-foreground text-xs">{t('history.details.pickup')}</Text>
-              <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {ride.pickup.address}
-              </Text>
-            </View>
-          </View>
-          <View className="flex-row items-start">
-            <View className="w-3 h-3 rounded-full bg-destructive mt-1" />
-            <View className="flex-1 ml-3">
-              <Text className="text-muted-foreground text-xs">{t('history.details.dropoff')}</Text>
-              <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {ride.dropoff.address}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Trip Stats */}
-        <View className="flex-row mx-4 mt-4 gap-3">
-          <View className={`flex-1 p-4 rounded-xl items-center ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-            <Ionicons name="time" size={24} color="#4CAF50" />
-            <Text className="text-muted-foreground text-sm mt-1">{t('history.details.duration')}</Text>
-            <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {ride.duration}
-            </Text>
-          </View>
-          <View className={`flex-1 p-4 rounded-xl items-center ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-            <Ionicons name="speedometer" size={24} color="#4CAF50" />
-            <Text className="text-muted-foreground text-sm mt-1">{t('history.details.distance')}</Text>
-            <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {ride.distance}
-            </Text>
-          </View>
-        </View>
-
-        {/* Driver Info */}
-        {ride.driver && (
-          <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-            <Text className="text-muted-foreground text-xs mb-3">{t('history.details.driver')}</Text>
-            <View className="flex-row items-center">
-              <View className="w-12 h-12 rounded-full bg-primary items-center justify-center">
-                <Text className="text-white font-bold">{ride.driver.name.split(' ').map(n => n[0]).join('')}</Text>
-              </View>
-              <View className="flex-1 ml-3">
-                <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {ride.driver.name}
-                </Text>
-                <View className="flex-row items-center mt-1">
-                  <Ionicons name="star" size={14} color="#FFB300" />
-                  <Text className="text-muted-foreground ml-1">{ride.driver.rating.toFixed(1)}</Text>
-                </View>
-              </View>
-              {ride.rating && (
-                <View className="items-end">
-                  <Text className="text-muted-foreground text-xs">{t('history.details.yourRating')}</Text>
-                  <View className="flex-row items-center">
-                    <Ionicons name="star" size={16} color="#FFB300" />
-                    <Text className={`ml-1 font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                      {ride.rating}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-            <View className={`flex-row items-center mt-3 pt-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
-              <Ionicons name="car" size={16} color={isDark ? '#FAFAFA' : '#212121'} />
-              <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {ride.driver.carColor} {ride.driver.carModel}
-              </Text>
-              <View className="flex-1" />
-              <View className="px-2 py-1 rounded bg-primary/10">
-                <Text className="text-primary font-medium">{ride.driver.carPlate}</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Fare Breakdown */}
-        <View className={`mx-4 mt-4 p-4 rounded-xl ${isDark ? 'bg-card-dark' : 'bg-card'}`}>
-          <Text className="text-muted-foreground text-xs mb-3">{t('history.details.fareBreakdown')}</Text>
-          <View className="flex-row justify-between py-2">
-            <Text className="text-muted-foreground">{ride.service}</Text>
-            <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              QAR {ride.fare.tripFare.toFixed(2)}
-            </Text>
-          </View>
-          <View className={`flex-row justify-between py-2 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className="text-muted-foreground">{t('history.details.serviceFee')}</Text>
-            <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              QAR {ride.fare.serviceFee.toFixed(2)}
-            </Text>
-          </View>
-          {ride.fare.discount > 0 && (
-            <View className={`flex-row justify-between py-2 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
-              <Text className="text-primary">{t('history.details.discount')}</Text>
-              <Text className="text-primary">-QAR {ride.fare.discount.toFixed(2)}</Text>
-            </View>
-          )}
-          <View className={`flex-row justify-between pt-3 mt-2 border-t-2 ${isDark ? 'border-border-dark' : 'border-border'}`}>
-            <Text className={`font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              {t('history.details.total')}
-            </Text>
-            <Text className={`font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-              QAR {ride.fare.total.toFixed(2)}
-            </Text>
-          </View>
-          <View className="flex-row items-center mt-3">
-            <Ionicons name="cash" size={16} color="#4CAF50" />
-            <Text className="text-muted-foreground ml-2">
-              {t('history.details.paidWith', { method: ride.paymentMethod })}
-            </Text>
-          </View>
-        </View>
-
-        {/* Report Issue Button */}
+      {/* Floating back button */}
+      <SafeAreaView
+        edges={['top']}
+        style={{ position: 'absolute', top: 0, left: 0 }}
+        pointerEvents="box-none"
+      >
         <TouchableOpacity
-          onPress={handleReportIssue}
-          className={`mx-4 mt-4 mb-8 p-4 rounded-xl flex-row items-center justify-center ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
+          activeOpacity={0.85}
+          onPress={() => router.back()}
+          style={{
+            marginLeft: 16 * s,
+            marginTop: 8 * s,
+            width: 40 * s,
+            height: 40 * s,
+            borderRadius: 20 * s,
+            backgroundColor: '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 6,
+          }}
         >
-          <Ionicons name="flag" size={20} color="#EF5350" />
-          <Text className="text-destructive font-medium ml-2">{t('history.details.reportIssue')}</Text>
+          <Ionicons
+            name={isRTL ? 'chevron-forward' : 'chevron-back'}
+            size={20 * s}
+            color="#111111"
+          />
         </TouchableOpacity>
+      </SafeAreaView>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 100 * s }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ paddingHorizontal: 20 * s, paddingTop: 14 * s, gap: 12 * s }}>
+          {/* Title row */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 * s }}>
+              <Text
+                style={{ color: '#111111', fontSize: 18 * s, fontWeight: '700', textAlign }}
+              >
+                {d.createdAt.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                })}
+              </Text>
+              <Text style={{ color: '#6B7380', fontSize: 12 * s, textAlign }}>
+                {d.createdAt.toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+                {' · '}
+                {d.createdAt.toLocaleTimeString(undefined, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </View>
+            <View
+              style={{
+                paddingHorizontal: 10 * s,
+                paddingVertical: 6 * s,
+                borderRadius: 999,
+                backgroundColor: isCompleted ? '#DBF5E3' : '#FFEBED',
+              }}
+            >
+              <Text
+                style={{
+                  color: isCompleted ? '#33BF73' : '#ED4557',
+                  fontSize: 12 * s,
+                  fontWeight: '600',
+                }}
+              >
+                {isCompleted
+                  ? t('history.completed', 'Completed')
+                  : t('history.cancelled', 'Cancelled')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Driver */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 12 * s,
+              backgroundColor: '#F5F7FC',
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              borderRadius: 14 * s,
+              paddingHorizontal: 14 * s,
+              paddingVertical: 12 * s,
+            }}
+          >
+            <View
+              style={{
+                width: 40 * s,
+                height: 40 * s,
+                borderRadius: 20 * s,
+                backgroundColor: '#101969',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 14 * s, fontWeight: '700' }}>
+                {(d.driverName?.[0] || 'D').toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{ color: '#111111', fontSize: 14 * s, fontWeight: '600', textAlign }}
+              >
+                {d.driverName}
+              </Text>
+              <View
+                style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  gap: 6 * s,
+                  marginTop: 2 * s,
+                }}
+              >
+                <Ionicons name="star" size={12 * s} color="#F28C0D" />
+                <Text style={{ color: '#111111', fontSize: 12 * s, fontWeight: '600' }}>
+                  {d.driverRating.toFixed(1)}
+                </Text>
+                <Text style={{ color: '#6B7380', fontSize: 12 * s }}>·</Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: '#6B7380', fontSize: 12 * s }}
+                >
+                  {[d.carModel, d.carPlate].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Stats row */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              gap: 10 * s,
+              height: 64 * s,
+            }}
+          >
+            {[
+              { label: t('rideComplete.distance', 'DISTANCE'), value: `${d.distance.toFixed(1)} km` },
+              { label: t('rideComplete.duration', 'DURATION'), value: `${Math.round(d.durationMin)} min` },
+              { label: t('history.payment', 'PAYMENT'), value: d.payment },
+            ].map((row, i) => (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  borderRadius: 14 * s,
+                  borderWidth: 1,
+                  borderColor: '#E5EBF2',
+                  backgroundColor: '#F5F7FC',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2 * s,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 10 * s,
+                    fontWeight: '500',
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  {row.label}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: '#111111', fontSize: 13 * s, fontWeight: '700' }}
+                >
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Fare breakdown */}
+          <View
+            style={{
+              borderRadius: 14 * s,
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              backgroundColor: '#FFFFFF',
+              paddingHorizontal: 14 * s,
+              paddingVertical: 12 * s,
+              gap: 10 * s,
+            }}
+          >
+            {[
+              { label: t('rideComplete.tripFare', 'Trip fare'), value: d.tripFare },
+              { label: t('rideComplete.serviceFee', 'Service fee'), value: d.serviceFee },
+              { label: t('history.promo', 'Promo'), value: -d.promoDiscount },
+            ].map((row) => (
+              <View
+                key={row.label}
+                style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{ flex: 1, color: '#6B7380', fontSize: 13 * s, textAlign }}
+                >
+                  {row.label}
+                </Text>
+                <Text style={{ color: '#111111', fontSize: 13 * s, fontWeight: '600' }}>
+                  {row.value < 0 ? '−' : ''}
+                  {d.currency} {Math.abs(row.value).toFixed(2)}
+                </Text>
+              </View>
+            ))}
+            <View style={{ height: 1, backgroundColor: '#E5EBF2' }} />
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  flex: 1,
+                  color: '#111111',
+                  fontSize: 15 * s,
+                  fontWeight: '700',
+                  textAlign,
+                }}
+              >
+                {t('rideComplete.total', 'Total')}
+              </Text>
+              <Text style={{ color: '#111111', fontSize: 17 * s, fontWeight: '700' }}>
+                {d.currency} {d.total.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Bottom action buttons */}
+      <SafeAreaView
+        edges={['bottom']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF' }}
+      >
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            gap: 10 * s,
+            paddingHorizontal: 20 * s,
+            paddingTop: 12 * s,
+            paddingBottom: 8 * s,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push('/(main)/(drawer)/support' as any)}
+            style={{
+              flex: 1,
+              height: 48 * s,
+              borderRadius: 14 * s,
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              backgroundColor: '#F5F7FC',
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8 * s,
+            }}
+          >
+            <Ionicons name="help-circle-outline" size={20 * s} color="#101969" />
+            <Text style={{ color: '#111111', fontSize: 15 * s, fontWeight: '600' }}>
+              {t('history.getHelp', 'Get help')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => router.push('/(main)/(drawer)' as any)}
+            style={{
+              flex: 1,
+              height: 48 * s,
+              borderRadius: 14 * s,
+              backgroundColor: '#101969',
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8 * s,
+            }}
+          >
+            <Ionicons name="repeat" size={20 * s} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 15 * s, fontWeight: '600' }}>
+              {t('history.rebook', 'Rebook')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }

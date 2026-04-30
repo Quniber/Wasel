@@ -1,259 +1,134 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Platform, Linking, Image, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Linking,
+  Image,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
-import { useThemeStore } from '@/stores/theme-store';
+import {
+  MapView,
+  MapMarker as Marker,
+  MapPolyline as Polyline,
+  MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE,
+} from '@/components/maps/MapView';
 import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
 import { orderApi } from '@/lib/api';
-import { getColors } from '@/constants/Colors';
 import AlertModal from '@/components/AlertModal';
+
+const BASE_W = 393;
 
 type RideStatus = 'driver_on_way' | 'driver_arrived' | 'trip_started';
 
 export default function RideActiveScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const { activeOrder, setActiveOrder, updateDriverLocation, updateOrderStatus, resetBooking, _hasHydrated } = useBookingStore();
-  const isDark = resolvedTheme === 'dark';
-  const colors = getColors(isDark);
+  const { t, i18n } = useTranslation();
+  const {
+    activeOrder,
+    setActiveOrder,
+    updateDriverLocation,
+    updateOrderStatus,
+    resetBooking,
+    _hasHydrated,
+  } = useBookingStore();
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   const mapRef = useRef<MapView>(null);
   const [status, setStatus] = useState<RideStatus>('driver_on_way');
   const [eta, setEta] = useState(5);
-  const [isLoading, setIsLoading] = useState(true);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const [distance, setDistance] = useState(0.4);
   const [confirmCancelVisible, setConfirmCancelVisible] = useState(false);
   const [cancelErrorMsg, setCancelErrorMsg] = useState<string | null>(null);
 
-  // Fetch order details from server if driver info is missing
+  const driver = activeOrder?.driver;
+  const pickup = activeOrder?.pickup;
+  const dropoff = activeOrder?.dropoff;
+
+  // Refresh order details once if missing
   useEffect(() => {
-    if (!_hasHydrated) return;
-
-    if (!activeOrder) {
-      router.replace('/(main)');
-      return;
-    }
-
-    const fetchOrderDetails = async () => {
-      // If we have driver info, we're good
-      if (activeOrder.driver) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch full order details from server
+    if (!_hasHydrated || !activeOrder?.id || activeOrder.driver?.id) return;
+    (async () => {
       try {
-        console.log('[RideActive] Fetching order details for:', activeOrder.id);
-        const response = await orderApi.getOrderDetails(String(activeOrder.id));
-        if (response.data) {
-          const order = response.data;
-          // Sync status from server
-          const serverStatus = order.status;
-          if (serverStatus === 'Arrived') {
-            setStatus('driver_arrived');
-          } else if (serverStatus === 'Started') {
-            setStatus('trip_started');
-          }
-          // Update the active order with full details including driver
-          const driverData = order.driver;
+        const res = await orderApi.getOrderDetails(String(activeOrder.id));
+        const o = res.data;
+        if (o?.driver) {
           setActiveOrder({
             ...activeOrder,
-            status: serverStatus || activeOrder.status,
-            driver: driverData ? {
-              id: String(driverData.id || ''),
-              firstName: driverData.firstName || 'Driver',
-              lastName: driverData.lastName || '',
-              mobileNumber: driverData.mobileNumber || '',
-              rating: driverData.rating || 5.0,
-              reviewCount: driverData.reviewCount || 0,
-              carModel: typeof driverData.carModel === 'string'
-                ? driverData.carModel
-                : driverData.carModel
-                  ? `${driverData.carModel.brand || ''} ${driverData.carModel.model || ''}`.trim()
+            driver: {
+              id: String(o.driver.id || ''),
+              firstName: o.driver.firstName || 'Driver',
+              lastName: o.driver.lastName || '',
+              mobileNumber: o.driver.mobileNumber || '',
+              rating: o.driver.rating || 5.0,
+              reviewCount: o.driver.reviewCount || 0,
+              carModel:
+                typeof o.driver.carModel === 'string'
+                  ? o.driver.carModel
+                  : o.driver.carModel
+                  ? `${o.driver.carModel.brand || ''} ${o.driver.carModel.model || ''}`.trim()
                   : '',
-              carColor: typeof driverData.carColor === 'string'
-                ? driverData.carColor
-                : driverData.carColor?.name || '',
-              carPlate: driverData.carPlate || '',
-              latitude: driverData.latitude || activeOrder.pickup.latitude,
-              longitude: driverData.longitude || activeOrder.pickup.longitude,
-            } : null,
+              carColor:
+                typeof o.driver.carColor === 'string'
+                  ? o.driver.carColor
+                  : o.driver.carColor?.name || '',
+              carPlate: o.driver.carPlate || '',
+              latitude: o.driver.latitude || pickup?.latitude || 0,
+              longitude: o.driver.longitude || pickup?.longitude || 0,
+            },
           });
         }
-        setIsLoading(false);
-      } catch (error) {
-        console.error('[RideActive] Error fetching order details:', error);
-        // If we can't fetch order, go back to home
-        resetBooking();
-        router.replace('/(main)');
-      }
-    };
+      } catch {}
+    })();
+  }, [_hasHydrated, activeOrder?.id]);
 
-    fetchOrderDetails();
-  }, [activeOrder?.id, _hasHydrated]);
-
-  // Setup socket connection and listeners
+  // Listen for socket events
   useEffect(() => {
-    if (!_hasHydrated || !activeOrder) return;
+    if (!activeOrder?.id) return;
+    socketService.connect();
+    socketService.joinOrderRoom(Number(activeOrder.id));
 
-    // Ensure socket is connected and join order room
-    const setupSocket = async () => {
-      await socketService.connect();
-      // Wait a moment for socket to fully connect
-      await new Promise(resolve => setTimeout(resolve, 500));
-      socketService.joinOrderRoom(activeOrder.id);
-      console.log('[RideActive] Joined order room:', activeOrder.id);
-      setSocketConnected(true);
-    };
-    setupSocket();
-
-    // Listen for driver location updates
-    const locationUnsub = socketService.on('driver:location', (data) => {
-      if (data.latitude && data.longitude) {
-        updateDriverLocation(data.latitude, data.longitude);
+    const locUnsub = socketService.on('driver:location', (data: any) => {
+      if (data?.latitude != null && data?.longitude != null) {
+        updateDriverLocation({ latitude: data.latitude, longitude: data.longitude });
       }
+      if (data?.eta != null) setEta(data.eta);
+      if (data?.distance != null) setDistance(data.distance);
     });
 
-    // Listen for order status updates
-    const statusUnsub = socketService.on('order:status', (data) => {
-      console.log('[RideActive] Received order:status:', data);
-      const status = data.status?.toLowerCase();
-      if (status === 'driver_arrived' || status === 'arrived') {
+    const statusUnsub = socketService.on('order:status', (data: any) => {
+      if (data?.status === 'Arrived') {
         setStatus('driver_arrived');
         updateOrderStatus('Arrived');
-      } else if (status === 'trip_started' || status === 'started') {
+      } else if (data?.status === 'Started') {
         setStatus('trip_started');
         updateOrderStatus('Started');
-      } else if (status === 'trip_completed' || status === 'completed' || status === 'finished') {
-        // Update local status before navigating to prevent stale state
-        updateOrderStatus('Finished');
+      } else if (data?.status === 'Finished' || data?.status === 'WaitingForPostPay') {
+        updateOrderStatus(data.status);
         router.replace('/(main)/ride-complete');
       }
     });
 
-    // Listen for ride completed event (separate from order:status)
-    const completedUnsub = socketService.on('order:completed', (data) => {
-      console.log('[RideActive] Order completed:', data);
-      router.replace('/(main)/ride-complete');
-    });
-
-    // Listen for payment required event (when payment fails and needs retry)
-    const paymentRequiredUnsub = socketService.on('order:payment_required', (data) => {
-      console.log('[RideActive] Payment required:', data);
-      if (data.payUrl) {
-        // Navigate to payment screen with WebView
-        router.push({
-          pathname: '/(main)/payment',
-          params: {
-            payUrl: data.payUrl,
-            orderId: String(data.orderId || activeOrder?.id),
-            amount: String(data.amount || ''),
-          },
-        });
-      } else {
-        // No payUrl - show alert to user
-        Alert.alert(
-          t('payment.required.title', { defaultValue: 'Payment Required' }),
-          t('payment.required.message', { defaultValue: 'Please complete payment to finish your ride.' }),
-          [
-            {
-              text: t('common.ok'),
-              onPress: () => {
-                // Navigate to ride complete where they can retry
-                router.replace('/(main)/ride-complete');
-              }
-            }
-          ]
-        );
-      }
-    });
-
-    // Listen for ride cancelled event
-    const cancelledUnsub = socketService.on('order:cancelled', (data) => {
-      console.log('[RideActive] Order cancelled by:', data.cancelledBy);
-
-      // Show alert to user explaining the cancellation
-      const cancelledBy = data.cancelledBy === 'driver' ? t('common.driver') : t('common.rider');
-      Alert.alert(
-        t('ride.cancelled.title'),
-        t('ride.cancelled.message', { who: cancelledBy }),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => {
-              // Reset booking and go home after user acknowledges
-              resetBooking();
-              if (activeOrder) {
-                socketService.leaveOrderRoom(activeOrder.id);
-              }
-              router.replace('/(main)');
-            }
-          }
-        ],
-        { cancelable: false }
-      );
+    const cancelledUnsub = socketService.on('order:cancelled', () => {
+      resetBooking();
+      router.replace('/(main)');
     });
 
     return () => {
-      locationUnsub?.();
+      locUnsub?.();
       statusUnsub?.();
-      completedUnsub?.();
-      paymentRequiredUnsub?.();
       cancelledUnsub?.();
-      if (activeOrder) {
-        socketService.leaveOrderRoom(activeOrder.id);
-      }
     };
-  }, [activeOrder?.id, _hasHydrated]);
-
-  useEffect(() => {
-    fitMapToRoute();
-  }, [status, activeOrder?.driver?.latitude, activeOrder?.driver?.longitude]);
-
-  const fitMapToRoute = () => {
-    if (!activeOrder || !mapRef.current) return;
-
-    const coordinates = [];
-    if (activeOrder.driver) {
-      coordinates.push({
-        latitude: activeOrder.driver.latitude,
-        longitude: activeOrder.driver.longitude,
-      });
-    }
-
-    if (status === 'trip_started') {
-      coordinates.push({
-        latitude: activeOrder.dropoff.latitude,
-        longitude: activeOrder.dropoff.longitude,
-      });
-    } else {
-      coordinates.push({
-        latitude: activeOrder.pickup.latitude,
-        longitude: activeOrder.pickup.longitude,
-      });
-    }
-
-    if (coordinates.length >= 2) {
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 100, right: 50, bottom: 250, left: 50 },
-        animated: true,
-      });
-    }
-  };
-
-  const handleCall = () => {
-    if (activeOrder?.driver?.mobileNumber) {
-      Linking.openURL(`tel:${activeOrder.driver.mobileNumber}`);
-    }
-  };
-
-  const handleChat = () => {
-    router.push('/(main)/chat');
-  };
+  }, [activeOrder?.id]);
 
   const handleCancel = () => {
     if (!activeOrder?.id) return;
@@ -273,215 +148,445 @@ export default function RideActiveScreen() {
     }
   };
 
-  // Show loading while hydrating, fetching order details, or if no active order
-  if (!_hasHydrated || isLoading || !activeOrder || !activeOrder.driver) {
+  const callDriver = () => {
+    if (!driver?.mobileNumber) return;
+    Linking.openURL(`tel:${driver.mobileNumber}`).catch(() => {});
+  };
+
+  const messageDriver = () => {
+    router.push('/(main)/chat');
+  };
+
+  const statusLabel =
+    status === 'driver_arrived'
+      ? t('ride.driverArrived', 'Driver arrived')
+      : status === 'trip_started'
+      ? t('ride.onTrip', 'On the trip')
+      : t('ride.driverArrivingIn', 'Driver arriving in');
+
+  const statusValue =
+    status === 'driver_arrived'
+      ? t('ride.atPickup', 'At your pickup point')
+      : status === 'trip_started'
+      ? t('ride.headingToDropoff', 'Heading to drop-off')
+      : `${eta} ${t('booking.minutes', { count: eta })} · ${distance.toFixed(1)} km`;
+
+  if (!activeOrder) {
     return (
-      <SafeAreaView
-        className="flex-1 items-center justify-center"
-        style={{ backgroundColor: colors.background }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.mutedForeground }} className="mt-4">
-          {t('common.loading')}
-        </Text>
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#101969" />
       </SafeAreaView>
     );
   }
 
-  const { pickup, dropoff } = activeOrder;
-  // Ensure driver has all required fields with defaults (spread first, then override with fallbacks)
-  const rawDriver = activeOrder.driver || {};
-  const driver = {
-    ...rawDriver,
-    firstName: rawDriver.firstName || 'Driver',
-    lastName: rawDriver.lastName || '',
-    rating: rawDriver.rating || 5.0,
-    carModel: rawDriver.carModel || '',
-    carColor: rawDriver.carColor || '',
-    carPlate: rawDriver.carPlate || '',
-    mobileNumber: rawDriver.mobileNumber || '',
-    latitude: rawDriver.latitude || pickup?.latitude || 0,
-    longitude: rawDriver.longitude || pickup?.longitude || 0,
-  };
-
-  const getStatusTitle = () => {
-    switch (status) {
-      case 'driver_on_way':
-        return t('ride.driverAccepted.title');
-      case 'driver_arrived':
-        return t('ride.driverArrived.title');
-      case 'trip_started':
-        return t('ride.inProgress.title');
-      default:
-        return '';
-    }
-  };
-
-  const destination = status === 'trip_started' ? dropoff : pickup;
-
   return (
-    <View className="flex-1">
+    <View style={{ flex: 1, backgroundColor: '#EBF0F7' }}>
       {/* Map */}
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={{
-          latitude: driver.latitude,
-          longitude: driver.longitude,
+          latitude: (pickup?.latitude || 25.2854) || 25.2854,
+          longitude: (pickup?.longitude || 51.531) || 51.531,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         }}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
       >
-        {/* Driver Marker */}
-        <Marker
-          coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
-          title={`${driver.firstName} ${driver.lastName}`}
-        >
-          <View className="w-10 h-10 rounded-full bg-primary items-center justify-center border-3 border-white">
-            <Ionicons name="car" size={20} color="#FFFFFF" />
-          </View>
-        </Marker>
-
-        {/* Pickup Marker */}
-        {status !== 'trip_started' && (
+        {pickup && (
           <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}>
-            <View className="w-6 h-6 rounded-full bg-primary border-2 border-white" />
+            <View
+              style={{
+                width: 32 * s,
+                height: 32 * s,
+                borderRadius: 16 * s,
+                backgroundColor: 'rgba(3, 102, 251, 0.18)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: 14 * s,
+                  height: 14 * s,
+                  borderRadius: 7 * s,
+                  backgroundColor: '#0366FB',
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }}
+              />
+            </View>
           </Marker>
         )}
-
-        {/* Dropoff Marker */}
-        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}>
-          <View className="w-6 h-6 rounded-full bg-destructive border-2 border-white" />
-        </Marker>
-
-        {/* Route Line */}
-        <Polyline
-          coordinates={[
-            { latitude: driver.latitude, longitude: driver.longitude },
-            { latitude: destination.latitude, longitude: destination.longitude },
-          ]}
-          strokeColor="#4CAF50"
-          strokeWidth={4}
-        />
+        {dropoff && (
+          <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}>
+            <Ionicons name="location" size={32 * s} color="#ED4557" />
+          </Marker>
+        )}
+        {driver?.latitude != null && driver?.longitude != null && (
+          <Marker coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}>
+            <View
+              style={{
+                width: 36 * s,
+                height: 36 * s,
+                borderRadius: 18 * s,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 2,
+                borderColor: '#101969',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="car-sport" size={18 * s} color="#101969" />
+            </View>
+          </Marker>
+        )}
+        {pickup && dropoff && (
+          <Polyline
+            coordinates={[
+              { latitude: pickup.latitude, longitude: pickup.longitude },
+              { latitude: dropoff.latitude, longitude: dropoff.longitude },
+            ]}
+            strokeColor="#0366FB"
+            strokeWidth={4}
+          />
+        )}
       </MapView>
 
-      {/* Header */}
-      <SafeAreaView className="absolute top-0 left-0 right-0 items-center" edges={['top']}>
-        <View className={`mx-4 mt-4 px-6 py-3 rounded-full shadow-lg ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-          <Text className={`text-lg font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-            {getStatusTitle()}
-          </Text>
+      {/* Status pill at top */}
+      <SafeAreaView
+        edges={['top']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
+        pointerEvents="box-none"
+      >
+        <View
+          style={{
+            marginHorizontal: 16 * s,
+            marginTop: 8 * s,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            gap: 12 * s,
+            paddingHorizontal: 16 * s,
+            paddingVertical: 14 * s,
+            borderRadius: 16 * s,
+            backgroundColor: '#FFFFFF',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 14,
+            elevation: 6,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: '#6B7380',
+                fontSize: 11 * s,
+                fontWeight: '500',
+                letterSpacing: 0.4,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {statusLabel}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: '#111111',
+                fontSize: 16 * s,
+                fontWeight: '700',
+                marginTop: 2 * s,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {statusValue}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.push('/(main)/chat')}
+            style={{
+              width: 40 * s,
+              height: 40 * s,
+              borderRadius: 20 * s,
+              backgroundColor: '#F5F7FC',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={20 * s} color="#101969" />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
-      {/* Bottom Sheet */}
+      {/* Driver sheet at bottom */}
       <SafeAreaView
         edges={['bottom']}
-        className={`absolute bottom-0 left-0 right-0 rounded-t-3xl shadow-lg ${
-          isDark ? 'bg-background-dark' : 'bg-white'
-        }`}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: 28 * s,
+          borderTopRightRadius: 28 * s,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 24,
+          elevation: 12,
+        }}
       >
-        <View className="px-6 py-5">
-          {/* Driver Info */}
-          <View className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-            <View className="flex-row items-center">
-              <View className="w-14 h-14 rounded-full bg-primary items-center justify-center">
-                <Text className="text-white text-xl font-bold">
-                  {driver.firstName?.[0] || ''}{driver.lastName?.[0] || ''}
+        <View
+          style={{
+            paddingTop: 14 * s,
+            paddingHorizontal: 20 * s,
+            paddingBottom: 14 * s,
+            gap: 16 * s,
+          }}
+        >
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 40 * s,
+                height: 4 * s,
+                borderRadius: 2 * s,
+                backgroundColor: '#E5EBF2',
+              }}
+            />
+          </View>
+
+          {/* Driver info */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 12 * s,
+            }}
+          >
+            <View
+              style={{
+                width: 56 * s,
+                height: 56 * s,
+                borderRadius: 28 * s,
+                backgroundColor: '#101969',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 18 * s, fontWeight: '700' }}>
+                {(driver?.firstName?.[0] || 'D').toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: '#111111',
+                  fontSize: 17 * s,
+                  fontWeight: '700',
+                  textAlign,
+                  writingDirection,
+                }}
+              >
+                {[driver?.firstName, driver?.lastName].filter(Boolean).join(' ') ||
+                  t('common.driver', 'Driver')}
+              </Text>
+              <View
+                style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  gap: 6 * s,
+                  marginTop: 2 * s,
+                }}
+              >
+                <Ionicons name="star" size={14 * s} color="#F28C0D" />
+                <Text style={{ color: '#111111', fontSize: 13 * s, fontWeight: '600' }}>
+                  {(driver?.rating || 5).toFixed(1)}
                 </Text>
-              </View>
-              <View className="flex-1 ml-3">
-                <Text className={`text-lg font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {driver.firstName} {driver.lastName}
+                <Text style={{ color: '#6B7380', fontSize: 13 * s }}>·</Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: '#6B7380', fontSize: 13 * s }}
+                >
+                  {[driver?.carModel, driver?.carColor].filter(Boolean).join(' · ') || ''}
                 </Text>
-                <View className="flex-row items-center">
-                  <Ionicons name="star" size={16} color="#FFB300" />
-                  <Text className="text-muted-foreground ml-1">{driver.rating}</Text>
-                </View>
-              </View>
-              <View className="items-end">
-                {status === 'driver_on_way' && (
-                  <Text className="text-primary font-semibold">
-                    {t('ride.driverAccepted.arriving', { minutes: eta })}
-                  </Text>
-                )}
               </View>
             </View>
+            {!!driver?.carPlate && (
+              <View
+                style={{
+                  paddingHorizontal: 12 * s,
+                  paddingVertical: 8 * s,
+                  borderRadius: 10 * s,
+                  backgroundColor: '#FFF5D9',
+                  borderWidth: 1,
+                  borderColor: '#D9B24D',
+                }}
+              >
+                <Text style={{ color: '#111111', fontSize: 14 * s, fontWeight: '700' }}>
+                  {driver.carPlate}
+                </Text>
+              </View>
+            )}
+          </View>
 
-            {/* Car Info */}
-            <View className={`flex-row items-center mt-3 pt-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
-              <Ionicons name="car" size={20} color={isDark ? '#FAFAFA' : '#212121'} />
-              <Text className={`ml-2 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {driver.carModel} • {driver.carColor}
+          {/* Message + Call buttons */}
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 * s }}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={messageDriver}
+              style={{
+                flex: 1,
+                height: 56 * s,
+                borderRadius: 14 * s,
+                backgroundColor: '#F5F7FC',
+                borderWidth: 1,
+                borderColor: '#E5EBF2',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8 * s,
+              }}
+            >
+              <Ionicons name="chatbubble-outline" size={20 * s} color="#101969" />
+              <Text style={{ color: '#111111', fontSize: 15 * s, fontWeight: '600' }}>
+                {t('ride.message', 'Message')}
               </Text>
-              <View className="flex-1" />
-              <View className="px-3 py-1 rounded-lg bg-primary/10">
-                <Text className="text-primary font-bold">{driver.carPlate}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={callDriver}
+              style={{
+                flex: 1,
+                height: 56 * s,
+                borderRadius: 14 * s,
+                backgroundColor: '#101969',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8 * s,
+              }}
+            >
+              <Ionicons name="call" size={20 * s} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: 15 * s, fontWeight: '600' }}>
+                {t('ride.call', 'Call')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Pickup → dropoff card */}
+          <View
+            style={{
+              backgroundColor: '#F5F7FC',
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              borderRadius: 14 * s,
+              paddingHorizontal: 14 * s,
+              paddingVertical: 12 * s,
+              gap: 10 * s,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 12 * s,
+              }}
+            >
+              <View
+                style={{
+                  width: 10 * s,
+                  height: 10 * s,
+                  borderRadius: 5 * s,
+                  backgroundColor: '#0366FB',
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 11 * s,
+                    fontWeight: '500',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {t('booking.pickup', 'PICKUP').toUpperCase()}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: '#111111',
+                    fontSize: 13 * s,
+                    fontWeight: '600',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {pickup?.address || t('home.currentLocation')}
+                </Text>
+              </View>
+            </View>
+            <View style={{ height: 1, backgroundColor: '#E5EBF2' }} />
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 12 * s,
+              }}
+            >
+              <View
+                style={{
+                  width: 10 * s,
+                  height: 10 * s,
+                  borderRadius: 2 * s,
+                  backgroundColor: '#ED4557',
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 11 * s,
+                    fontWeight: '500',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {t('booking.dropoff', 'DROP-OFF').toUpperCase()}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: '#111111',
+                    fontSize: 13 * s,
+                    fontWeight: '600',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {dropoff?.address || ''}
+                </Text>
               </View>
             </View>
           </View>
 
-          {/* Status Message */}
-          {status === 'driver_arrived' && (
-            <View className={`p-4 rounded-xl mb-4 bg-primary/10`}>
-              <Text className="text-primary font-semibold text-center">
-                {t('ride.driverArrived.lookFor')} {driver.carColor} {driver.carModel}
-              </Text>
-            </View>
-          )}
-
-          {status === 'trip_started' && (
-            <View className="flex-row justify-around mb-4">
-              <View className="items-center">
-                <Text className="text-muted-foreground text-sm">{t('ride.inProgress.remaining', { minutes: 12 })}</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-muted-foreground text-sm">{t('ride.inProgress.distance', { km: 4.5 })}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Destination */}
-          {status === 'trip_started' && (
-            <View className={`flex-row items-center p-3 rounded-xl mb-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-              <View className="w-3 h-3 rounded-full bg-destructive" />
-              <Text className={`ml-3 flex-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`} numberOfLines={1}>
-                {dropoff.address}
-              </Text>
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              onPress={handleCall}
-              className={`flex-1 flex-row items-center justify-center py-4 rounded-xl ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
-            >
-              <Ionicons name="call" size={20} color="#4CAF50" />
-              <Text className="text-primary font-semibold ml-2">{t('ride.call')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleChat}
-              className={`flex-1 flex-row items-center justify-center py-4 rounded-xl ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
-            >
-              <Ionicons name="chatbubble" size={20} color="#4CAF50" />
-              <Text className="text-primary font-semibold ml-2">{t('ride.chat')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Cancel Button (only before trip starts) */}
-          {status !== 'trip_started' && (
-            <TouchableOpacity
-              onPress={handleCancel}
-              className="mt-4 py-3 items-center"
-            >
-              <Text className="text-destructive font-medium">
-                {t('ride.cancel.title')}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {/* Cancel link */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleCancel}
+            style={{ alignItems: 'center', paddingVertical: 4 * s }}
+          >
+            <Text style={{ color: '#ED4557', fontSize: 14 * s, fontWeight: '600' }}>
+              {t('ride.cancelSearch', 'Cancel ride')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
