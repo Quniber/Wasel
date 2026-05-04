@@ -4,3 +4,16 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# Google Play service account key (do NOT commit)
+google-play-key.json
+
+# Expo build cache and logs
+.expo/prebuild/
+.expo/web/cache/
+.expo/xcodebuild.log
+.expo/xcodebuild-error.log
+
+# macOS Finder duplicate files (e.g. "file 2.tsx")
+* 2
+* 2.*
