@@ -1,0 +1,78 @@
+default_platform(:ios)
+
+ASC_KEY_ID      = "L8235S574M"
+ASC_ISSUER_ID   = "9ae99d44-8b05-4e76-bb59-24a45a0b15e4"
+ASC_KEY_PATH    = File.expand_path("~/.appstore-connect/AuthKey_L8235S574M.p8")
+APP_IDENTIFIER  = "qa.waselapp.rider"
+APP_VERSION     = "1.1.6"
+
+RELEASE_NOTES = {
+  "en-US" => "- New look across the app\n- Easier password reset by email\n- Faster phone signup\n- Bug fixes and improvements",
+  "ar-SA" => "- مظهر جديد للتطبيق\n- إعادة تعيين كلمة المرور عبر البريد الإلكتروني\n- تسجيل أسرع برقم الهاتف\n- إصلاحات وتحسينات",
+}
+
+platform :ios do
+  desc "Create v1.1.6 version, attach latest build, set release notes, submit for review"
+  lane :submit_for_review do
+    require "spaceship"
+
+    UI.message "Authenticating with App Store Connect API..."
+    token = Spaceship::ConnectAPI::Token.create(
+      key_id: ASC_KEY_ID,
+      issuer_id: ASC_ISSUER_ID,
+      filepath: ASC_KEY_PATH,
+    )
+    Spaceship::ConnectAPI.token = token
+
+    app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+    UI.user_error!("App #{APP_IDENTIFIER} not found in ASC") unless app
+    UI.success "Found app: #{app.name} (#{app.id})"
+
+    UI.message "Ensuring v#{APP_VERSION} edit version exists..."
+    app.ensure_version!(APP_VERSION, platform: Spaceship::ConnectAPI::Platform::IOS)
+    edit_version = app.get_edit_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS)
+    UI.user_error!("Could not get editable version after ensure_version!") unless edit_version
+    UI.success "Edit version: #{edit_version.version_string} (#{edit_version.id})"
+
+    UI.message "Looking for latest processed build for v#{APP_VERSION}..."
+    builds = Spaceship::ConnectAPI::Build.all(
+      app_id: app.id,
+      version: APP_VERSION,
+      processing_states: "VALID",
+      platform: Spaceship::ConnectAPI::Platform::IOS,
+      sort: "-uploadedDate",
+      limit: 5,
+    )
+    UI.user_error!("No processed builds found for v#{APP_VERSION}. Wait a few more minutes for Apple to finish processing.") if builds.empty?
+    latest_build = builds.first
+    UI.success "Found build #{latest_build.version} (uploaded #{latest_build.uploaded_date})"
+
+    UI.message "Attaching build #{latest_build.version} to version..."
+    edit_version.select_build(build_id: latest_build.id)
+    UI.success "Build attached"
+
+    UI.message "Setting release notes (en-US, ar-SA)..."
+    localizations = edit_version.get_app_store_version_localizations
+    RELEASE_NOTES.each do |locale, notes|
+      loc = localizations.find { |l| l.locale == locale }
+      if loc
+        loc.update(attributes: { whatsNew: notes })
+        UI.success "Updated #{locale}"
+      else
+        UI.message "#{locale} localization missing — skipping (configure in ASC if needed)"
+      end
+    end
+
+    UI.message "Creating review submission..."
+    submission = app.create_review_submission(platform: Spaceship::ConnectAPI::Platform::IOS)
+    UI.success "Created submission: #{submission.id}"
+
+    UI.message "Adding v#{APP_VERSION} to submission..."
+    submission.add_app_store_version_to_review_items(app_store_version_id: edit_version.id)
+    UI.success "Version added to submission"
+
+    UI.message "Submitting for App Store review..."
+    submission.submit_for_review
+    UI.success "🎉 Submitted v#{APP_VERSION} (build #{latest_build.version}) to Apple review!"
+  end
+end
