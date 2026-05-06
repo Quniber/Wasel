@@ -114,24 +114,36 @@ export default function DocumentsScreen() {
       if (!result.canceled && result.assets[0]) {
         setUploadingType(type);
         try {
-          // Note: In a real implementation, you would first upload the image
-          // to get a mediaId, then call documentsApi.upload with documentTypeId and mediaId
-          // For now, we'll show an alert that media upload is needed
-          Alert.alert(
-            'Document Selected',
-            'The document upload flow requires integration with media upload service.',
-            [{ text: 'OK' }]
+          const requiredResp = await documentsApi.getRequired();
+          const required = requiredResp.data || [];
+          const matched = required.find((dt: { id: number; name: string }) =>
+            dt.name?.toLowerCase().replace(/\s+/g, '_') === type
           );
-          // Example of how it would work with proper media upload:
-          // const mediaResponse = await mediaApi.upload(result.assets[0]);
-          // await documentsApi.upload({
-          //   documentTypeId: getDocumentTypeId(type),
-          //   mediaId: mediaResponse.data.id,
-          // });
-          // fetchDocuments();
-        } catch (error) {
-          console.error('Error uploading document:', error);
-          Alert.alert(t('errors.uploadFailed'), t('errors.tryAgain'));
+          if (!matched) {
+            throw new Error(`Document type "${type}" not found on server`);
+          }
+
+          const asset = result.assets[0];
+          const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+          const mime = asset.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg');
+          const fileName = `doc_${type}_${Date.now()}.${ext}`;
+
+          const mediaResp = await documentsApi.uploadFile({
+            uri: asset.uri,
+            name: fileName,
+            type: mime,
+          });
+
+          await documentsApi.upload({
+            documentTypeId: matched.id,
+            mediaId: mediaResp.data.id,
+          });
+
+          await fetchDocuments();
+          Alert.alert(t('documents.uploadedTitle') || 'Uploaded', t('documents.uploadedMessage') || 'Document submitted for review.');
+        } catch (error: any) {
+          console.error('Error uploading document:', error?.response?.data || error);
+          Alert.alert(t('errors.uploadFailed') || 'Upload failed', t('errors.tryAgain') || 'Please try again.');
         } finally {
           setUploadingType(null);
         }

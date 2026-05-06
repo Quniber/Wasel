@@ -1,10 +1,28 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Req, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, UseGuards, Req, ParseIntPipe, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentsService } from './documents.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 @Controller({ path: 'documents', version: '1' })
 export class DocumentsController {
   constructor(private documentsService: DocumentsService) {}
+
+  // Upload a file → returns { id, address } to use as mediaId in POST /documents
+  @UseGuards(JwtAuthGuard)
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { storage: require('multer').memoryStorage() }))
+  uploadMedia(@Req() req: any, @UploadedFile() file: MulterFile) {
+    return this.documentsService.uploadMedia(req.user.id, file);
+  }
 
   // Get required document types (public endpoint - no auth required for signup)
   @Get('required')

@@ -310,7 +310,16 @@ export const documentsApi = {
   // Get document submission status
   getStatus: () => api.get('/documents/status'),
 
-  // Upload document
+  // Upload a file → returns { id, address }; pass id as mediaId to upload()
+  uploadFile: (file: { uri: string; name: string; type: string }) => {
+    const formData = new FormData();
+    formData.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+    return api.post('/documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // Register a document for a driver (using mediaId from uploadFile)
   upload: (data: { documentTypeId: number; mediaId: number; expiryDate?: string }) =>
     api.post('/documents', data),
 

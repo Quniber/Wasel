@@ -1,10 +1,46 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DocumentStatus } from 'database';
+
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 @Injectable()
 export class DocumentsService {
   constructor(private prisma: PrismaService) {}
+
+  async uploadMedia(driverId: number, file: MulterFile) {
+    if (!file) throw new BadRequestException('No file uploaded');
+
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'documents');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname) || '.jpg';
+    const fileName = `driver_${driverId}_${timestamp}${ext}`;
+    const filePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(filePath, file.buffer);
+
+    const baseUrl = process.env.DRIVER_API_URL || 'http://localhost:3002';
+    const media = await this.prisma.media.create({
+      data: {
+        fileName,
+        address: `${baseUrl}/uploads/documents/${fileName}`,
+        mimeType: file.mimetype,
+        size: file.size,
+      },
+    });
+
+    return { id: media.id, address: media.address, mimeType: media.mimeType, size: media.size };
+  }
 
   // Get required document types
   async getRequiredDocuments() {
