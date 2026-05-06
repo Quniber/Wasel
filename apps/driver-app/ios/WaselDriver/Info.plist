@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.6</string>
+    <string>1.1.7</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>34</string>
+    <string>35</string>
     <key>GMSApiKey</key>
     <string>AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE</string>
     <key>ITSAppUsesNonExemptEncryption</key>
