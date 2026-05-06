@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Image, Modal, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -43,6 +43,7 @@ const DOCUMENT_TYPES = [
 export default function DocumentsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme === 'dark';
   const colors = getColors(isDark);
@@ -371,45 +372,61 @@ export default function DocumentsScreen() {
       {/* Document Viewer Modal */}
       <Modal
         visible={viewingDocument !== null}
-        transparent={true}
         animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
         onRequestClose={() => setViewingDocument(null)}
       >
-        <View className="flex-1 bg-black">
-          <SafeAreaView style={{ flex: 1 }}>
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-4 py-3" style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          {/* Image fills the screen and sits BEHIND the header so the header
+              never shares hit-testing with it. */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            {viewingDocument && (
+              <Image
+                source={{ uri: viewingDocument }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+
+          {/* Header — explicit safe-area top inset because Modal can swallow
+              the SafeAreaView context on iOS. zIndex/elevation guarantees it
+              receives touches over the Image. */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0,
+              paddingTop: insets.top,
+              paddingHorizontal: 12,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              zIndex: 10,
+              elevation: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
               <TouchableOpacity
                 onPress={() => setViewingDocument(null)}
-                className="w-10 h-10 rounded-full items-center justify-center"
-                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' }}
               >
-                <Ionicons name="close" size={24} color="#ffffff" />
+                <Ionicons name="close" size={26} color="#ffffff" />
               </TouchableOpacity>
-              <Text className="text-white text-base font-medium">Document Preview</Text>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '500' }}>
+                {t('documents.viewDocument') || 'Document Preview'}
+              </Text>
               <TouchableOpacity
                 onPress={() => {
                   const doc = documents.find(d => d.media?.address === viewingDocument);
                   if (doc) handleDownloadDocument(doc);
                 }}
-                className="w-10 h-10 rounded-full items-center justify-center"
-                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)' }}
               >
                 <Ionicons name="download-outline" size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
-
-            {/* Image Viewer */}
-            <View className="flex-1 items-center justify-center">
-              {viewingDocument && (
-                <Image
-                  source={{ uri: viewingDocument }}
-                  className="w-full h-full"
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
