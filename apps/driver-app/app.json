@@ -30,7 +30,8 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "34"
+      "buildNumber": "34",
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -51,7 +52,8 @@
           "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
       },
-      "versionCode": 4
+      "versionCode": 6,
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "bundler": "metro",
@@ -97,6 +99,9 @@
         "projectId": "4747bf5d-9bb2-476d-9c9d-5a41358e1c4b"
       }
     },
-    "owner": "rshafrah"
+    "owner": "rshafrah",
+    "updates": {
+      "url": "https://u.expo.dev/4747bf5d-9bb2-476d-9c9d-5a41358e1c4b"
+    }
   }
 }
