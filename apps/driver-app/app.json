@@ -30,7 +30,7 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "35",
+      "buildNumber": "38",
       "runtimeVersion": "1.0.0"
     },
     "android": {
@@ -52,7 +52,7 @@
           "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
       },
-      "versionCode": 20,
+      "versionCode": 23,
       "runtimeVersion": "1.0.0"
     },
     "web": {

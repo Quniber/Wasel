@@ -23,3 +23,12 @@ android/.cxx/
 # macOS Finder duplicates
 * 2
 * 2.*
+
+# Fastlane secrets and auto-generated artifacts (never commit ASC API keys)
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/screenshots
+ios/fastlane/test_output
+ios/fastlane/metadata
+ios/fastlane/README.md
+*.p8

@@ -36,6 +36,14 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6758286195"
+      },
+      "android": {
+        "serviceAccountKeyPath": "../rider-app/google-play-key.json",
+        "track": "production"
+      }
+    }
   }
 }

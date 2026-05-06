@@ -29,12 +29,15 @@ interface Document {
   createdAt?: string;
 }
 
+// `name` MUST match the server's DocumentType.name exactly (case + punctuation).
+// We compare by raw equality — the server is the source of truth.
 const DOCUMENT_TYPES = [
-  { key: 'drivers_license', icon: 'card-outline' as const, label: 'documents.driversLicense' },
-  { key: 'vehicle_registration', icon: 'document-text-outline' as const, label: 'documents.vehicleRegistration' },
-  { key: 'insurance', icon: 'shield-checkmark-outline' as const, label: 'documents.insurance' },
-  { key: 'profile_photo', icon: 'person-circle-outline' as const, label: 'documents.profilePhoto' },
-  { key: 'vehicle_photo', icon: 'car-outline' as const, label: 'documents.vehiclePhoto' },
+  { name: "Driver's License",       icon: 'card-outline'              as const, label: 'documents.driversLicense' },
+  { name: 'Insurance Certificate',  icon: 'shield-checkmark-outline'  as const, label: 'documents.insurance' },
+  { name: 'Vehicle Registration',   icon: 'document-text-outline'     as const, label: 'documents.vehicleRegistration' },
+  { name: 'Profile Photo',          icon: 'person-circle-outline'     as const, label: 'documents.profilePhoto' },
+  { name: 'Vehicle Photo (Front)',  icon: 'car-outline'               as const, label: 'documents.vehiclePhotoFront' },
+  { name: 'Vehicle Photo (Back)',   icon: 'car-outline'               as const, label: 'documents.vehiclePhotoBack' },
 ];
 
 export default function DocumentsScreen() {
@@ -59,26 +62,23 @@ export default function DocumentsScreen() {
       const response = await documentsApi.getMyDocuments();
       const uploadedDocs = response.data || [];
 
-      // Create a map of uploaded documents by document type name
+      // Map uploaded docs by their exact server name
       const docMap = new Map<string, Document>();
       uploadedDocs.forEach((doc: Document) => {
-        const typeName = doc.documentType?.name?.toLowerCase().replace(/\s+/g, '_');
-        if (typeName) {
-          docMap.set(typeName, doc);
-        }
+        const name = doc.documentType?.name;
+        if (name) docMap.set(name, doc);
       });
 
-      // Merge with required document types
       const mergedDocs = DOCUMENT_TYPES.map((docType) => {
-        const uploaded = docMap.get(docType.key);
-        return uploaded || { type: docType.key, status: 'required' as const };
+        const uploaded = docMap.get(docType.name);
+        return uploaded || { type: docType.name, status: 'required' as const };
       });
 
       setDocuments(mergedDocs);
     } catch (error) {
       console.error('Error fetching documents:', error);
       // Set default required documents
-      setDocuments(DOCUMENT_TYPES.map((d) => ({ type: d.key, status: 'required' })));
+      setDocuments(DOCUMENT_TYPES.map((d) => ({ type: d.name, status: 'required' })));
     } finally {
       setIsLoading(false);
     }
@@ -136,9 +136,7 @@ export default function DocumentsScreen() {
     try {
       const requiredResp = await documentsApi.getRequired();
       const required = requiredResp.data || [];
-      const matched = required.find((dt: { id: number; name: string }) =>
-        dt.name?.toLowerCase().replace(/\s+/g, '_') === type
-      );
+      const matched = required.find((dt: { id: number; name: string }) => dt.name === type);
       if (!matched) throw new Error(`Document type "${type}" not found on server`);
 
       const mediaResp = await documentsApi.uploadFile({
@@ -174,8 +172,8 @@ export default function DocumentsScreen() {
     );
   };
 
-  const getDocumentStatus = (type: string): Document => {
-    return documents.find((d) => d.type === type || d.documentType?.name?.toLowerCase().replace(/\s+/g, '_') === type) || { type, status: 'required' };
+  const getDocumentStatus = (name: string): Document => {
+    return documents.find((d) => d.type === name || d.documentType?.name === name) || { type: name, status: 'required' };
   };
 
   const handleViewDocument = (doc: Document) => {
@@ -254,14 +252,14 @@ export default function DocumentsScreen() {
 
           {/* Document List */}
           {DOCUMENT_TYPES.map((docType) => {
-            const doc = getDocumentStatus(docType.key);
+            const doc = getDocumentStatus(docType.name);
             const statusInfo = getStatusInfo(doc.status);
-            const isUploading = uploadingType === docType.key;
+            const isUploading = uploadingType === docType.name;
             const hasUploadedDoc = doc.media?.address;
 
             return (
               <View
-                key={docType.key}
+                key={docType.name}
                 className="p-4 rounded-xl mb-3"
                 style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }}
               >
@@ -298,7 +296,7 @@ export default function DocumentsScreen() {
                   {isUploading ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : doc.status !== 'approved' ? (
-                    <TouchableOpacity onPress={() => handleUpload(docType.key)}>
+                    <TouchableOpacity onPress={() => handleUpload(docType.name)}>
                       <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
                     </TouchableOpacity>
                   ) : (
