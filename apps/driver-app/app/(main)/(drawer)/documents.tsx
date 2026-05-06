@@ -5,6 +5,7 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useThemeStore } from '@/stores/theme-store';
 import { getColors } from '@/constants/Colors';
 import { documentsApi } from '@/lib/api';
@@ -96,61 +97,81 @@ export default function DocumentsScreen() {
     }
   };
 
-  const handleUpload = async (type: string) => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('errors.permissionRequired'), t('errors.photoPermission'));
-        return;
-      }
+  const pickPhoto = async (): Promise<{ uri: string; name: string; mime: string } | null> => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('errors.permissionRequired'), t('errors.photoPermission'));
+      return null;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+      presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+    });
+    if (result.canceled || !result.assets[0]) return null;
+    const a = result.assets[0];
+    const ext = a.uri.split('.').pop()?.toLowerCase() || 'jpg';
+    const mime = a.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg');
+    return { uri: a.uri, name: `doc_${Date.now()}.${ext}`, mime };
+  };
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-        presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+  const pickFile = async (): Promise<{ uri: string; name: string; mime: string } | null> => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return null;
+    const a = result.assets[0];
+    return {
+      uri: a.uri,
+      name: a.name || `doc_${Date.now()}`,
+      mime: a.mimeType || 'application/octet-stream',
+    };
+  };
+
+  const performUpload = async (type: string, picked: { uri: string; name: string; mime: string }) => {
+    setUploadingType(type);
+    try {
+      const requiredResp = await documentsApi.getRequired();
+      const required = requiredResp.data || [];
+      const matched = required.find((dt: { id: number; name: string }) =>
+        dt.name?.toLowerCase().replace(/\s+/g, '_') === type
+      );
+      if (!matched) throw new Error(`Document type "${type}" not found on server`);
+
+      const mediaResp = await documentsApi.uploadFile({
+        uri: picked.uri,
+        name: picked.name,
+        type: picked.mime,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        setUploadingType(type);
-        try {
-          const requiredResp = await documentsApi.getRequired();
-          const required = requiredResp.data || [];
-          const matched = required.find((dt: { id: number; name: string }) =>
-            dt.name?.toLowerCase().replace(/\s+/g, '_') === type
-          );
-          if (!matched) {
-            throw new Error(`Document type "${type}" not found on server`);
-          }
+      await documentsApi.upload({
+        documentTypeId: matched.id,
+        mediaId: mediaResp.data.id,
+      });
 
-          const asset = result.assets[0];
-          const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const mime = asset.mimeType || (ext === 'png' ? 'image/png' : 'image/jpeg');
-          const fileName = `doc_${type}_${Date.now()}.${ext}`;
-
-          const mediaResp = await documentsApi.uploadFile({
-            uri: asset.uri,
-            name: fileName,
-            type: mime,
-          });
-
-          await documentsApi.upload({
-            documentTypeId: matched.id,
-            mediaId: mediaResp.data.id,
-          });
-
-          await fetchDocuments();
-          Alert.alert(t('documents.uploadedTitle') || 'Uploaded', t('documents.uploadedMessage') || 'Document submitted for review.');
-        } catch (error: any) {
-          console.error('Error uploading document:', error?.response?.data || error);
-          Alert.alert(t('errors.uploadFailed') || 'Upload failed', t('errors.tryAgain') || 'Please try again.');
-        } finally {
-          setUploadingType(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
+      await fetchDocuments();
+      Alert.alert(t('documents.uploadedTitle') || 'Uploaded', t('documents.uploadedMessage') || 'Document submitted for review.');
+    } catch (error: any) {
+      console.error('Error uploading document:', error?.response?.data || error);
+      Alert.alert(t('errors.uploadFailed') || 'Upload failed', t('errors.tryAgain') || 'Please try again.');
+    } finally {
+      setUploadingType(null);
     }
+  };
+
+  const handleUpload = async (type: string) => {
+    Alert.alert(
+      t('documents.uploadTitle') || 'Upload document',
+      t('documents.uploadPrompt') || 'Choose a source',
+      [
+        { text: t('documents.photo') || 'Photo', onPress: async () => { const f = await pickPhoto(); if (f) await performUpload(type, f); } },
+        { text: t('documents.pdfOrFile') || 'PDF / File', onPress: async () => { const f = await pickFile(); if (f) await performUpload(type, f); } },
+        { text: t('common.cancel') || 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const getDocumentStatus = (type: string): Document => {
