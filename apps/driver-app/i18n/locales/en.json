@@ -279,6 +279,8 @@
     "upload": "Upload Document",
     "reupload": "Re-upload",
     "viewDocument": "View Document",
+    "tapToView": "Tap to view full size",
+    "tapToOpenPdf": "Tap to open PDF",
     "expiresOn": "Expires on {{date}}",
     "uploadSuccess": "Document uploaded successfully",
     "uploadError": "Failed to upload document"

@@ -176,19 +176,25 @@ export default function DocumentsScreen() {
     return documents.find((d) => d.type === name || d.documentType?.name === name) || { type: name, status: 'required' };
   };
 
-  const handleViewDocument = (doc: Document) => {
-    if (doc.media?.address) {
-      setViewingDocument(doc.media.address);
+  const isPdfUrl = (url?: string | null) => !!url && /\.pdf(\?|#|$)/i.test(url);
+
+  const handleViewDocument = async (doc: Document) => {
+    const url = doc.media?.address;
+    if (!url) return;
+    // PDFs (and anything not an image) → open in the system viewer / browser.
+    // Images stay in the in-app modal so the driver can pinch-zoom.
+    if (isPdfUrl(url)) {
+      try { await Linking.openURL(url); }
+      catch { Alert.alert(t('errors.uploadFailed') || 'Error', 'Could not open document'); }
+      return;
     }
+    setViewingDocument(url);
   };
 
   const handleDownloadDocument = async (doc: Document) => {
     if (doc.media?.address) {
-      try {
-        await Linking.openURL(doc.media.address);
-      } catch (error) {
-        Alert.alert('Error', 'Could not open document');
-      }
+      try { await Linking.openURL(doc.media.address); }
+      catch { Alert.alert('Error', 'Could not open document'); }
     }
   };
 
@@ -295,12 +301,14 @@ export default function DocumentsScreen() {
 
                   {isUploading ? (
                     <ActivityIndicator size="small" color={colors.primary} />
-                  ) : doc.status !== 'approved' ? (
-                    <TouchableOpacity onPress={() => handleUpload(docType.name)}>
-                      <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
-                    </TouchableOpacity>
                   ) : (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                    <TouchableOpacity onPress={() => handleUpload(docType.name)} hitSlop={10}>
+                      <Ionicons
+                        name={hasUploadedDoc ? 'refresh' : 'cloud-upload-outline'}
+                        size={24}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
                   )}
                 </View>
 
@@ -311,19 +319,30 @@ export default function DocumentsScreen() {
                       onPress={() => handleViewDocument(doc)}
                       className="flex-row items-center"
                     >
-                      <View className="w-16 h-16 rounded-lg overflow-hidden mr-3" style={{ backgroundColor: colors.secondary }}>
-                        <Image
-                          source={{ uri: doc.media?.address }}
-                          className="w-full h-full"
-                          resizeMode="cover"
-                        />
-                      </View>
+                      {isPdfUrl(doc.media?.address) ? (
+                        <View
+                          className="w-16 h-16 rounded-lg items-center justify-center mr-3"
+                          style={{ backgroundColor: colors.primary + '20' }}
+                        >
+                          <Ionicons name="document-text" size={28} color={colors.primary} />
+                        </View>
+                      ) : (
+                        <View className="w-16 h-16 rounded-lg overflow-hidden mr-3" style={{ backgroundColor: colors.secondary }}>
+                          <Image
+                            source={{ uri: doc.media?.address }}
+                            className="w-full h-full"
+                            resizeMode="cover"
+                          />
+                        </View>
+                      )}
                       <View className="flex-1">
                         <Text style={{ color: colors.foreground }} className="text-sm font-medium">
-                          View Document
+                          {t('documents.viewDocument') || 'View Document'}
                         </Text>
                         <Text style={{ color: colors.mutedForeground }} className="text-xs mt-1">
-                          Tap to view full size
+                          {isPdfUrl(doc.media?.address)
+                            ? (t('documents.tapToOpenPdf') || 'Tap to open PDF')
+                            : (t('documents.tapToView') || 'Tap to view full size')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />

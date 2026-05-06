@@ -107,11 +107,6 @@ export class DocumentsService {
       throw new NotFoundException('Document type not found or disabled');
     }
 
-    // Check if document type requires expiry date
-    if (documentType.hasExpiry && !data.expiryDate) {
-      throw new BadRequestException('Expiry date is required for this document type');
-    }
-
     // Verify media exists
     const media = await this.prisma.media.findUnique({
       where: { id: data.mediaId },

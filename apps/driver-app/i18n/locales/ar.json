@@ -276,6 +276,8 @@
     "upload": "رفع المستند",
     "reupload": "إعادة الرفع",
     "viewDocument": "عرض المستند",
+    "tapToView": "اضغط للعرض بالحجم الكامل",
+    "tapToOpenPdf": "اضغط لفتح ملف PDF",
     "expiresOn": "ينتهي في {{date}}",
     "uploadSuccess": "تم رفع المستند بنجاح",
     "uploadError": "فشل رفع المستند"
