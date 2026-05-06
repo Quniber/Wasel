@@ -113,6 +113,19 @@ export default function DriverDetailsPage() {
     },
   });
 
+  // Reject document mutation
+  const rejectDocumentMutation = useMutation({
+    mutationFn: ({ documentId, note }: { documentId: number; note: string }) =>
+      api.rejectDriverDocument(documentId, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver-documents', driverId] });
+      toast.success('Document rejected');
+    },
+    onError: () => {
+      toast.error('Failed to reject document');
+    },
+  });
+
   if (driverLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -246,7 +259,9 @@ export default function DriverDetailsPage() {
           <DocumentsTab
             documents={documents}
             onVerify={(id) => verifyDocumentMutation.mutate(id)}
+            onReject={(id, note) => rejectDocumentMutation.mutate({ documentId: id, note })}
             isVerifying={verifyDocumentMutation.isPending}
+            isRejecting={rejectDocumentMutation.isPending}
           />
         )}
         {activeTab === 'orders' && (
@@ -473,11 +488,15 @@ function OverviewTab({ driver, documents }: { driver: DriverDetails; documents?:
 function DocumentsTab({
   documents,
   onVerify,
-  isVerifying
+  onReject,
+  isVerifying,
+  isRejecting,
 }: {
   documents?: DriverDocument[];
   onVerify: (id: number) => void;
+  onReject: (id: number, note: string) => void;
   isVerifying: boolean;
+  isRejecting: boolean;
 }) {
   if (!documents || documents.length === 0) {
     return (
@@ -550,13 +569,18 @@ function DocumentsTab({
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => onVerify(doc.id)}
-                disabled={isVerifying}
+                disabled={isVerifying || isRejecting}
                 className="flex-1 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
               >
                 Approve
               </button>
               <button
-                className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => {
+                  const note = window.prompt('Reason for rejection (visible to the driver):');
+                  if (note && note.trim()) onReject(doc.id, note.trim());
+                }}
+                disabled={isVerifying || isRejecting}
+                className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 Reject
               </button>
