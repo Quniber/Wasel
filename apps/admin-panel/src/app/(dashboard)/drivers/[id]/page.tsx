@@ -508,15 +508,31 @@ function DocumentsTab({
             </span>
           </div>
 
-          {doc.media?.url && (
-            <div className="mb-3 aspect-video bg-muted rounded-md overflow-hidden">
-              <img
-                src={doc.media.url}
-                alt={doc.documentType?.name || 'Document'}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
+          {doc.media?.address && (() => {
+            const mediaUrl = doc.media.address;
+            const isPdf = /\.pdf(\?|#|$)/i.test(mediaUrl) || doc.media.mimeType === 'application/pdf';
+            return (
+              <a
+                href={mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 block aspect-video bg-muted rounded-md overflow-hidden hover:opacity-90"
+              >
+                {isPdf ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                    <FileText className="h-10 w-10 mb-2" />
+                    <span className="text-xs">Open PDF</span>
+                  </div>
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={doc.documentType?.name || 'Document'}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </a>
+            );
+          })()}
 
           {doc.expiryDate && (
             <p className="text-sm text-muted-foreground mb-2">

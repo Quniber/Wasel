@@ -863,7 +863,9 @@ export interface DriverDocument {
   };
   media?: {
     id: number;
-    url: string;
+    address: string;
+    mimeType?: string;
+    size?: number;
   };
 }
 
