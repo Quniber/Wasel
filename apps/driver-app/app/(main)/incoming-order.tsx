@@ -193,8 +193,8 @@ export default function IncomingOrderScreen() {
               className="w-28 h-28 rounded-full items-center justify-center"
               style={{ backgroundColor: colors.primary }}
             >
-              <Text className="text-white text-4xl font-bold">{timeLeft}</Text>
-              <Text className="text-white text-sm">{t('incomingOrder.seconds')}</Text>
+              <Text style={{ color: colors.primaryForeground }} className="text-4xl font-bold">{timeLeft}</Text>
+              <Text style={{ color: colors.primaryForeground }} className="text-sm">{t('incomingOrder.seconds')}</Text>
             </View>
           </Animated.View>
 

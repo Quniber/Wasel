@@ -191,9 +191,9 @@ export default function SupportScreen() {
             style={{ backgroundColor: colors.primary }}
           >
             {isSending ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text className="text-white font-semibold">{t('support.send')}</Text>
+              <Text style={{ color: colors.primaryForeground }} className="font-semibold">{t('support.send')}</Text>
             )}
           </TouchableOpacity>
         </View>

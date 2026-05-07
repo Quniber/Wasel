@@ -183,7 +183,7 @@ export default function RideCompleteScreen() {
             className="py-4 rounded-xl items-center mb-3"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white text-lg font-semibold">
+            <Text style={{ color: colors.primaryForeground }} className="text-lg font-semibold">
               {isSubmitting ? t('common.loading') : t('rideComplete.submit')}
             </Text>
           </TouchableOpacity>

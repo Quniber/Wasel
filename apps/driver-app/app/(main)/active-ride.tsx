@@ -294,7 +294,7 @@ export default function ActiveRideScreen() {
             className="px-4 py-2 rounded-full shadow-lg"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white text-sm font-medium">
+            <Text style={{ color: colors.primaryForeground }} className="text-sm font-medium">
               {status === 'accepted' || status === 'arriving'
                 ? t('activeRide.goingToPickup')
                 : status === 'arrived'

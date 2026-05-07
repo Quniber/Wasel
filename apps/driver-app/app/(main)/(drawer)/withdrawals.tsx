@@ -328,9 +328,9 @@ export default function WithdrawalsScreen() {
               style={{ backgroundColor: colors.primary }}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text className="text-white text-lg font-semibold">{t('withdrawals.submit')}</Text>
+                <Text style={{ color: colors.primaryForeground }} className="text-lg font-semibold">{t('withdrawals.submit')}</Text>
               )}
             </TouchableOpacity>
 

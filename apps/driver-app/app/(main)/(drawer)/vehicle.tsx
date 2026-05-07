@@ -187,7 +187,7 @@ export default function VehicleScreen() {
             className="px-4 py-2 rounded-lg"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white font-medium">{t('common.edit')}</Text>
+            <Text style={{ color: colors.primaryForeground }} className="font-medium">{t('common.edit')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -207,7 +207,7 @@ export default function VehicleScreen() {
             className="mt-4 px-6 py-3 rounded-xl"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white font-semibold">{t('vehicle.addVehicle')}</Text>
+            <Text style={{ color: colors.primaryForeground }} className="font-semibold">{t('vehicle.addVehicle')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -359,9 +359,9 @@ export default function VehicleScreen() {
               style={{ backgroundColor: colors.primary }}
             >
               {isSaving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text className="text-white text-lg font-semibold">{t('common.save')}</Text>
+                <Text style={{ color: colors.primaryForeground }} className="text-lg font-semibold">{t('common.save')}</Text>
               )}
             </TouchableOpacity>
           )}

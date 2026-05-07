@@ -168,7 +168,7 @@ export default function EarningsScreen() {
                 className="px-4 py-2 rounded-lg"
                 style={{ backgroundColor: colors.primary }}
               >
-                <Text className="text-white font-medium">{t('earnings.withdraw')}</Text>
+                <Text style={{ color: colors.primaryForeground }} className="font-medium">{t('earnings.withdraw')}</Text>
               </TouchableOpacity>
             </View>
 

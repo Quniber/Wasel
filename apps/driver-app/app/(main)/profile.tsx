@@ -109,7 +109,7 @@ export default function ProfileScreen() {
             className="px-4 py-2 rounded-lg"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white font-medium">{t('common.edit')}</Text>
+            <Text style={{ color: colors.primaryForeground }} className="font-medium">{t('common.edit')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
                   className="absolute bottom-0 right-0 w-8 h-8 rounded-full items-center justify-center"
                   style={{ backgroundColor: colors.primary }}
                 >
-                  <Ionicons name="camera" size={16} color="#fff" />
+                  <Ionicons name="camera" size={16} color={colors.primaryForeground} />
                 </View>
               )}
             </View>
@@ -275,9 +275,9 @@ export default function ProfileScreen() {
             style={{ backgroundColor: colors.primary }}
           >
             {isSaving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text className="text-white text-lg font-semibold">{t('common.save')}</Text>
+              <Text style={{ color: colors.primaryForeground }} className="text-lg font-semibold">{t('common.save')}</Text>
             )}
           </TouchableOpacity>
         )}
