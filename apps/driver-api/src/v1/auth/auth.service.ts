@@ -81,13 +81,18 @@ export class AuthService {
   }
 
   // Step 2: Verify OTP and complete registration
-  async verifyOtpAndRegister(data: {
-    mobileNumber: string;
-    otp: string;
-    firstName: string;
-    lastName: string;
-    email?: string;
-  }) {
+  async verifyOtpAndRegister(
+    data: {
+      mobileNumber: string;
+      otp: string;
+      firstName: string;
+      lastName: string;
+      email?: string;
+    },
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
@@ -122,7 +127,7 @@ export class AuthService {
       });
     }
 
-    return this.generateToken(driver);
+    return this.generateTokenWithSession(driver, deviceInfo, ipAddress, userAgent);
   }
 
   // Find test account driver (flexible match for demo account)
@@ -179,7 +184,13 @@ export class AuthService {
   }
 
   // Verify OTP for login
-  async verifyOtpLogin(mobileNumber: string, otp: string) {
+  async verifyOtpLogin(
+    mobileNumber: string,
+    otp: string,
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const valid = await this.verifyTwilioOtp(mobileNumber, otp);
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
@@ -205,7 +216,7 @@ export class AuthService {
       data: { lastSeenAt: new Date() },
     });
 
-    return this.generateToken(driver);
+    return this.generateTokenWithSession(driver, deviceInfo, ipAddress, userAgent);
   }
 
   // Resend OTP
@@ -218,7 +229,13 @@ export class AuthService {
   }
 
   // Legacy email/password login
-  async login(email: string, password: string) {
+  async login(
+    email: string,
+    password: string,
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const driver = await this.prisma.driver.findUnique({ where: { email } });
 
     if (!driver) {
@@ -241,17 +258,22 @@ export class AuthService {
       data: { lastSeenAt: new Date() },
     });
 
-    return this.generateToken(driver);
+    return this.generateTokenWithSession(driver, deviceInfo, ipAddress, userAgent);
   }
 
   // Email-based registration (without documents - simple signup)
-  async registerWithEmail(data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    mobileNumber: string;
-    password: string;
-  }) {
+  async registerWithEmail(
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      mobileNumber: string;
+      password: string;
+    },
+    deviceInfo: DeviceInfo = {},
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     // Check if email already exists
     const existingEmail = await this.prisma.driver.findUnique({
       where: { email: data.email },
@@ -283,7 +305,7 @@ export class AuthService {
       },
     });
 
-    return this.generateToken(driver);
+    return this.generateTokenWithSession(driver, deviceInfo, ipAddress, userAgent);
   }
 
   private driverResponse(driver: any) {

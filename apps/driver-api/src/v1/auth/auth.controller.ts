@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Req, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards, Req, Headers, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { DriverStatus } from 'database';
+import { DeviceInfo } from '../sessions/sessions.service';
 
 // Multer file type for uploaded files
 interface MulterFile {
@@ -79,6 +80,8 @@ export class AuthController {
   // Step 2: Verify OTP and complete registration
   @Post('verify-otp')
   verifyOtpAndRegister(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
     @Body()
     body: {
       mobileNumber: string;
@@ -86,9 +89,15 @@ export class AuthController {
       firstName: string;
       lastName: string;
       email?: string;
+      deviceInfo?: DeviceInfo;
     },
   ) {
-    return this.authService.verifyOtpAndRegister(body);
+    return this.authService.verifyOtpAndRegister(
+      body,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // Request OTP for login
@@ -99,8 +108,18 @@ export class AuthController {
 
   // Verify OTP for login
   @Post('login/verify-otp')
-  verifyOtpLogin(@Body() body: { mobileNumber: string; otp: string }) {
-    return this.authService.verifyOtpLogin(body.mobileNumber, body.otp);
+  verifyOtpLogin(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
+    @Body() body: { mobileNumber: string; otp: string; deviceInfo?: DeviceInfo },
+  ) {
+    return this.authService.verifyOtpLogin(
+      body.mobileNumber,
+      body.otp,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // Resend OTP
@@ -112,22 +131,40 @@ export class AuthController {
   // ========== Legacy Email/Password Auth ==========
 
   @Post('login/email')
-  loginWithEmail(@Body() body: { email: string; password: string }) {
-    return this.authService.login(body.email, body.password);
+  loginWithEmail(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
+    @Body() body: { email: string; password: string; deviceInfo?: DeviceInfo },
+  ) {
+    return this.authService.login(
+      body.email,
+      body.password,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // Email-based registration (simple signup without documents)
   @Post('register/email')
   registerWithEmail(
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string,
     @Body() body: {
       firstName: string;
       lastName: string;
       email: string;
       mobileNumber: string;
       password: string;
+      deviceInfo?: DeviceInfo;
     },
   ) {
-    return this.authService.registerWithEmail(body);
+    return this.authService.registerWithEmail(
+      body,
+      body.deviceInfo || {},
+      req.ip || req.connection?.remoteAddress,
+      userAgent,
+    );
   }
 
   // ========== Profile Endpoints ==========
