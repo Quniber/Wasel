@@ -659,6 +659,70 @@ class ApiClient {
   async changePassword(data: ChangePasswordDto) {
     await this.client.post('/auth/change-password', data);
   }
+
+  // ============ SMS ============
+  async sendSms(data: {
+    body: string;
+    language?: 'en' | 'ar';
+    mode: 'customers' | 'drivers' | 'manual';
+    manualNumbers?: string[];
+  }) {
+    const response = await this.client.post<{
+      batchId: string;
+      totalRecipients: number;
+      successCount: number;
+      failedCount: number;
+    }>('/sms/send', data);
+    return response.data;
+  }
+
+  async previewSmsRecipients(mode: 'customers' | 'drivers' | 'manual', manualNumbers?: string[]) {
+    const params: Record<string, string> = { mode };
+    if (manualNumbers) params.manualNumbers = JSON.stringify(manualNumbers);
+    const response = await this.client.get<{ count: number }>('/sms/preview', { params });
+    return response.data;
+  }
+
+  async getSmsBatches(params?: { page?: number; limit?: number }) {
+    const response = await this.client.get<{
+      batches: Array<{
+        batchId: string;
+        body: string;
+        recipientType: string;
+        sentById: number | null;
+        total: number;
+        success: number;
+        failed: number;
+        pending: number;
+        firstCreatedAt: string;
+      }>;
+      page: number;
+      limit: number;
+    }>('/sms/batches', { params });
+    return response.data;
+  }
+
+  async getSmsMessages(params?: { page?: number; limit?: number; batchId?: string }) {
+    const response = await this.client.get<{
+      messages: Array<{
+        id: number;
+        batchId: string | null;
+        body: string;
+        recipient: string;
+        recipientName: string | null;
+        recipientType: string;
+        status: string;
+        transactionId: string | null;
+        errorMessage: string | null;
+        createdAt: string;
+        sentAt: string | null;
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>('/sms/messages', { params });
+    return response.data;
+  }
 }
 
 export const api = new ApiClient();

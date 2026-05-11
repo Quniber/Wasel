@@ -22,6 +22,7 @@ import {
   Cog,
   User,
   MapPin,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
@@ -38,6 +39,7 @@ const navigation = [
   { name: 'Coupons', href: '/coupons', icon: Ticket },
   { name: 'Payments', href: '/payments', icon: CreditCard },
   { name: 'Support', href: '/support', icon: Headphones },
+  { name: 'SMS', href: '/sms', icon: MessageSquare },
   { name: 'Operators', href: '/operators', icon: UserCog },
   { name: 'Settings', href: '/settings', icon: Cog },
 ];

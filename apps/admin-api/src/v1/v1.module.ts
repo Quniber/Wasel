@@ -14,6 +14,7 @@ import { PaymentModule } from './payment/payment.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { SocketModule } from './socket/socket.module';
+import { SmsModule } from './sms/sms.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SocketModule } from './socket/socket.module';
     CouponsModule,
     ComplaintsModule,
     SocketModule,
+    SmsModule,
   ],
 })
 export class V1Module {}

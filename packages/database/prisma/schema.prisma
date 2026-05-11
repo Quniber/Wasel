@@ -1128,6 +1128,31 @@ model Setting {
   @@map("settings")
 }
 
+// Outbound SMS audit log. One row per recipient (so partial failures of a
+// bulk send are visible). Bulk sends share a batchId so the admin UI can
+// group them as a single "campaign" without a parent table.
+model SmsMessage {
+  id             Int       @id @default(autoincrement())
+  batchId        String?   @db.VarChar(36)
+  body           String    @db.Text
+  language       String?   @db.VarChar(8)
+  recipient      String    @db.VarChar(32)
+  recipientName  String?   @db.VarChar(120)
+  recipientType  String    @db.VarChar(16)  // 'customer' | 'driver' | 'manual' | 'system'
+  status         String    @db.VarChar(16)  // 'sent' | 'failed' | 'pending'
+  transactionId  String?   @db.VarChar(64)
+  errorMessage   String?   @db.Text
+  sentById       Int?
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+
+  @@index([sentById])
+  @@index([batchId])
+  @@index([createdAt])
+  @@index([recipient])
+  @@map("sms_messages")
+}
+
 // Short-lived one-time passwords sent via Ooredoo SMS.
 // Code is stored as a SHA-256 HMAC hex digest (using OTP_HMAC_SECRET),
 // never plaintext. `purpose` is informational — distinguishes rider vs
