@@ -1128,6 +1128,25 @@ model Setting {
   @@map("settings")
 }
 
+// Saved recipient list for the admin SMS broadcast feature. Stores IDs
+// for drivers / customers so phones are resolved fresh at send time
+// (handles number changes after the group was created). Manual entries
+// are stored verbatim.
+model SmsGroup {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(120)
+  driverIds       Json      // number[]
+  customerIds     Json      // number[]
+  manualNumbers   Json      // string[]
+  createdById     Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("sms_groups")
+}
+
 // Outbound SMS audit log. One row per recipient (so partial failures of a
 // bulk send are visible). Bulk sends share a batchId so the admin UI can
 // group them as a single "campaign" without a parent table.

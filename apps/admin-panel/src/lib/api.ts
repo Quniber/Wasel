@@ -664,7 +664,9 @@ class ApiClient {
   async sendSms(data: {
     body: string;
     language?: 'en' | 'ar';
-    mode: 'customers' | 'drivers' | 'manual';
+    groupId?: number;
+    driverIds?: number[];
+    customerIds?: number[];
     manualNumbers?: string[];
   }) {
     const response = await this.client.post<{
@@ -676,11 +678,74 @@ class ApiClient {
     return response.data;
   }
 
-  async previewSmsRecipients(mode: 'customers' | 'drivers' | 'manual', manualNumbers?: string[]) {
-    const params: Record<string, string> = { mode };
-    if (manualNumbers) params.manualNumbers = JSON.stringify(manualNumbers);
-    const response = await this.client.get<{ count: number }>('/sms/preview', { params });
+  async listSmsDrivers(query?: string) {
+    const response = await this.client.get<Array<{
+      id: number;
+      firstName: string | null;
+      lastName: string | null;
+      mobileNumber: string;
+      status: string;
+    }>>('/sms/recipients/drivers', { params: query ? { q: query } : undefined });
     return response.data;
+  }
+
+  async listSmsCustomers(query?: string) {
+    const response = await this.client.get<Array<{
+      id: number;
+      firstName: string | null;
+      lastName: string | null;
+      mobileNumber: string;
+    }>>('/sms/recipients/customers', { params: query ? { q: query } : undefined });
+    return response.data;
+  }
+
+  async listSmsGroups() {
+    const response = await this.client.get<Array<{
+      id: number;
+      name: string;
+      driverIds: number[];
+      customerIds: number[];
+      manualNumbers: string[];
+      createdById: number | null;
+      createdAt: string;
+      updatedAt: string;
+    }>>('/sms/groups');
+    return response.data;
+  }
+
+  async getSmsGroup(id: number) {
+    const response = await this.client.get<{
+      id: number;
+      name: string;
+      driverIds: number[];
+      customerIds: number[];
+      manualNumbers: string[];
+    }>(`/sms/groups/${id}`);
+    return response.data;
+  }
+
+  async createSmsGroup(data: {
+    name: string;
+    driverIds?: number[];
+    customerIds?: number[];
+    manualNumbers?: string[];
+  }) {
+    const response = await this.client.post<{ id: number; name: string }>('/sms/groups', data);
+    return response.data;
+  }
+
+  async updateSmsGroup(id: number, data: {
+    name?: string;
+    driverIds?: number[];
+    customerIds?: number[];
+    manualNumbers?: string[];
+  }) {
+    const response = await this.client.put<{ id: number }>(`/sms/groups/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSmsGroup(id: number) {
+    await this.client.delete(`/sms/groups/${id}`);
   }
 
   async getSmsBatches(params?: { page?: number; limit?: number }) {

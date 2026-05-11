@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req } from '@nestjs/common';
-import { SmsService, RecipientMode } from './sms.service';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards, Req, ParseIntPipe } from '@nestjs/common';
+import { SmsService } from './sms.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller({ path: 'sms', version: '1' })
@@ -7,34 +7,79 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 export class SmsController {
   constructor(private smsService: SmsService) {}
 
+  // ============ recipient pickers ============
+
+  @Get('recipients/drivers')
+  listDrivers(@Query('q') q?: string) {
+    return this.smsService.listDrivers(q);
+  }
+
+  @Get('recipients/customers')
+  listCustomers(@Query('q') q?: string) {
+    return this.smsService.listCustomers(q);
+  }
+
+  // ============ groups ============
+
+  @Get('groups')
+  listGroups() {
+    return this.smsService.listGroups();
+  }
+
+  @Get('groups/:id')
+  getGroup(@Param('id', ParseIntPipe) id: number) {
+    return this.smsService.getGroup(id);
+  }
+
+  @Post('groups')
+  createGroup(
+    @Req() req: any,
+    @Body() body: {
+      name: string;
+      driverIds?: number[];
+      customerIds?: number[];
+      manualNumbers?: string[];
+    },
+  ) {
+    return this.smsService.createGroup(body, req.user?.id);
+  }
+
+  @Put('groups/:id')
+  updateGroup(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: {
+      name?: string;
+      driverIds?: number[];
+      customerIds?: number[];
+      manualNumbers?: string[];
+    },
+  ) {
+    return this.smsService.updateGroup(id, body);
+  }
+
+  @Delete('groups/:id')
+  deleteGroup(@Param('id', ParseIntPipe) id: number) {
+    return this.smsService.deleteGroup(id);
+  }
+
+  // ============ send ============
+
   @Post('send')
   send(
     @Req() req: any,
     @Body() body: {
       body: string;
       language?: 'en' | 'ar';
-      mode: RecipientMode;
+      groupId?: number;
+      driverIds?: number[];
+      customerIds?: number[];
       manualNumbers?: string[];
     },
   ) {
-    const operatorId = req.user?.id;
-    return this.smsService.sendBulk(body, operatorId);
+    return this.smsService.sendBulk(body, req.user?.id);
   }
 
-  @Get('preview')
-  preview(
-    @Query('mode') mode: RecipientMode,
-    @Query('manualNumbers') manualNumbersJson?: string,
-  ) {
-    let manualNumbers: string[] | undefined;
-    if (manualNumbersJson) {
-      try {
-        const parsed = JSON.parse(manualNumbersJson);
-        if (Array.isArray(parsed)) manualNumbers = parsed.map(String);
-      } catch {}
-    }
-    return this.smsService.previewRecipients(mode, manualNumbers);
-  }
+  // ============ history ============
 
   @Get('messages')
   listMessages(
