@@ -3,9 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
-import Twilio from 'twilio';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
+import { OtpService } from './otp.service';
 import { DriverStatus, Gender, DocumentStatus } from 'database';
 
 // Multer file type for uploaded files
@@ -18,48 +18,23 @@ interface MulterFile {
   buffer: Buffer;
 }
 
-// Test account bypass - skip Twilio for this number
+// Test account bypass — number must end with this suffix; OTP must equal
+// TEST_OTP_CODE. Logic lives in OtpService, the constant stays here only
+// for the legacy driver-lookup at line ~143.
 const TEST_PHONE_NUMBER = '55555555';
-const TEST_OTP_CODE = '123456';
 
 @Injectable()
 export class AuthService {
-  private _twilio?: ReturnType<typeof Twilio>;
-
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     @Inject(forwardRef(() => SessionsService))
     private sessionsService: SessionsService,
+    private otpService: OtpService,
   ) {}
-
-  private get twilio() {
-    if (!this._twilio) {
-      this._twilio = Twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN,
-      );
-    }
-    return this._twilio;
-  }
 
   private isTestNumber(mobileNumber: string): boolean {
     return mobileNumber.replace(/\D/g, '').endsWith(TEST_PHONE_NUMBER);
-  }
-
-  private async sendTwilioOtp(mobileNumber: string): Promise<void> {
-    if (this.isTestNumber(mobileNumber)) return;
-    await this.twilio.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
-      .verifications.create({ to: mobileNumber, channel: 'sms' });
-  }
-
-  private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
-    if (this.isTestNumber(mobileNumber)) return code === TEST_OTP_CODE;
-    const check = await this.twilio.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
-      .verificationChecks.create({ to: mobileNumber, code });
-    return check.status === 'approved';
   }
 
   // Step 1: Register with phone - sends OTP
@@ -73,7 +48,7 @@ export class AuthService {
       throw new ConflictException('Phone number already registered');
     }
 
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'register');
 
     return {
       message: 'OTP sent successfully',
@@ -93,7 +68,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+    const valid = await this.otpService.verifyOtp(data.mobileNumber, data.otp, 'register');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -176,7 +151,7 @@ export class AuthService {
       throw new UnauthorizedException('Account is disabled');
     }
 
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'login');
 
     return {
       message: 'OTP sent successfully',
@@ -191,7 +166,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    const valid = await this.otpService.verifyOtp(mobileNumber, otp, 'login');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -219,9 +194,12 @@ export class AuthService {
     return this.generateTokenWithSession(driver, deviceInfo, ipAddress, userAgent);
   }
 
-  // Resend OTP
+  // Resend OTP — we don't know which flow the user started, so re-issue
+  // for whichever pending purpose makes sense. Use 'login' as the default
+  // since that's the most common resend trigger; sendOtp invalidates any
+  // prior unused codes anyway so it's safe to be loose here.
   async resendOtp(mobileNumber: string) {
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'login');
 
     return {
       message: 'OTP resent successfully',

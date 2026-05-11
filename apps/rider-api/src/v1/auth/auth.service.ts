@@ -1,14 +1,13 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import Twilio from 'twilio';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SessionsService, DeviceInfo } from '../sessions/sessions.service';
+import { OtpService } from './otp.service';
 import { Gender } from 'database';
 
-// Test account bypass - skip Twilio for this number
+// Test account bypass — same convention as driver-api.
 const TEST_PHONE_NUMBER = '55555555';
-const TEST_OTP_CODE = '123456';
 
 // In-memory store for password-reset codes.
 // NOTE: not durable across restarts — adequate for testing & low-volume use.
@@ -21,61 +20,23 @@ const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
-  private _twilio?: ReturnType<typeof Twilio>;
-
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     @Inject(forwardRef(() => SessionsService))
     private sessionsService: SessionsService,
+    private otpService: OtpService,
   ) {}
-
-  private get twilio() {
-    if (!this._twilio) {
-      this._twilio = Twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN,
-      );
-    }
-    return this._twilio;
-  }
 
   private isTestNumber(mobileNumber: string): boolean {
     return mobileNumber.replace(/\D/g, '').endsWith(TEST_PHONE_NUMBER);
-  }
-
-  private async sendTwilioOtp(mobileNumber: string): Promise<void> {
-    if (this.isTestNumber(mobileNumber)) return;
-    await this.twilio.verify.v2
-      .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
-      .verifications.create({ to: mobileNumber, channel: 'sms' });
-  }
-
-  private async verifyTwilioOtp(mobileNumber: string, code: string): Promise<boolean> {
-    if (this.isTestNumber(mobileNumber)) return code === TEST_OTP_CODE;
-    try {
-      const check = await this.twilio.verify.v2
-        .services(process.env.TWILIO_VERIFY_SERVICE_SID!)
-        .verificationChecks.create({ to: mobileNumber, code });
-      return check.status === 'approved';
-    } catch (err: any) {
-      // Twilio returns 404 when the verification has expired, been approved
-      // already, or hit the max-attempts limit (~5). Surface that as a clean
-      // BadRequest so the client shows "code expired, request a new one".
-      if (err?.status === 404 || err?.code === 20404) {
-        throw new BadRequestException(
-          'Verification code expired or too many attempts. Please request a new code.',
-        );
-      }
-      throw err;
-    }
   }
 
   // Pre-verify OTP and issue a short-lived registration token.
   // Used by phone-signup flow so the OTP can be checked at the OTP screen
   // (and the token used later when completing the profile form).
   async verifyOtpCheck(mobileNumber: string, otp: string) {
-    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    const valid = await this.otpService.verifyOtp(mobileNumber, otp, 'register');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -111,7 +72,7 @@ export class AuthService {
       throw new ConflictException('Phone number already registered');
     }
 
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'register');
 
     return {
       message: 'OTP sent successfully',
@@ -126,7 +87,7 @@ export class AuthService {
     lastName: string;
     email?: string;
   }) {
-    const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+    const valid = await this.otpService.verifyOtp(data.mobileNumber, data.otp, 'register');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -183,7 +144,7 @@ export class AuthService {
     if (data.registrationToken) {
       await this.verifyRegistrationToken(data.mobileNumber, data.registrationToken);
     } else if (data.otp) {
-      const valid = await this.verifyTwilioOtp(data.mobileNumber, data.otp);
+      const valid = await this.otpService.verifyOtp(data.mobileNumber, data.otp, 'register');
       if (!valid) throw new BadRequestException('Invalid OTP');
     } else {
       throw new BadRequestException('OTP or registration token is required');
@@ -245,7 +206,7 @@ export class AuthService {
       }
     }
 
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'login');
 
     return {
       message: 'OTP sent successfully',
@@ -254,7 +215,7 @@ export class AuthService {
 
   // Verify OTP for login
   async verifyOtpLogin(mobileNumber: string, otp: string) {
-    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    const valid = await this.otpService.verifyOtp(mobileNumber, otp, 'login');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -284,7 +245,7 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const valid = await this.verifyTwilioOtp(mobileNumber, otp);
+    const valid = await this.otpService.verifyOtp(mobileNumber, otp, 'login');
     if (!valid) {
       throw new BadRequestException('Invalid OTP');
     }
@@ -361,9 +322,12 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
-  // Resend OTP
+  // Resend OTP — we don't know which purpose the user started with, so
+  // default to 'login' (the most common resend trigger). sendOtp invalidates
+  // any prior unused codes for this recipient+purpose, so a stale 'register'
+  // code won't get in the way.
   async resendOtp(mobileNumber: string) {
-    await this.sendTwilioOtp(mobileNumber);
+    await this.otpService.sendOtp(mobileNumber, 'login');
 
     return {
       message: 'OTP resent successfully',

@@ -1127,3 +1127,22 @@ model Setting {
 
   @@map("settings")
 }
+
+// Short-lived one-time passwords sent via Ooredoo SMS.
+// Code is stored as a SHA-256 HMAC hex digest (using OTP_HMAC_SECRET),
+// never plaintext. `purpose` is informational — distinguishes rider vs
+// driver vs password-reset OTPs in logs.
+model OtpCode {
+  id         Int       @id @default(autoincrement())
+  recipient  String    @db.VarChar(32)
+  codeHash   String    @db.VarChar(80)
+  purpose    String    @db.VarChar(24)
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([recipient, usedAt])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
