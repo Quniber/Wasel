@@ -327,7 +327,14 @@ export class AuthService {
   // any prior unused codes for this recipient+purpose, so a stale 'register'
   // code won't get in the way.
   async resendOtp(mobileNumber: string) {
-    await this.otpService.sendOtp(mobileNumber, 'login');
+    // Mirror the routing in loginWithPhone/registerWithPhone: an enabled
+    // customer resends a login OTP; everyone else (new or disabled) resends
+    // a register OTP. Without this the resend always used 'login', so users
+    // in the register flow received an OTP that the register-verify path
+    // couldn't match against.
+    const customer = await this.prisma.customer.findFirst({ where: { mobileNumber } });
+    const purpose = customer?.status === 'enabled' ? 'login' : 'register';
+    await this.otpService.sendOtp(mobileNumber, purpose);
 
     return {
       message: 'OTP resent successfully',
