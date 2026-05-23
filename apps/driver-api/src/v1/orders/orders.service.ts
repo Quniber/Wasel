@@ -596,11 +596,13 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    // Can only cancel if order is accepted, arrived, or started
+    // Can only cancel if order is accepted, arrived, started, or stuck
+    // awaiting post-pay (ride finished but rider never completed payment)
     const cancellableStatuses: OrderStatus[] = [
       OrderStatus.DriverAccepted,
       OrderStatus.Arrived,
       OrderStatus.Started,
+      OrderStatus.WaitingForPostPay,
     ];
 
     if (!cancellableStatuses.includes(order.status)) {
