@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WaselGo — Ride-hailing in Qatar</title>
+<meta name="description" content="WaselGo is Qatar's ride-hailing platform. Book a ride in seconds, track your driver live, and pay your way. Available in English and Arabic." />
+<meta name="theme-color" content="#0366FB" />
+<meta property="og:title" content="WaselGo — Ride-hailing in Qatar" />
+<meta property="og:description" content="Book a ride in seconds, track your driver live, pay your way." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://waselapp.qa/" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230366FB'/%3E%3Cpath d='M16 40l8-18h16l8 18' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='42' r='4' fill='white'/%3E%3Ccircle cx='41' cy='42' r='4' fill='white'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --blue:#0366FB; --blue-dark:#0247b3; --ink:#0b1220; --muted:#5b6675;
+    --line:#e6ebf2; --bg:#ffffff; --soft:#f5f8fd; --radius:18px;
+    --max:1100px; --shadow:0 18px 50px rgba(3,102,251,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Kufi Arabic",sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+  body[dir="rtl"]{font-family:"Noto Kufi Arabic","Segoe UI",Tahoma,sans-serif}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 22px}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:15px;padding:13px 22px;border-radius:999px;border:1.5px solid transparent;transition:.2s;cursor:pointer}
+  .btn-primary{background:var(--blue);color:#fff;box-shadow:0 8px 22px rgba(3,102,251,.32)}
+  .btn-primary:hover{background:var(--blue-dark);transform:translateY(-1px)}
+  .btn-ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+
+  /* header */
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:20px;letter-spacing:-.3px}
+  .brand .mark{width:34px;height:34px;border-radius:10px;background:var(--blue);display:grid;place-items:center}
+  .nav-links{display:flex;align-items:center;gap:26px;font-weight:600;font-size:14.5px;color:var(--muted)}
+  .nav-links a:hover{color:var(--ink)}
+  .lang{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 15px;font-weight:700;font-size:13.5px;cursor:pointer;color:var(--ink)}
+  .lang:hover{border-color:var(--blue);color:var(--blue)}
+  @media(max-width:760px){.nav-links a{display:none}}
+
+  /* hero */
+  .hero{position:relative;overflow:hidden;background:radial-gradient(1100px 480px at 80% -10%,#e7f0ff 0%,#fff 60%)}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:46px;align-items:center;padding:78px 0 70px}
+  @media(max-width:880px){.hero-grid{grid-template-columns:1fr;padding:54px 0 40px;text-align:center}}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;background:#e7f0ff;color:var(--blue);font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px;margin-bottom:20px}
+  h1{font-size:clamp(34px,5.4vw,58px);line-height:1.04;letter-spacing:-1.4px;font-weight:850}
+  h1 .accent{color:var(--blue)}
+  .lede{font-size:clamp(16px,2vw,19px);color:var(--muted);max-width:520px;margin:20px 0 30px}
+  @media(max-width:880px){.lede{margin-left:auto;margin-right:auto}}
+  .cta{display:flex;gap:13px;flex-wrap:wrap}
+  @media(max-width:880px){.cta{justify-content:center}}
+
+  /* phone mockup */
+  .phone-stage{display:grid;place-items:center}
+  .phone{width:280px;height:560px;border-radius:42px;background:#0b1220;padding:13px;box-shadow:var(--shadow);position:relative}
+  .phone::before{content:"";position:absolute;top:20px;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#0b1220;border-radius:0 0 16px 16px;z-index:3}
+  .screen{width:100%;height:100%;border-radius:30px;overflow:hidden;background:linear-gradient(170deg,#0366FB,#0247b3);position:relative;display:flex;flex-direction:column;justify-content:flex-end}
+  .screen .map{position:absolute;inset:0;background:
+     radial-gradient(circle at 30% 30%,rgba(255,255,255,.16),transparent 38%),
+     repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,transparent 1px 46px),
+     repeating-linear-gradient(0deg,rgba(255,255,255,.07) 0 1px,transparent 1px 46px)}
+  .pin{position:absolute;top:38%;left:46%;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 0 0 8px rgba(255,255,255,.22)}
+  .route{position:absolute;top:42%;left:50%;width:3px;height:120px;background:repeating-linear-gradient(#fff 0 9px,transparent 9px 18px);transform:rotate(28deg);transform-origin:top}
+  .sheet{position:relative;z-index:2;background:#fff;margin:12px;border-radius:20px;padding:16px;box-shadow:0 -8px 24px rgba(0,0,0,.18)}
+  .sheet .row{display:flex;align-items:center;gap:11px}
+  .sheet .dot{width:36px;height:36px;border-radius:10px;background:#e7f0ff;display:grid;place-items:center;color:var(--blue);font-weight:800}
+  .sheet .t1{font-weight:800;font-size:14px}
+  .sheet .t2{font-size:12px;color:var(--muted)}
+  .sheet .go{margin-top:13px;background:var(--blue);color:#fff;text-align:center;font-weight:800;padding:11px;border-radius:12px;font-size:14px}
+
+  /* sections */
+  section{padding:72px 0}
+  .kicker{color:var(--blue);font-weight:800;font-size:13px;letter-spacing:1.5px;text-transform:uppercase}
+  h2{font-size:clamp(26px,3.6vw,38px);letter-spacing:-.8px;font-weight:820;margin:10px 0 12px}
+  .section-sub{color:var(--muted);max-width:560px;font-size:16.5px}
+  .center{text-align:center}.center .section-sub{margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:42px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--soft);border:1px solid var(--line);border-radius:var(--radius);padding:26px;transition:.2s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow);background:#fff}
+  .card .ic{width:46px;height:46px;border-radius:12px;background:#e7f0ff;display:grid;place-items:center;font-size:22px;margin-bottom:16px}
+  .card h3{font-size:18px;font-weight:800;margin-bottom:6px}
+  .card p{color:var(--muted);font-size:15px}
+
+  /* split (drivers) */
+  .split{background:var(--ink);color:#fff;border-radius:28px;padding:54px;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+  @media(max-width:880px){.split{grid-template-columns:1fr;padding:36px;text-align:center}}
+  .split h2{color:#fff}
+  .split .section-sub{color:#aab6c9}
+  .checks{list-style:none;display:grid;gap:13px;margin-top:8px}
+  .checks li{display:flex;align-items:center;gap:12px;font-weight:600}
+  body[dir="rtl"] .checks li{flex-direction:row-reverse}
+  .split.center-rtl{}
+  .check{width:24px;height:24px;border-radius:50%;background:var(--blue);display:grid;place-items:center;flex:none;font-size:13px}
+  .stat-row{display:flex;gap:34px;flex-wrap:wrap;margin-top:18px}
+  @media(max-width:880px){.stat-row{justify-content:center}}
+  .stat .n{font-size:30px;font-weight:850;color:var(--blue)}
+  .stat .l{font-size:13px;color:#aab6c9}
+
+  /* download */
+  .download{text-align:center;background:radial-gradient(800px 320px at 50% 0%,#e7f0ff,#fff)}
+  .stores{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .store{display:inline-flex;align-items:center;gap:11px;background:var(--ink);color:#fff;padding:13px 22px;border-radius:14px;font-weight:700}
+  .store small{display:block;font-size:11px;font-weight:600;opacity:.8;line-height:1}
+  .store b{font-size:16px}
+  .store:hover{transform:translateY(-2px)}
+  .soon{font-size:13px;color:var(--muted);margin-top:14px}
+
+  /* contact */
+  .contact-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:38px}
+  @media(max-width:880px){.contact-cards{grid-template-columns:1fr}}
+  .ccard{border:1px solid var(--line);border-radius:var(--radius);padding:24px;display:flex;align-items:center;gap:15px;transition:.2s}
+  .ccard:hover{border-color:var(--blue);box-shadow:var(--shadow)}
+  .ccard .ic{width:48px;height:48px;border-radius:12px;background:#e7f0ff;display:grid;place-items:center;font-size:22px;flex:none}
+  .ccard .t1{font-weight:800}.ccard .t2{color:var(--muted);font-size:14px}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body dir="ltr">
+<header>
+  <div class="wrap nav">
+    <div class="brand">
+      <span class="mark">
+        <svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true"><path d="M16 40l8-18h16l8 18" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23" cy="42" r="4" fill="#fff"/><circle cx="41" cy="42" r="4" fill="#fff"/></svg>
+      </span>
+      <span>WaselGo</span>
+    </div>
+    <nav class="nav-links">
+      <a href="#features" data-i="nav_features">Features</a>
+      <a href="#drivers" data-i="nav_drivers">Drive with us</a>
+      <a href="#download" data-i="nav_download">Get the app</a>
+      <a href="#contact" data-i="nav_contact">Contact</a>
+    </nav>
+    <button class="lang" id="langBtn" onclick="toggleLang()">العربية</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" style="padding:0">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">🇶🇦 <span data-i="hero_badge">Now serving Qatar</span></span>
+      <h1><span data-i="hero_h1a">Your ride,</span> <span class="accent" data-i="hero_h1b">a tap away.</span></h1>
+      <p class="lede" data-i="hero_lede">WaselGo connects you with nearby drivers in seconds — track your trip live, see the fare up front, and pay the way you like. Fast, safe, and affordable.</p>
+      <div class="cta">
+        <a href="#download" class="btn btn-primary" data-i="hero_cta1">Get the app</a>
+        <a href="#drivers" class="btn btn-ghost" data-i="hero_cta2">Drive &amp; earn</a>
+      </div>
+    </div>
+    <div class="phone-stage">
+      <div class="phone"><div class="screen">
+        <div class="map"></div><div class="route"></div><div class="pin"></div>
+        <div class="sheet">
+          <div class="row"><div class="dot">▾</div><div><div class="t1" data-i="m_pickup">Pickup · Now</div><div class="t2" data-i="m_loc">West Bay, Doha</div></div></div>
+          <div class="go" data-i="m_go">Confirm ride · 18 QAR</div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap center">
+    <span class="kicker" data-i="f_kicker">For riders</span>
+    <h2 data-i="f_h2">Everything you need to get there</h2>
+    <p class="section-sub" data-i="f_sub">A smarter way to move around the city — built for speed, clarity, and peace of mind.</p>
+    <div class="grid">
+      <div class="card"><div class="ic">🚗</div><h3 data-i="f1t">Book in seconds</h3><p data-i="f1p">Enter your destination and get matched with a nearby driver instantly.</p></div>
+      <div class="card"><div class="ic">📍</div><h3 data-i="f2t">Live tracking</h3><p data-i="f2p">Follow your driver from pickup to drop-off on a real-time map.</p></div>
+      <div class="card"><div class="ic">💰</div><h3 data-i="f3t">Upfront pricing</h3><p data-i="f3p">See the fare estimate before you book. No surprises, no hidden charges.</p></div>
+      <div class="card"><div class="ic">💳</div><h3 data-i="f4t">Pay your way</h3><p data-i="f4p">Pay with cash or your preferred payment method — your choice every ride.</p></div>
+      <div class="card"><div class="ic">📅</div><h3 data-i="f5t">Schedule ahead</h3><p data-i="f5p">Book rides in advance for the airport, meetings, and planned trips.</p></div>
+      <div class="card"><div class="ic">🔒</div><h3 data-i="f6t">Safe &amp; supported</h3><p data-i="f6p">Verified drivers, in-app chat, ride sharing, and 24/7 support.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- DRIVERS -->
+<section id="drivers">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <span class="kicker" data-i="d_kicker">For drivers</span>
+        <h2 data-i="d_h2">Drive on your schedule. Earn on your terms.</h2>
+        <p class="section-sub" data-i="d_sub">WaselGo Driver puts you in control — go online whenever you want and turn your time on the road into income.</p>
+        <div class="stat-row">
+          <div class="stat"><div class="n" data-i="d_s1n">24/7</div><div class="l" data-i="d_s1l">Go online anytime</div></div>
+          <div class="stat"><div class="n" data-i="d_s2n">Live</div><div class="l" data-i="d_s2l">Earnings tracking</div></div>
+          <div class="stat"><div class="n" data-i="d_s3n">Fast</div><div class="l" data-i="d_s3l">Weekly payouts</div></div>
+        </div>
+      </div>
+      <ul class="checks">
+        <li><span class="check">✓</span> <span data-i="d_c1">Flexible hours — you decide when to drive</span></li>
+        <li><span class="check">✓</span> <span data-i="d_c2">Ride requests from passengers near you</span></li>
+        <li><span class="check">✓</span> <span data-i="d_c3">Built-in turn-by-turn navigation</span></li>
+        <li><span class="check">✓</span> <span data-i="d_c4">Track daily, weekly &amp; monthly earnings</span></li>
+        <li><span class="check">✓</span> <span data-i="d_c5">In-app support whenever you need it</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section id="download" class="download">
+  <div class="wrap">
+    <span class="kicker" data-i="dl_kicker">Get started</span>
+    <h2 data-i="dl_h2">Download WaselGo</h2>
+    <p class="section-sub" style="margin:0 auto" data-i="dl_sub">Available for the rider app and the driver app — in English and Arabic.</p>
+    <div class="stores">
+      <a class="store" href="#" aria-label="Google Play"><span>▶</span><span><small data-i="dl_get">GET IT ON</small><b>Google Play</b></span></a>
+      <a class="store" href="#" aria-label="App Store"><span></span><span><small data-i="dl_dl">Download on the</small><b>App Store</b></span></a>
+    </div>
+    <p class="soon" data-i="dl_soon">Apps launching soon — for early access, reach us below.</p>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact" style="background:var(--soft)">
+  <div class="wrap center">
+    <span class="kicker" data-i="c_kicker">Contact</span>
+    <h2 data-i="c_h2">We're here 24/7</h2>
+    <p class="section-sub" data-i="c_sub">Questions, feedback, or need a hand? Reach the WaselGo team any time.</p>
+    <div class="contact-cards" style="text-align:start">
+      <a class="ccard" href="https://wa.me/97470656846"><div class="ic">💬</div><div><div class="t1">WhatsApp</div><div class="t2">+974 7065 6846</div></div></a>
+      <a class="ccard" href="tel:+97440409999"><div class="ic">📞</div><div><div class="t1" data-i="c_call">Call us</div><div class="t2">+974 4040 9999</div></div></a>
+      <a class="ccard" href="mailto:support@waselapp.qa"><div class="ic">✉️</div><div><div class="t1" data-i="c_email">Email</div><div class="t2">support@waselapp.qa</div></div></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="brand" style="font-size:17px"><span class="mark" style="width:28px;height:28px"><svg width="16" height="16" viewBox="0 0 64 64" aria-hidden="true"><path d="M16 40l8-18h16l8 18" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23" cy="42" r="4" fill="#fff"/><circle cx="41" cy="42" r="4" fill="#fff"/></svg></span> WaselGo</div>
+    <div data-i="foot_copy">© 2026 WaselGo · Ride-hailing in Qatar</div>
+    <div><a href="#features" data-i="nav_features">Features</a> · <a href="#contact" data-i="nav_contact">Contact</a></div>
+  </div>
+</footer>
+
+<script>
+  var AR = {
+    nav_features:"المميزات", nav_drivers:"قُد معنا", nav_download:"حمّل التطبيق", nav_contact:"تواصل معنا",
+    hero_badge:"متوفر الآن في قطر",
+    hero_h1a:"رحلتك", hero_h1b:"على بُعد نقرة.",
+    hero_lede:"يربطك واصل جو بالسائقين القريبين خلال ثوانٍ — تابع رحلتك مباشرةً، واطّلع على الأجرة مسبقًا، وادفع بالطريقة التي تناسبك. سريع وآمن وبأسعار معقولة.",
+    hero_cta1:"حمّل التطبيق", hero_cta2:"قُد واربح",
+    m_pickup:"الانطلاق · الآن", m_loc:"الخليج الغربي، الدوحة", m_go:"تأكيد الرحلة · ١٨ ر.ق",
+    f_kicker:"للركّاب", f_h2:"كل ما تحتاجه للوصول", f_sub:"طريقة أذكى للتنقل في المدينة — مصمّمة للسرعة والوضوح وراحة البال.",
+    f1t:"احجز خلال ثوانٍ", f1p:"أدخل وجهتك ليتم ربطك بسائق قريب على الفور.",
+    f2t:"تتبّع مباشر", f2p:"تابع سائقك من نقطة الانطلاق حتى الوصول على الخريطة لحظيًا.",
+    f3t:"سعر مسبق", f3p:"شاهد تقدير الأجرة قبل الحجز. لا مفاجآت ولا رسوم خفية.",
+    f4t:"ادفع كما تريد", f4p:"ادفع نقدًا أو بطريقة الدفع المفضّلة لديك في كل رحلة.",
+    f5t:"احجز مسبقًا", f5p:"احجز رحلاتك مقدمًا للمطار والاجتماعات والرحلات المخطط لها.",
+    f6t:"آمن ومدعوم", f6p:"سائقون موثّقون، ومحادثة داخل التطبيق، ومشاركة الرحلة، ودعم على مدار الساعة.",
+    d_kicker:"للسائقين", d_h2:"قُد وفق جدولك. واربح بشروطك.",
+    d_sub:"يمنحك تطبيق واصل جو للسائقين التحكّم الكامل — اتصل بالإنترنت متى شئت وحوّل وقتك على الطريق إلى دخل.",
+    d_s1n:"٢٤/٧", d_s1l:"اتصل في أي وقت", d_s2n:"مباشر", d_s2l:"تتبّع الأرباح", d_s3n:"سريع", d_s3l:"دفعات أسبوعية",
+    d_c1:"ساعات مرنة — أنت تقرر متى تقود", d_c2:"طلبات رحلات من ركّاب بالقرب منك", d_c3:"ملاحة مدمجة خطوة بخطوة",
+    d_c4:"تتبّع الأرباح اليومية والأسبوعية والشهرية", d_c5:"دعم داخل التطبيق متى احتجت إليه",
+    dl_kicker:"ابدأ الآن", dl_h2:"حمّل واصل جو", dl_sub:"متوفر لتطبيق الركّاب وتطبيق السائقين — بالعربية والإنجليزية.",
+    dl_get:"احصل عليه من", dl_dl:"حمّله من", dl_soon:"التطبيقات قادمة قريبًا — للوصول المبكر تواصل معنا أدناه.",
+    c_kicker:"تواصل", c_h2:"نحن هنا على مدار الساعة", c_sub:"أسئلة أو ملاحظات أو تحتاج مساعدة؟ تواصل مع فريق واصل جو في أي وقت.",
+    c_call:"اتصل بنا", c_email:"البريد الإلكتروني",
+    foot_copy:"© ٢٠٢٦ واصل جو · خدمة النقل في قطر"
+  };
+  var EN = {}; // captured from DOM on load
+  var isAR = false;
+  document.querySelectorAll('[data-i]').forEach(function(el){ EN[el.getAttribute('data-i')] = el.innerHTML; });
+  function apply(map){ document.querySelectorAll('[data-i]').forEach(function(el){ var k=el.getAttribute('data-i'); if(map[k]!=null) el.innerHTML=map[k]; }); }
+  function toggleLang(){
+    isAR = !isAR;
+    document.documentElement.lang = isAR ? 'ar' : 'en';
+    document.body.setAttribute('dir', isAR ? 'rtl' : 'ltr');
+    document.getElementById('langBtn').textContent = isAR ? 'English' : 'العربية';
+    apply(isAR ? AR : EN);
+  }
+</script>
+</body>
+</html>
