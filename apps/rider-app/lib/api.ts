@@ -318,6 +318,22 @@ export const cancelReasonApi = {
   getCancelReasons: () => api.get('/cancel-reasons'),
 };
 
+// Wallet APIs
+export const walletApi = {
+  getBalance: () => api.get<{ balance: number; currency: string }>('/wallet'),
+
+  getTransactions: (limit = 20, offset = 0) =>
+    api.get('/wallet/transactions', { params: { limit, offset } }),
+
+  // Create a SkipCash payment link to top up the wallet. The webhook credits the
+  // balance once payment is confirmed.
+  createTopup: (amount: number) =>
+    api.post<{ success: boolean; payUrl: string; paymentId: string; amount: number; currency: string }>(
+      '/skipcash/wallet-topup',
+      { amount },
+    ),
+};
+
 // Notification APIs
 export const notificationApi = {
   getNotifications: () => api.get('/notifications'),

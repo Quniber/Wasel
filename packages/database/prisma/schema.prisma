@@ -723,7 +723,9 @@ model Order {
   costAfterCoupon     Decimal        @default(0) @db.Decimal(10, 2)
   tipAmount           Decimal        @default(0) @db.Decimal(10, 2)
   paidAmount          Decimal        @default(0) @db.Decimal(10, 2)
-  providerShare       Decimal        @default(0) @db.Decimal(10, 2)
+  governmentFee       Decimal        @default(0) @db.Decimal(10, 2)  // Flat gov fee deducted from fare
+  paymentFee          Decimal        @default(0) @db.Decimal(10, 2)  // Gateway fee (flat + percent), gateway payments only
+  providerShare       Decimal        @default(0) @db.Decimal(10, 2)  // Total not paid to driver (gov + gateway + platform + fleet)
 
   // Payment
   paymentMode         PaymentMode    @default(cash)

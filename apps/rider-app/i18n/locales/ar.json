@@ -456,6 +456,19 @@
     "wallet": "المحفظة",
     "guest": "ضيف"
   },
+  "wallet": {
+    "title": "المحفظة",
+    "balance": "الرصيد المتاح",
+    "topUp": "إضافة رصيد",
+    "topUpNow": "إضافة الرصيد الآن",
+    "customAmount": "أدخل المبلغ",
+    "invalidAmount": "الرجاء إدخال مبلغ صحيح",
+    "topupFailed": "تعذر بدء عملية الإضافة. حاول مرة أخرى.",
+    "topupSuccessTitle": "تمت الإضافة بنجاح",
+    "topupSuccessMessage": "تمت إضافة الرصيد إلى محفظتك.",
+    "recentActivity": "النشاط الأخير",
+    "noTransactions": "لا توجد معاملات بعد"
+  },
   "payment": {
     "title": "إتمام الدفع",
     "tryAgain": "حاول مرة أخرى",

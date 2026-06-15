@@ -58,6 +58,7 @@ function CustomDrawerContent(props: any) {
   const menuItems = [
     { icon: 'home', label: t('drawer.home'), route: '/(main)/(drawer)' },
     { icon: 'time', label: t('drawer.myRides'), route: '/(main)/(drawer)/history' },
+    { icon: 'wallet', label: t('drawer.wallet'), route: '/(main)/(drawer)/wallet' },
     { icon: 'calendar', label: t('drawer.scheduledRides'), route: '/(main)/(drawer)/scheduled' },
     { icon: 'location', label: t('drawer.savedPlaces'), route: '/(main)/(drawer)/places' },
     { icon: 'pricetag', label: t('drawer.promotions'), route: '/(main)/(drawer)/promotions' },
@@ -209,6 +210,7 @@ export default function DrawerLayout() {
     >
       <Drawer.Screen name="index" options={{ headerShown: false }} />
       <Drawer.Screen name="history" options={{ headerShown: false }} />
+      <Drawer.Screen name="wallet" options={{ headerShown: false }} />
       <Drawer.Screen name="scheduled" options={{ headerShown: false }} />
       <Drawer.Screen name="places" options={{ headerShown: false }} />
       <Drawer.Screen name="promotions" options={{ headerShown: false }} />

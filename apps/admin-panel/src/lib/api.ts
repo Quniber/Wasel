@@ -562,6 +562,23 @@ class ApiClient {
     await this.client.delete(`/operators/${id}`);
   }
 
+  // Settings - Generic key/value (fees, commission, etc.)
+  async getSettings() {
+    const response = await this.client.get<Array<{ key: string; value: string; description?: string }>>(
+      '/settings',
+    );
+    return response.data;
+  }
+
+  async upsertSetting(key: string, value: string, description?: string) {
+    const response = await this.client.post<{ key: string; value: string }>('/settings', {
+      key,
+      value,
+      description,
+    });
+    return response.data;
+  }
+
   // Settings - Document Types
   async getDocumentTypes(includeInactive = false) {
     const response = await this.client.get<DocumentType[]>('/settings/document-types', {

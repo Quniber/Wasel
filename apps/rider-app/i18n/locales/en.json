@@ -558,6 +558,19 @@
     "wallet": "Wallet",
     "guest": "Guest"
   },
+  "wallet": {
+    "title": "Wallet",
+    "balance": "Available balance",
+    "topUp": "Top up",
+    "topUpNow": "Top up now",
+    "customAmount": "Enter amount",
+    "invalidAmount": "Please enter a valid amount",
+    "topupFailed": "Could not start the top-up. Please try again.",
+    "topupSuccessTitle": "Top-up successful",
+    "topupSuccessMessage": "Your wallet has been credited.",
+    "recentActivity": "Recent activity",
+    "noTransactions": "No transactions yet"
+  },
   "payment": {
     "title": "Complete Payment",
     "tryAgain": "Try Again",

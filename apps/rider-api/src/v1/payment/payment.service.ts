@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { TransactionType, TransactionAction, PaymentGatewayType } from 'database';
+import { computeRideSplit, loadFeeRates, usesGatewayMode } from '../common/pricing';
 
 // Payment types (embedded to avoid external package dependency issues)
 export enum PaymentMethod {
@@ -533,7 +534,13 @@ export class PaymentService {
 
     // Credit driver earnings (if driver exists)
     if (order.driverId) {
-      await this.creditDriverEarnings(order.driverId, orderId, amount, tipAmount);
+      await this.creditDriverEarnings(
+        order.driverId,
+        orderId,
+        amount,
+        tipAmount,
+        usesGatewayMode(order.paymentMode),
+      );
     }
 
     return {
@@ -543,14 +550,15 @@ export class PaymentService {
     };
   }
 
-  private async creditDriverEarnings(driverId: number, orderId: number, amount: number, tipAmount: number) {
-    // Get platform commission rate from settings
-    const commissionSetting = await this.prisma.setting.findFirst({
-      where: { key: 'platform_commission_rate' },
-    });
-    const platformCommissionRate = commissionSetting
-      ? parseFloat(commissionSetting.value)
-      : 20;
+  private async creditDriverEarnings(
+    driverId: number,
+    orderId: number,
+    amount: number,
+    tipAmount: number,
+    usesGateway: boolean,
+  ) {
+    // Load fee rates (government / payment / platform commission) from settings.
+    const rates = await loadFeeRates(this.prisma);
 
     // Check if driver has a fleet
     const driver = await this.prisma.driver.findUnique({
@@ -562,18 +570,15 @@ export class PaymentService {
       ? Number(driver.fleet.commissionSharePercent)
       : 0;
 
-    // Calculate commissions
-    const platformCommission = (amount * platformCommissionRate) / 100;
-    const afterPlatform = amount - platformCommission;
-    const fleetCommission = (afterPlatform * fleetCommissionRate) / 100;
-    const driverEarnings = amount - platformCommission - fleetCommission;
+    // Run the fee waterfall: gov fee -> gateway fee -> platform -> fleet -> driver.
+    const split = computeRideSplit({ amount, usesGateway, fleetCommissionRate, rates });
 
     // Credit driver earnings
     await this.prisma.driverTransaction.create({
       data: {
         driverId,
         orderId,
-        amount: driverEarnings,
+        amount: split.driverEarnings,
         currency: 'QAR',
         type: TransactionType.credit,
         action: TransactionAction.ride_earning,
@@ -583,7 +588,7 @@ export class PaymentService {
 
     await this.prisma.driver.update({
       where: { id: driverId },
-      data: { walletBalance: { increment: driverEarnings } },
+      data: { walletBalance: { increment: split.driverEarnings } },
     });
 
     // Credit tip separately
@@ -606,10 +611,14 @@ export class PaymentService {
       });
     }
 
-    // Update order with provider share
+    // Record the fee breakdown on the order for auditing.
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { providerShare: platformCommission + fleetCommission },
+      data: {
+        governmentFee: split.governmentFee,
+        paymentFee: split.paymentFee,
+        providerShare: split.providerShare,
+      },
     });
   }
 

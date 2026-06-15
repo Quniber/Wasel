@@ -28,6 +28,70 @@ export class SkipCashController {
   ) {}
 
   /**
+   * Create a SkipCash payment link to top up the authenticated customer's wallet.
+   * A PENDING CustomerTransaction is recorded (reference = SkipCash payment id); the
+   * webhook credits the balance and clears the marker once the payment is confirmed.
+   */
+  @Post('wallet-topup')
+  @UseGuards(JwtAuthGuard)
+  async createWalletTopup(@Request() req: any, @Body() body: { amount: number }) {
+    const customerId = Number(req.user.id || req.user.sub);
+    if (!customerId) {
+      throw new BadRequestException('Customer ID not found in token');
+    }
+
+    const amount = Number(body.amount);
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('Amount must be greater than zero');
+    }
+    if (amount > 5000) {
+      throw new BadRequestException('Maximum top-up amount is 5000 QAR');
+    }
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, firstName: true, lastName: true, email: true, mobileNumber: true },
+    });
+    if (!customer) {
+      throw new BadRequestException('Customer not found');
+    }
+
+    const result = await this.skipCashService.createWalletTopupPayment({
+      amount,
+      firstName: customer.firstName || 'Customer',
+      lastName: customer.lastName || '',
+      email: customer.email || `customer${customerId}@wasel.app`,
+      phone: customer.mobileNumber || undefined,
+      customerId,
+    });
+
+    if (!result.success || !result.paymentId) {
+      throw new BadRequestException(result.error || 'Failed to create wallet top-up');
+    }
+
+    // Record the pending top-up so the webhook can credit it idempotently.
+    await this.prisma.customerTransaction.create({
+      data: {
+        customerId,
+        type: 'credit',
+        action: 'topup',
+        amount,
+        currency: 'QAR',
+        description: `PENDING: Wallet top-up via SkipCash`,
+        reference: result.paymentId,
+      },
+    });
+
+    return {
+      success: true,
+      paymentId: result.paymentId,
+      payUrl: result.payUrl,
+      amount,
+      currency: 'QAR',
+    };
+  }
+
+  /**
    * Create a pre-payment link for card/Apple Pay.
    * Creates the Order with status=WaitingForPrePay first so the webhook can find it.
    * Once SkipCash sends StatusId=2 (paid), the webhook flips it to Requested and dispatches.
@@ -253,6 +317,40 @@ export class SkipCashController {
     this.logger.log(
       `Payment return: type=${type}, orderId=${orderId}, paymentId=${paymentId}, simulated=${simulated}`,
     );
+
+    // Simulated mode is for local development only. Reject it whenever real SkipCash
+    // credentials are configured or we're running in production, so it can never be
+    // abused to mark an order paid without an actual payment.
+    if (simulated === 'true' && (this.skipCashService.isConfigured || process.env.NODE_ENV === 'production')) {
+      this.logger.warn(
+        `Rejected simulated payment return for order ${orderId} — gateway is configured / production`,
+      );
+      return { success: false, message: 'Simulated payments are not allowed' };
+    }
+
+    // Wallet top-up return. In simulated mode fire a synthetic Paid webhook so the
+    // balance is credited; in the real flow the webhook does the crediting and this
+    // just hands the WebView a deep link back to the wallet screen.
+    if (type === 'wallet' && paymentId) {
+      if (simulated === 'true') {
+        await this.skipCashService.processWebhook({
+          PaymentId: paymentId,
+          Amount: amount || '0',
+          StatusId: 2,
+          TransactionId: `wallet_${paymentId}`,
+        });
+      } else {
+        const status = await this.skipCashService.getPaymentStatus(paymentId);
+        if (!status.paid) {
+          return { success: false, redirect: `waselrider://wallet-topup-failed?paymentId=${paymentId}` };
+        }
+      }
+      return {
+        success: true,
+        message: 'Wallet top-up completed',
+        redirect: `waselrider://wallet-topup-complete?paymentId=${paymentId}`,
+      };
+    }
 
     // Simulated mode: fire a synthetic Paid webhook so local dev can drive the success path.
     if (simulated === 'true' && paymentId && orderId) {

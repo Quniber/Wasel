@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import * as crypto from 'crypto';
+import { computeRideSplit, loadFeeRates } from '../common/pricing';
 
 export interface SkipCashPaymentRequest {
   amount: number;
@@ -23,6 +24,15 @@ export interface SkipCashPrePaymentRequest {
   transactionId: string;
   customerId: number;
   orderId: number;
+}
+
+export interface SkipCashWalletTopupRequest {
+  amount: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  customerId: number;
 }
 
 export interface SkipCashPaymentResponse {
@@ -100,6 +110,14 @@ export class SkipCashService {
       `SkipCash config loaded — env=${environment}, keyId=${this.keyId ? 'set' : 'MISSING'}, ` +
       `secretKey=${this.secretKey ? 'set' : 'MISSING'}, webhookKey=${this.webhookKey ? 'set' : 'MISSING'}`,
     );
+  }
+
+  /**
+   * True when real SkipCash credentials are configured. When false the service runs
+   * in "fake gateway" mode and the simulated return path is permitted.
+   */
+  get isConfigured(): boolean {
+    return !!this.keyId && !!this.secretKey;
   }
 
   /**
@@ -329,6 +347,111 @@ export class SkipCashService {
   }
 
   /**
+   * Create a SkipCash payment link to top up a customer's wallet (no order involved).
+   * The TransactionId is `wallet_{customerId}`; the webhook credits the wallet on StatusId=2.
+   */
+  async createWalletTopupPayment(
+    request: SkipCashWalletTopupRequest,
+  ): Promise<SkipCashPaymentResponse> {
+    if (!this.keyId || !this.secretKey) {
+      const paymentId = `sim_wallet_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      this.logger.log(`Simulated SkipCash wallet top-up created: ${paymentId}`);
+      const returnUrl =
+        `${this.returnUrl}?type=wallet&simulated=true&paymentId=${paymentId}` +
+        `&customerId=${request.customerId}&amount=${request.amount}`;
+      return { success: true, paymentId, payUrl: returnUrl };
+    }
+
+    const uid = this.generateUid();
+    const params: Record<string, string> = {
+      Uid: uid,
+      KeyId: this.keyId,
+      Amount: request.amount.toFixed(2),
+      FirstName: request.firstName,
+      LastName: request.lastName,
+      Phone: request.phone || '',
+      Email: request.email,
+      TransactionId: `wallet_${request.customerId}`,
+      Custom1: JSON.stringify({ type: 'wallet_topup', customerId: request.customerId }),
+    };
+
+    const signature = this.generateSignature(params);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: signature },
+        body: JSON.stringify({
+          ...params,
+          WebhookUrl: this.webhookUrl,
+          ReturnUrl: this.returnUrl,
+        }),
+      });
+      const data = await response.json();
+      if (data.returnCode === 200 && data.resultObj) {
+        this.logger.log(`SkipCash wallet top-up created: ${data.resultObj.id}`);
+        return { success: true, paymentId: data.resultObj.id, payUrl: data.resultObj.payUrl };
+      }
+      this.logger.error(`SkipCash wallet top-up failed: ${data.errorMessage}`);
+      return { success: false, error: data.errorMessage || 'Payment creation failed' };
+    } catch (error) {
+      this.logger.error(`SkipCash API error: ${error.message}`);
+      return { success: false, error: error.message || 'Failed to connect to payment gateway' };
+    }
+  }
+
+  /**
+   * Credit a customer's wallet from a SkipCash webhook. Idempotent: the pending
+   * CustomerTransaction (description prefixed `PENDING:`, reference = paymentId) is
+   * created when the top-up link is generated; this clears the marker and bumps the
+   * balance exactly once. Returns true if it handled the payload (wallet top-up).
+   */
+  async handleWalletTopupWebhook(
+    payload: SkipCashWebhookPayload,
+  ): Promise<{ success: boolean } | null> {
+    const pending = await this.prisma.customerTransaction.findFirst({
+      where: { reference: payload.PaymentId },
+    });
+    if (!pending) return null; // not a wallet top-up we know about
+
+    const status = payload.StatusId as SkipCashStatus;
+    const isPending = (pending.description || '').startsWith('PENDING:');
+
+    if (status === SkipCashStatus.Paid) {
+      if (!isPending) {
+        this.logger.warn(`Wallet top-up ${payload.PaymentId} already credited — ignoring duplicate`);
+        return { success: true };
+      }
+      await this.prisma.customerTransaction.update({
+        where: { id: pending.id },
+        data: { description: `Wallet top-up via SkipCash (${payload.PaymentId})` },
+      });
+      await this.prisma.customer.update({
+        where: { id: pending.customerId },
+        data: { walletBalance: { increment: pending.amount } },
+      });
+      this.logger.log(
+        `Wallet top-up credited: customer #${pending.customerId} +${pending.amount}`,
+      );
+      return { success: true };
+    }
+
+    if (
+      status === SkipCashStatus.Failed ||
+      status === SkipCashStatus.Rejected ||
+      status === SkipCashStatus.Canceled
+    ) {
+      // Drop the never-completed pending row so it doesn't linger as a fake credit.
+      if (isPending) {
+        await this.prisma.customerTransaction.delete({ where: { id: pending.id } });
+      }
+      return { success: true };
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Simulate payment for development/testing
    */
   private async simulatePayment(request: SkipCashPaymentRequest): Promise<SkipCashPaymentResponse> {
@@ -425,6 +548,10 @@ export class SkipCashService {
     });
 
     if (!order) {
+      // No order matched — this may be a wallet top-up payment.
+      const walletResult = await this.handleWalletTopupWebhook(payload);
+      if (walletResult) return walletResult;
+
       this.logger.warn(`Order not found for SkipCash PaymentId=${payload.PaymentId}`);
       return { success: false };
     }
@@ -659,11 +786,8 @@ export class SkipCashService {
    * Credit driver earnings after successful payment
    */
   private async creditDriverEarnings(driverId: number, orderId: number, amount: number, tipAmount: number) {
-    // Get platform commission rate
-    const commissionSetting = await this.prisma.setting.findFirst({
-      where: { key: 'platform_commission_rate' },
-    });
-    const platformCommissionRate = commissionSetting ? parseFloat(commissionSetting.value) : 20;
+    // Load fee rates (government / payment / platform commission) from settings.
+    const rates = await loadFeeRates(this.prisma);
 
     // Check if driver has a fleet
     const driver = await this.prisma.driver.findUnique({
@@ -675,18 +799,15 @@ export class SkipCashService {
       ? Number(driver.fleet.commissionSharePercent)
       : 0;
 
-    // Calculate commissions
-    const platformCommission = (amount * platformCommissionRate) / 100;
-    const afterPlatform = amount - platformCommission;
-    const fleetCommission = (afterPlatform * fleetCommissionRate) / 100;
-    const driverEarnings = amount - platformCommission - fleetCommission;
+    // SkipCash payments always settle through the gateway, so gateway fees apply.
+    const split = computeRideSplit({ amount, usesGateway: true, fleetCommissionRate, rates });
 
     // Credit driver earnings
     await this.prisma.driverTransaction.create({
       data: {
         driverId,
         orderId,
-        amount: driverEarnings,
+        amount: split.driverEarnings,
         currency: 'QAR',
         type: 'credit',
         action: 'ride_earning',
@@ -696,7 +817,7 @@ export class SkipCashService {
 
     await this.prisma.driver.update({
       where: { id: driverId },
-      data: { walletBalance: { increment: driverEarnings } },
+      data: { walletBalance: { increment: split.driverEarnings } },
     });
 
     // Credit tip separately
@@ -719,10 +840,14 @@ export class SkipCashService {
       });
     }
 
-    // Update order with provider share
+    // Record the fee breakdown on the order for auditing.
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { providerShare: platformCommission + fleetCommission },
+      data: {
+        governmentFee: split.governmentFee,
+        paymentFee: split.paymentFee,
+        providerShare: split.providerShare,
+      },
     });
   }
 

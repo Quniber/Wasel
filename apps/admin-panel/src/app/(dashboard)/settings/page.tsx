@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/toast';
+import { api, getErrorMessage } from '@/lib/api';
 import { Settings, Bell, DollarSign, Shield, Save, FileText, Car, Palette, XCircle, ChevronRight, Search, Send } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -18,13 +19,52 @@ export default function SettingsPage() {
     timezone: 'UTC',
   });
 
-  // Commission Settings
+  // Commission & fee settings — persisted to the `settings` table (key/value).
   const [commissionSettings, setCommissionSettings] = useState({
-    defaultCommission: 15,
+    defaultCommission: 20,
     minimumFare: 5,
     cancellationFee: 3,
     waitingTimePerMinute: 0.5,
+    governmentFee: 5,
+    paymentFlatFee: 1,
+    paymentPercentFee: 2.3,
   });
+
+  // Map UI fields <-> settings keys (must match rider-api FEE_SETTING_KEYS).
+  const SETTING_KEYS = {
+    defaultCommission: 'platform_commission_rate',
+    minimumFare: 'minimum_fare',
+    cancellationFee: 'cancellation_fee',
+    waitingTimePerMinute: 'waiting_time_per_minute',
+    governmentFee: 'government_fee',
+    paymentFlatFee: 'payment_flat_fee',
+    paymentPercentFee: 'payment_percent_fee',
+  } as const;
+
+  // Load persisted commission/fee settings on mount.
+  useEffect(() => {
+    api
+      .getSettings()
+      .then((rows) => {
+        const map = new Map(rows.map((r) => [r.key, r.value]));
+        const num = (key: string, fallback: number) => {
+          const raw = map.get(key);
+          const parsed = raw != null ? parseFloat(raw) : NaN;
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+        setCommissionSettings((prev) => ({
+          defaultCommission: num(SETTING_KEYS.defaultCommission, prev.defaultCommission),
+          minimumFare: num(SETTING_KEYS.minimumFare, prev.minimumFare),
+          cancellationFee: num(SETTING_KEYS.cancellationFee, prev.cancellationFee),
+          waitingTimePerMinute: num(SETTING_KEYS.waitingTimePerMinute, prev.waitingTimePerMinute),
+          governmentFee: num(SETTING_KEYS.governmentFee, prev.governmentFee),
+          paymentFlatFee: num(SETTING_KEYS.paymentFlatFee, prev.paymentFlatFee),
+          paymentPercentFee: num(SETTING_KEYS.paymentPercentFee, prev.paymentPercentFee),
+        }));
+      })
+      .catch(() => {/* keep defaults if settings can't be loaded */});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Notification Settings
   const [notificationSettings, setNotificationSettings] = useState({
@@ -38,10 +78,23 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast.success('Settings saved successfully');
+    try {
+      // Persist commission & fee settings to the settings table.
+      await Promise.all([
+        api.upsertSetting(SETTING_KEYS.defaultCommission, String(commissionSettings.defaultCommission), 'Platform commission % of the distributable remainder'),
+        api.upsertSetting(SETTING_KEYS.minimumFare, String(commissionSettings.minimumFare), 'Minimum fare for any ride'),
+        api.upsertSetting(SETTING_KEYS.cancellationFee, String(commissionSettings.cancellationFee), 'Fee charged on customer cancellation'),
+        api.upsertSetting(SETTING_KEYS.waitingTimePerMinute, String(commissionSettings.waitingTimePerMinute), 'Waiting charge per minute'),
+        api.upsertSetting(SETTING_KEYS.governmentFee, String(commissionSettings.governmentFee), 'Flat government fee deducted from every ride (QAR)'),
+        api.upsertSetting(SETTING_KEYS.paymentFlatFee, String(commissionSettings.paymentFlatFee), 'Flat payment-gateway fee, card payments only (QAR)'),
+        api.upsertSetting(SETTING_KEYS.paymentPercentFee, String(commissionSettings.paymentPercentFee), 'Payment-gateway percent fee of fare, card payments only (%)'),
+      ]);
+      toast.success('Settings saved successfully');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Data management sub-pages
@@ -173,7 +226,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Default Commission (%)</label>
+              <label className="block text-sm font-medium mb-1">Platform Commission (%)</label>
               <input
                 type="number"
                 value={commissionSettings.defaultCommission}
@@ -182,7 +235,44 @@ export default function SettingsPage() {
                 min="0"
                 max="100"
               />
-              <p className="text-xs text-muted-foreground mt-1">Platform commission from each ride</p>
+              <p className="text-xs text-muted-foreground mt-1">Wasel&apos;s share of the remainder after government &amp; payment fees; the rest goes to the driver (minus fleet share)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Government Fee (QAR)</label>
+              <input
+                type="number"
+                value={commissionSettings.governmentFee}
+                onChange={(e) => setCommissionSettings({ ...commissionSettings, governmentFee: parseFloat(e.target.value) })}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                min="0"
+                step="0.5"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Flat fee deducted from every ride before the split</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Payment Fee — Flat (QAR)</label>
+              <input
+                type="number"
+                value={commissionSettings.paymentFlatFee}
+                onChange={(e) => setCommissionSettings({ ...commissionSettings, paymentFlatFee: parseFloat(e.target.value) })}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                min="0"
+                step="0.5"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Flat gateway fee, card payments only</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Payment Fee — Percent (%)</label>
+              <input
+                type="number"
+                value={commissionSettings.paymentPercentFee}
+                onChange={(e) => setCommissionSettings({ ...commissionSettings, paymentPercentFee: parseFloat(e.target.value) })}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                min="0"
+                max="100"
+                step="0.1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Percent of fare charged by the gateway, card payments only</p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Minimum Fare</label>
