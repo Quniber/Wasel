@@ -1,20 +1,33 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { getColors } from '@/constants/Colors';
 import { authApi } from '@/lib/api';
 
+const BASE_W = 393;
+
 export default function EmailLoginScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
+  const { t, i18n } = useTranslation();
   const { setSession } = useAuthStore();
-  const isDark = resolvedTheme === 'dark';
-  const colors = getColors(isDark);
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,14 +37,12 @@ export default function EmailLoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) return;
-
     setIsLoading(true);
     setError('');
 
     try {
       const response = await authApi.loginWithEmail({ email, password });
 
-      // Save session with tokens (for persistence)
       await setSession(
         {
           accessToken: response.data.accessToken,
@@ -57,188 +68,285 @@ export default function EmailLoginScreen() {
     }
   };
 
-  const isValid = email && password;
+  const isValid = !!email && !!password;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={{ flex: 1 }}
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }}>
-          {/* Back Button */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: 24 * s,
+            paddingBottom: 24 * s,
+            flexGrow: 1,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Back button */}
           <TouchableOpacity
+            activeOpacity={0.8}
             onPress={() => router.back()}
-            style={{ backgroundColor: colors.secondary }}
-            className="w-10 h-10 items-center justify-center mt-2 rounded-full"
+            style={{
+              width: 40 * s,
+              height: 40 * s,
+              borderRadius: 12 * s,
+              backgroundColor: '#F5F7FC',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 10 * s,
+              alignSelf: isRTL ? 'flex-end' : 'flex-start',
+            }}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.foreground} />
+            <Ionicons
+              name={isRTL ? 'chevron-forward' : 'chevron-back'}
+              size={20 * s}
+              color="#111111"
+            />
           </TouchableOpacity>
 
           {/* Title */}
-          <View className="mt-8">
+          <View style={{ marginTop: 32 * s }}>
             <Text
-              style={{ color: colors.foreground }}
-              className="text-2xl font-bold"
+              style={{
+                color: '#111111',
+                fontSize: 32 * s,
+                fontWeight: '700',
+                letterSpacing: -0.8,
+                lineHeight: 38 * s,
+                textAlign,
+                writingDirection,
+              }}
             >
               {t('auth.email.loginTitle')}
             </Text>
             <Text
-              style={{ color: colors.mutedForeground }}
-              className="text-base mt-2"
+              style={{
+                marginTop: 12 * s,
+                color: '#6B7380',
+                fontSize: 16 * s,
+                lineHeight: 24 * s,
+                textAlign,
+                writingDirection,
+              }}
             >
               {t('auth.email.loginSubtitle')}
             </Text>
           </View>
 
-          {/* Error Message */}
-          {error && (
+          {/* Error */}
+          {!!error && (
             <View
-              style={{ backgroundColor: `${colors.destructive}15` }}
-              className="mt-4 p-4 rounded-xl flex-row items-center"
+              style={{
+                marginTop: 16 * s,
+                padding: 12 * s,
+                borderRadius: 12 * s,
+                backgroundColor: '#FEE2E2',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+              }}
             >
-              <Ionicons name="alert-circle" size={20} color={colors.destructive} />
-              <Text style={{ color: colors.destructive }} className="text-sm ml-2 flex-1">
+              <Ionicons name="alert-circle" size={18 * s} color="#DC2626" />
+              <Text
+                style={{
+                  color: '#DC2626',
+                  fontSize: 13 * s,
+                  marginLeft: isRTL ? 0 : 8 * s,
+                  marginRight: isRTL ? 8 * s : 0,
+                  flex: 1,
+                  textAlign,
+                  writingDirection,
+                }}
+              >
                 {error}
               </Text>
             </View>
           )}
 
-          {/* Form */}
-          <View className="mt-6">
-            {/* Email Field */}
-            <View className="mb-4">
-              <Text
-                style={{ color: colors.foreground }}
-                className="mb-2 font-medium"
-              >
-                {t('auth.email.email')}
-              </Text>
-              <View
-                style={{
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                }}
-                className="flex-row items-center rounded-xl px-4"
-              >
-                <Ionicons name="mail-outline" size={20} color={colors.mutedForeground} />
-                <TextInput
-                  style={{ color: colors.foreground }}
-                  className="flex-1 px-3 py-4 text-base"
-                  placeholder={t('auth.email.emailPlaceholder') || 'Enter your email'}
-                  placeholderTextColor={colors.mutedForeground}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
+          {/* Email field */}
+          <View
+            style={{
+              marginTop: 28 * s,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 12 * s,
+              height: 60 * s,
+              paddingHorizontal: 16 * s,
+              borderRadius: 14 * s,
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              backgroundColor: '#F5F7FC',
+            }}
+          >
+            <Ionicons name="mail-outline" size={20 * s} color="#6B7380" />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t('auth.email.emailPlaceholder')}
+              placeholderTextColor="#6B7380"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                flex: 1,
+                fontSize: 16 * s,
+                fontWeight: '600',
+                color: '#111111',
+                padding: 0,
+                textAlign,
+              }}
+            />
+          </View>
 
-            {/* Password Field */}
-            <View className="mb-4">
-              <Text
-                style={{ color: colors.foreground }}
-                className="mb-2 font-medium"
-              >
-                {t('auth.email.password')}
-              </Text>
-              <View
-                style={{
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                }}
-                className="flex-row items-center rounded-xl px-4"
-              >
-                <Ionicons name="lock-closed-outline" size={20} color={colors.mutedForeground} />
-                <TextInput
-                  style={{ color: colors.foreground }}
-                  className="flex-1 px-3 py-4 text-base"
-                  placeholder={t('auth.email.passwordPlaceholder') || 'Enter your password'}
-                  placeholderTextColor={colors.mutedForeground}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={colors.mutedForeground}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+          {/* Password field */}
+          <View
+            style={{
+              marginTop: 12 * s,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 12 * s,
+              height: 60 * s,
+              paddingHorizontal: 16 * s,
+              borderRadius: 14 * s,
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+              backgroundColor: '#F5F7FC',
+            }}
+          >
+            <Ionicons name="lock-closed-outline" size={20 * s} color="#6B7380" />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder={t('auth.email.passwordPlaceholder')}
+              placeholderTextColor="#6B7380"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                flex: 1,
+                fontSize: 16 * s,
+                fontWeight: '600',
+                color: '#111111',
+                padding: 0,
+                textAlign,
+              }}
+            />
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={8}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20 * s}
+                color="#6B7380"
+              />
+            </TouchableOpacity>
+          </View>
 
-            {/* Forgot Password */}
-            <TouchableOpacity className="self-end mb-6">
-              <Text style={{ color: colors.primary }} className="font-medium">
+          {/* Forgot password (right-aligned in LTR, left in RTL) */}
+          <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end', marginTop: 12 * s }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/(auth)/forgot-password')}
+            >
+              <Text
+                style={{
+                  color: '#101969',
+                  fontSize: 14 * s,
+                  fontWeight: '600',
+                }}
+              >
                 {t('auth.email.forgotPassword')}
               </Text>
             </TouchableOpacity>
-
-            {/* Login Button */}
-            <TouchableOpacity
-              onPress={handleLogin}
-              disabled={!isValid || isLoading}
-              style={{
-                backgroundColor: isValid ? colors.primary : colors.secondary,
-              }}
-              className="py-4 rounded-xl items-center flex-row justify-center"
-            >
-              {isLoading ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text
-                  style={{
-                    color: isValid ? colors.primaryForeground : colors.mutedForeground,
-                  }}
-                  className="text-lg font-semibold"
-                >
-                  {t('auth.email.login')}
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
 
-          {/* Divider */}
-          <View className="flex-row items-center my-8">
-            <View style={{ backgroundColor: colors.border }} className="flex-1 h-px" />
-            <Text style={{ color: colors.mutedForeground }} className="px-4 text-sm">
-              {t('common.or') || 'OR'}
-            </Text>
-            <View style={{ backgroundColor: colors.border }} className="flex-1 h-px" />
-          </View>
-
-          {/* Use Phone Instead */}
+          {/* Sign in button */}
           <TouchableOpacity
+            activeOpacity={0.9}
+            disabled={!isValid || isLoading}
+            onPress={handleLogin}
+            style={{
+              marginTop: 20 * s,
+              height: 56 * s,
+              borderRadius: 14 * s,
+              backgroundColor: isValid ? '#101969' : '#C7CDD8',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={{ color: '#FFFFFF', fontSize: 17 * s, fontWeight: '600' }}>
+                {t('auth.email.login')}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* OR divider */}
+          <View
+            style={{
+              marginTop: 24 * s,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12 * s,
+            }}
+          >
+            <View style={{ flex: 1, height: 1, backgroundColor: '#E5EBF2' }} />
+            <Text
+              style={{
+                color: '#6B7380',
+                fontSize: 12 * s,
+                fontWeight: '500',
+                letterSpacing: 1.2,
+              }}
+            >
+              OR
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: '#E5EBF2' }} />
+          </View>
+
+          {/* Use phone instead */}
+          <TouchableOpacity
+            activeOpacity={0.8}
             onPress={() => router.replace('/(auth)/phone')}
             style={{
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-              borderWidth: 1,
+              marginTop: 20 * s,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 8 * s,
             }}
-            className="py-4 rounded-xl items-center flex-row justify-center"
           >
-            <Ionicons name="call-outline" size={20} color={colors.foreground} />
-            <Text
-              style={{ color: colors.foreground }}
-              className="text-base font-medium ml-2"
-            >
+            <Text style={{ color: '#101969', fontSize: 15 * s, fontWeight: '600' }}>
               {t('auth.email.usePhone')}
             </Text>
           </TouchableOpacity>
 
-          {/* Register Link */}
-          <View className="flex-row justify-center mt-8">
-            <Text style={{ color: colors.mutedForeground }} className="text-base">
-              {t('auth.email.noAccount')}{' '}
+          {/* Spacer pushes register link to bottom */}
+          <View style={{ flex: 1 }} />
+
+          {/* Register link */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6 * s,
+              marginTop: 24 * s,
+            }}
+          >
+            <Text style={{ color: '#6B7380', fontSize: 15 * s }}>
+              {t('auth.email.noAccount')}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/email-register')}>
-              <Text style={{ color: colors.primary }} className="text-base font-semibold">
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/(auth)/email-register')}
+            >
+              <Text style={{ color: '#101969', fontSize: 15 * s, fontWeight: '600' }}>
                 {t('auth.email.signUp')}
               </Text>
             </TouchableOpacity>

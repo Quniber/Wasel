@@ -1,365 +1,251 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Linking,
-  useWindowDimensions,
-} from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
 
-const BASE_W = 393;
-
-interface Message {
+interface ChatMessage {
   id: string;
   text: string;
-  fromMe: boolean;
-  at: Date;
+  senderId: string;
+  timestamp: Date;
+  isDriver: boolean;
 }
 
-const formatTime = (d: Date) =>
-  d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-
 export default function ChatScreen() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const { resolvedTheme } = useThemeStore();
   const { activeOrder } = useBookingStore();
-  const { width } = useWindowDimensions();
-  const s = width / BASE_W;
-  const isRTL = i18n.language === 'ar';
-  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
-  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
+  const isDark = resolvedTheme === 'dark';
 
-  const driver = activeOrder?.driver;
+  const flatListRef = useRef<FlatList>(null);
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isInRoom, setIsInRoom] = useState(false);
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [text, setText] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const quickReplies = [
+    { key: 'onMyWay', label: t('chat.quickReplies.onMyWay') },
+    { key: 'waitPlease', label: t('chat.quickReplies.waitPlease') },
+    { key: 'outside', label: t('chat.quickReplies.outside') },
+    { key: 'callMe', label: t('chat.quickReplies.callMe') },
+  ];
 
-  // Listen for chat events
+  // Ensure socket is connected and in order room
   useEffect(() => {
     if (!activeOrder?.id) return;
-    socketService.connect();
-    socketService.joinOrderRoom(Number(activeOrder.id));
-    const unsub = socketService.on('chat:message', (data: any) => {
-      if (!data?.text) return;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: data.id?.toString() || String(Date.now()),
-          text: data.text,
-          fromMe: data.from === 'rider',
-          at: new Date(data.at || Date.now()),
-        },
-      ]);
-    });
+
+    const setupChat = async () => {
+      console.log('[Chat] Setting up chat for order:', activeOrder.id);
+
+      // Ensure socket is connected
+      await socketService.connect();
+      console.log('[Chat] Socket connected');
+      setIsConnected(true);
+
+      // Join order room
+      socketService.joinOrderRoom(activeOrder.id);
+      console.log('[Chat] Joined order room:', activeOrder.id);
+      setIsInRoom(true);
+    };
+
+    setupChat();
+
     return () => {
-      unsub?.();
+      if (activeOrder?.id) {
+        console.log('[Chat] Leaving order room:', activeOrder.id);
+        // Don't leave room here - let ride-active manage it
+      }
     };
   }, [activeOrder?.id]);
 
   useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-  }, [messages.length]);
+    // Listen for incoming messages (matches driver app event name)
+    const unsubscribe = socketService.on('chat:message', (data: {
+      orderId: number;
+      senderId: number;
+      senderType: 'driver' | 'rider';
+      content: string;
+      timestamp: string;
+    }) => {
+      console.log('[Chat] Received message:', data);
 
-  const sendQuick = (q: string) => {
-    setText(q);
-    setTimeout(send, 0);
-  };
+      const newMessage: ChatMessage = {
+        id: `${data.senderId}-${data.timestamp}`,
+        text: data.content,
+        senderId: data.senderId.toString(),
+        timestamp: new Date(data.timestamp),
+        isDriver: data.senderType === 'driver',
+      };
 
-  const send = () => {
-    const v = text.trim();
-    if (!v || !activeOrder?.id) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: String(Date.now()), text: v, fromMe: true, at: new Date() },
-    ]);
-    setText('');
-    socketService.emit?.('chat:send', {
-      orderId: activeOrder.id,
-      from: 'rider',
-      text: v,
+      // Check if message already exists (avoid duplicates)
+      setMessages((prev) => {
+        const exists = prev.some(msg => msg.id === newMessage.id);
+        if (exists) return prev;
+        return [...prev, newMessage];
+      });
     });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
+  const sendMessage = (text: string) => {
+    if (!text.trim()) return;
+
+    // Validate socket connection and room membership
+    if (!isConnected || !isInRoom) {
+      console.warn('[Chat] Cannot send message: socket not connected or not in room');
+      return;
+    }
+
+    if (!activeOrder?.id) {
+      console.warn('[Chat] Cannot send message: no active order');
+      return;
+    }
+
+    const messageText = text.trim();
+    setMessage('');
+
+    console.log('[Chat] Sending message:', { orderId: activeOrder.id, content: messageText });
+
+    // Send via socket (matches driver app event name)
+    // Message will come back via 'chat:message' event and be displayed
+    socketService.emit('chat:send', {
+      orderId: Number(activeOrder.id),
+      content: messageText,
+    });
+
+    // Scroll to bottom after a brief delay for the message to arrive
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 200);
   };
 
-  const callDriver = () => {
-    if (!driver?.mobileNumber) return;
-    Linking.openURL(`tel:${driver.mobileNumber}`).catch(() => {});
+  const handleQuickReply = (text: string) => {
+    sendMessage(text);
   };
 
-  const Bubble = ({ m }: { m: Message }) => (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: m.fromMe ? 'flex-end' : 'flex-start',
-        marginBottom: 14 * s,
-      }}
-    >
-      <View style={{ maxWidth: 280 * s }}>
-        <View
-          style={{
-            backgroundColor: m.fromMe ? '#101969' : '#EDF0F7',
-            borderRadius: 18 * s,
-            borderTopLeftRadius: m.fromMe ? 18 * s : 4 * s,
-            borderBottomRightRadius: m.fromMe ? 4 * s : 18 * s,
-            paddingHorizontal: 14 * s,
-            paddingVertical: 10 * s,
-          }}
-        >
-          <Text
-            style={{
-              color: m.fromMe ? '#FFFFFF' : '#111111',
-              fontSize: 15 * s,
-              lineHeight: 22 * s,
-            }}
-          >
-            {m.text}
-          </Text>
-        </View>
-        <Text
-          style={{
-            color: '#6B7380',
-            fontSize: 11 * s,
-            fontWeight: '500',
-            marginTop: 4 * s,
-            textAlign: m.fromMe ? 'right' : 'left',
-          }}
-        >
-          {formatTime(m.at)}
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const driver = activeOrder?.driver;
+
+  const renderMessage = ({ item }: { item: ChatMessage }) => (
+    <View className={`px-4 mb-3 ${item.isDriver ? 'items-start' : 'items-end'}`}>
+      <View
+        className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+          item.isDriver
+            ? isDark
+              ? 'bg-muted-dark rounded-bl-none'
+              : 'bg-muted rounded-bl-none'
+            : 'bg-primary rounded-br-none'
+        }`}
+      >
+        <Text className={item.isDriver ? (isDark ? 'text-foreground-dark' : 'text-foreground') : 'text-white'}>
+          {item.text}
         </Text>
       </View>
+      <Text className="text-muted-foreground text-xs mt-1">{formatTime(item.timestamp)}</Text>
     </View>
   );
 
-  const quickReplies = [
-    t('chat.quick1', 'On my way'),
-    t('chat.quick2', 'Wait please'),
-    t('chat.quick3', "I'm outside"),
-  ];
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
+    <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background'}`} edges={['top']}>
       {/* Header */}
-      <View
-        style={{
-          flexDirection: isRTL ? 'row-reverse' : 'row',
-          alignItems: 'center',
-          gap: 12 * s,
-          paddingHorizontal: 12 * s,
-          height: 70 * s,
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5EBF2',
-        }}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.back()}
-          style={{
-            width: 40 * s,
-            height: 40 * s,
-            borderRadius: 12 * s,
-            backgroundColor: '#F5F7FC',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons
-            name={isRTL ? 'chevron-forward' : 'chevron-back'}
-            size={20 * s}
-            color="#111111"
-          />
+      <View className={`flex-row items-center px-4 py-4 border-b ${isDark ? 'border-border-dark' : 'border-border'}`}>
+        <TouchableOpacity onPress={() => router.replace('/(main)/ride-active')} className="w-10 h-10 items-center justify-center">
+          <Ionicons name="arrow-back" size={24} color={isDark ? '#FAFAFA' : '#212121'} />
         </TouchableOpacity>
-        <View
-          style={{
-            width: 40 * s,
-            height: 40 * s,
-            borderRadius: 20 * s,
-            backgroundColor: '#101969',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ color: '#FFFFFF', fontSize: 14 * s, fontWeight: '700' }}>
-            {(driver?.firstName?.[0] || 'D').toUpperCase()}
-          </Text>
-        </View>
-        <View style={{ flex: 1, gap: 2 * s }}>
-          <Text
-            numberOfLines={1}
-            style={{ color: '#111111', fontSize: 15 * s, fontWeight: '700', textAlign }}
-          >
-            {[driver?.firstName, driver?.lastName].filter(Boolean).join(' ') ||
-              t('common.driver', 'Driver')}
-          </Text>
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 * s }}>
-            <View
-              style={{
-                width: 6 * s,
-                height: 6 * s,
-                borderRadius: 3 * s,
-                backgroundColor: '#33BF73',
-              }}
-            />
-            <Text style={{ color: '#6B7380', fontSize: 12 * s, fontWeight: '500' }}>
-              {t('chat.onTheWay', 'On the way')} · {driver?.carModel || ''}
+        <View className="flex-row items-center flex-1 ml-2">
+          <View className="w-10 h-10 rounded-full bg-primary items-center justify-center">
+            <Text className="text-white font-bold">
+              {driver?.firstName?.[0]}{driver?.lastName?.[0] || 'D'}
             </Text>
+          </View>
+          <View className="ml-3">
+            <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
+              {driver?.firstName || t('chat.driver')}
+            </Text>
+            <Text className="text-muted-foreground text-sm">{t('chat.yourDriver')}</Text>
           </View>
         </View>
         <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={callDriver}
-          style={{
-            width: 40 * s,
-            height: 40 * s,
-            borderRadius: 20 * s,
-            backgroundColor: '#F5F7FC',
-            alignItems: 'center',
-            justifyContent: 'center',
+          onPress={() => {
+            if (driver?.mobileNumber) {
+              // Linking.openURL(`tel:${driver.mobileNumber}`);
+            }
           }}
+          className="w-10 h-10 items-center justify-center"
         >
-          <Ionicons name="call" size={20 * s} color="#101969" />
+          <Ionicons name="call" size={24} color="#4CAF50" />
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+        keyboardVerticalOffset={0}
       >
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 20 * s, paddingVertical: 16 * s }}
-        >
-          <Text
-            style={{
-              color: '#6B7380',
-              fontSize: 11 * s,
-              fontWeight: '600',
-              letterSpacing: 0.8,
-              textAlign: 'center',
-              marginBottom: 14 * s,
-            }}
-          >
-            {t('chat.todayHeader', 'TODAY')}
-          </Text>
-          {messages.map((m) => (
-            <Bubble key={m.id} m={m} />
-          ))}
-        </ScrollView>
+        {/* Messages List */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingVertical: 16 }}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        />
 
-        {/* Quick replies */}
-        {messages.length === 0 && (
-          <ScrollView
+        {/* Quick Replies */}
+        <View className={`px-4 py-2 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
+          <FlatList
             horizontal
+            data={quickReplies}
+            keyExtractor={(item) => item.key}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              gap: 8 * s,
-              paddingHorizontal: 20 * s,
-              paddingVertical: 10 * s,
-            }}
-          >
-            {quickReplies.map((q) => (
+            renderItem={({ item }) => (
               <TouchableOpacity
-                key={q}
-                activeOpacity={0.85}
-                onPress={() => sendQuick(q)}
-                style={{
-                  paddingHorizontal: 14 * s,
-                  paddingVertical: 8 * s,
-                  borderRadius: 999,
-                  backgroundColor: '#F5F7FC',
-                  borderWidth: 1,
-                  borderColor: '#E5EBF2',
-                }}
+                onPress={() => handleQuickReply(item.label)}
+                className={`px-4 py-2 rounded-full mr-2 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
               >
-                <Text style={{ color: '#111111', fontSize: 13 * s, fontWeight: '600' }}>
-                  {q}
-                </Text>
+                <Text className={`${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>{item.label}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Compose */}
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: '#E5EBF2',
-            backgroundColor: '#FFFFFF',
-            paddingHorizontal: 16 * s,
-            paddingTop: 12 * s,
-            paddingBottom: 18 * s,
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            alignItems: 'center',
-            gap: 10 * s,
-          }}
-        >
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={{
-              width: 40 * s,
-              height: 40 * s,
-              borderRadius: 20 * s,
-              backgroundColor: '#F5F7FC',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="add" size={20 * s} color="#101969" />
-          </TouchableOpacity>
-          <View
-            style={{
-              flex: 1,
-              minHeight: 44 * s,
-              maxHeight: 100 * s,
-              paddingHorizontal: 16 * s,
-              paddingVertical: 10 * s,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: '#E5EBF2',
-              backgroundColor: '#F5F7FC',
-              justifyContent: 'center',
-            }}
-          >
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder={t('chat.message', 'Message')}
-              placeholderTextColor="#6B7380"
-              multiline
-              style={{
-                fontSize: 15 * s,
-                color: '#111111',
-                padding: 0,
-                textAlign,
-                writingDirection,
-              }}
-            />
-          </View>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            disabled={!text.trim()}
-            onPress={send}
-            style={{
-              width: 44 * s,
-              height: 44 * s,
-              borderRadius: 22 * s,
-              backgroundColor: text.trim() ? '#101969' : '#C7CDD8',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name={isRTL ? 'send' : 'send'} size={20 * s} color="#FFFFFF" />
-          </TouchableOpacity>
+            )}
+          />
         </View>
+
+        {/* Input */}
+        <SafeAreaView edges={['bottom']} className={`${isDark ? 'bg-background-dark' : 'bg-background'}`}>
+          <View className={`flex-row items-center px-4 py-3 border-t ${isDark ? 'border-border-dark' : 'border-border'}`}>
+            <View className={`flex-1 flex-row items-center rounded-full px-4 py-2 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
+              <TextInput
+                className={`flex-1 text-base ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}
+                placeholder={t('chat.placeholder')}
+                placeholderTextColor={isDark ? '#757575' : '#9E9E9E'}
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                maxLength={500}
+              />
+            </View>
+            <TouchableOpacity
+              onPress={() => sendMessage(message)}
+              disabled={!message.trim()}
+              className={`ml-3 w-12 h-12 rounded-full items-center justify-center ${
+                message.trim() ? 'bg-primary' : isDark ? 'bg-muted-dark' : 'bg-muted'
+              }`}
+            >
+              <Ionicons name="send" size={20} color={message.trim() ? '#FFFFFF' : '#9E9E9E'} />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

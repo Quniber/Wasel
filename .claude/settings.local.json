@@ -26,7 +26,12 @@
       "Bash(echo sshpass not available:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
-      "Bash(sshpass:*)"
+      "Bash(sshpass:*)",
+      "Bash(find /Users/rashid/Desktop/shafrah/projects/wasel/apps -path */node_modules -prune -o -name *delete* -type f -print)",
+      "Bash(find /Users/rashid/Desktop/shafrah/projects/wasel/apps/rider-app -name *auth*store*)",
+      "Bash(find /Users/rashid/Desktop/shafrah/projects/wasel/apps -name *.json -path */locales/* -o -name *.json -path */i18n/*)",
+      "Bash(cd:*)",
+      "Bash(eas:*)"
     ],
     "deny": [],
     "ask": []

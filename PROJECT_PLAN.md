@@ -31,7 +31,7 @@ Building a production-ready taxi platform for a single city with:
 | Auth | JWT (Passport) |
 | File Storage | Local (dev) / S3 (prod) |
 | Push Notifications | Firebase Cloud Messaging |
-| SMS | Twilio / local provider |
+| SMS | Ooredoo BMS |
 | Email | SendGrid / SES |
 
 ---
@@ -812,7 +812,7 @@ Type is missing properties: perHundredMeters, perMinuteDrive
 **Tasks:**
 - [ ] Create NotificationService
 - [ ] Integrate Firebase Admin SDK
-- [ ] Create SMS service (Twilio)
+- [ ] Create SMS service (Ooredoo BMS)
 - [ ] Create Email service (SendGrid)
 - [ ] Create notification templates
 

@@ -101,13 +101,18 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         case 'driver':
           this.drivers.set(userId, connectedClient);
           client.join('drivers');
-          // Register driver with DriverTracker (with default location)
-          DriverTracker.setOnline(
-            userId,
-            client.id,
-            { latitude: 0, longitude: 0 }, // Will be updated when driver sends location
-            [] // Service IDs will be updated when driver goes online
-          );
+          // Register driver with DriverTracker, rebinding to the CURRENT socket id.
+          // On reconnect keep any existing location/services instead of resetting
+          // them; the driver app also re-emits driver:online to refresh these.
+          {
+            const existing = DriverTracker.getDriver(Number(userId));
+            DriverTracker.setOnline(
+              userId,
+              client.id,
+              existing?.location || { latitude: 0, longitude: 0 },
+              existing?.serviceIds || [],
+            );
+          }
           this.logger.log(`Driver ${userId} connected (socket: ${client.id})`);
           break;
         case 'rider':
@@ -136,19 +141,29 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       switch (type) {
         case 'admin':
-          this.admins.delete(userId);
+          if (this.admins.get(userId)?.socketId === client.id) {
+            this.admins.delete(userId);
+          }
           this.logger.log(`Admin ${userId} disconnected`);
           break;
         case 'driver':
-          this.drivers.delete(userId);
-          // Remove from DriverTracker
-          DriverTracker.setOffline(userId);
-          this.logger.log(`Driver ${userId} disconnected`);
-          // Notify admins about driver going offline
-          this.emitToAdmins('driver:status', { driverId: userId, status: 'offline' });
+          // Guard against stale disconnects: on reconnect the OLD socket fires a
+          // disconnect AFTER the new socket has registered. Only tear down the
+          // presence if this disconnecting socket is still the current one.
+          if (this.drivers.get(userId)?.socketId === client.id) {
+            this.drivers.delete(userId);
+            DriverTracker.setOffline(userId);
+            this.logger.log(`Driver ${userId} disconnected`);
+            // Notify admins about driver going offline
+            this.emitToAdmins('driver:status', { driverId: userId, status: 'offline' });
+          } else {
+            this.logger.log(`Driver ${userId} stale socket ${client.id} disconnected (kept current presence)`);
+          }
           break;
         case 'rider':
-          this.riders.delete(userId);
+          if (this.riders.get(userId)?.socketId === client.id) {
+            this.riders.delete(userId);
+          }
           this.logger.log(`Rider ${userId} disconnected`);
           break;
       }
@@ -331,14 +346,56 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========== Emit Methods (called by API) ==========
 
   emitToDriver(driverId: number, event: string, data: any): boolean {
-    const driver = this.drivers.get(driverId);
-    if (driver) {
+    let driver = this.drivers.get(driverId);
+
+    // If the tracked socket is gone/disconnected (e.g. after a reconnect where
+    // we ended up with a stale reference), try to recover the driver's current
+    // live socket before giving up.
+    if (!driver || !driver.socket?.connected) {
+      const liveSocket = this.findLiveSocketForUser('driver', driverId);
+      if (liveSocket) {
+        driver = {
+          socketId: liveSocket.id,
+          type: 'driver',
+          userId: driverId,
+          socket: liveSocket,
+        };
+        this.drivers.set(driverId, driver);
+        // Keep DriverTracker pointing at the live socket too.
+        const tracked = DriverTracker.getDriver(driverId);
+        DriverTracker.setOnline(
+          driverId,
+          liveSocket.id,
+          tracked?.location || { latitude: 0, longitude: 0 },
+          tracked?.serviceIds || [],
+        );
+        this.logger.warn(`Recovered live socket ${liveSocket.id} for driver ${driverId}`);
+      }
+    }
+
+    if (driver && driver.socket?.connected) {
       driver.socket.emit(event, data);
       this.logger.log(`Emitted ${event} to driver ${driverId}`);
       return true;
     }
+
+    // Genuinely not connected — clean up so dispatch skips this driver.
+    this.drivers.delete(driverId);
+    DriverTracker.setOffline(driverId);
     this.logger.warn(`Driver ${driverId} not connected, cannot emit ${event}`);
     return false;
+  }
+
+  // Find a currently-connected socket for a given user, used to recover from
+  // stale presence references after reconnects.
+  private findLiveSocketForUser(type: 'driver' | 'rider' | 'admin', userId: number): Socket | undefined {
+    for (const [socketId, info] of this.socketToClient) {
+      if (info.type === type && Number(info.userId) === Number(userId)) {
+        const sock = this.server.sockets.sockets.get(socketId);
+        if (sock?.connected) return sock;
+      }
+    }
+    return undefined;
   }
 
   emitToRider(riderId: number, event: string, data: any): boolean {

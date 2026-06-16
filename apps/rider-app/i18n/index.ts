@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { I18nManager } from 'react-native';
 
 import en from './locales/en.json';
 import ar from './locales/ar.json';
@@ -30,6 +31,13 @@ const getStoredLanguage = async (): Promise<string> => {
 
 // Initialize i18n
 export const initI18n = async () => {
+  // Force LTR layout direction at the native level so flexbox doesn't auto-mirror.
+  // RTL text alignment is handled per-component via JS (textAlign / writingDirection).
+  if (I18nManager.isRTL) {
+    I18nManager.allowRTL(false);
+    I18nManager.forceRTL(false);
+  }
+
   const language = await getStoredLanguage();
 
   await i18n.use(initReactI18next).init({
@@ -47,7 +55,8 @@ export const initI18n = async () => {
   return language;
 };
 
-// Change language
+// Change language — persist + swap i18n. No native RTL flag, no reload.
+// Text alignment is handled per-component via JS (textAlign based on lang).
 export const changeLanguage = async (lang: 'en' | 'ar') => {
   await AsyncStorage.setItem(LANGUAGE_KEY, lang);
   await i18n.changeLanguage(lang);

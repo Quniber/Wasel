@@ -4,10 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { I18nextProvider } from 'react-i18next';
-import { View, ActivityIndicator, I18nManager } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import i18n, { initI18n } from '@/i18n';
-import { useThemeStore } from '@/stores/theme-store';
 import { useAuthStore } from '@/stores/auth-store';
 import '../global.css';
 
@@ -21,34 +20,27 @@ const queryClient = new QueryClient({
 });
 
 function RootLayoutContent() {
-  const { resolvedTheme } = useThemeStore();
-  const { loadStoredAuth, logout, isLoading, setLoading } = useAuthStore();
+  const { loadStoredAuth, isLoading } = useAuthStore();
 
   useEffect(() => {
-    // Load auth from storage to persist login
-    const initAuth = async () => {
-      await loadStoredAuth();
-    };
-    initAuth();
+    loadStoredAuth();
   }, []);
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-background dark:bg-background-dark">
-        <ActivityIndicator size="large" color="#0366FB" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#101969" />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="dark" />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: {
-            backgroundColor: resolvedTheme === 'dark' ? '#121212' : '#FFFFFF',
-          },
+          contentStyle: { backgroundColor: '#FFFFFF' },
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -64,13 +56,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     const setupI18n = async () => {
-      const lang = await initI18n();
-      // Set RTL for Arabic
-      const isRTL = lang === 'ar';
-      if (I18nManager.isRTL !== isRTL) {
-        I18nManager.allowRTL(isRTL);
-        I18nManager.forceRTL(isRTL);
-      }
+      await initI18n();
       setI18nReady(true);
     };
     setupI18n();

@@ -1,71 +1,82 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Modal, Pressable, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  useWindowDimensions,
+  LayoutChangeEvent,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { MapView, MapMarker as Marker, MapPolyline as Polyline, MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE } from '@/components/maps/MapView';
-import { useThemeStore } from '@/stores/theme-store';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import {
+  MapView,
+  MapMarker as Marker,
+  MapPolyline as Polyline,
+  MAP_PROVIDER_GOOGLE as PROVIDER_GOOGLE,
+} from '@/components/maps/MapView';
 import { useBookingStore, Service, FareEstimate, PaymentMethod } from '@/stores/booking-store';
 import { api, orderApi } from '@/lib/api';
+import AlertModal from '@/components/AlertModal';
+import CouponModal from '@/components/CouponModal';
+import BottomSheet from '@/components/BottomSheet';
 
-// Calculate distance between two points (Haversine formula)
+const BASE_W = 393;
+
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Decode Google polyline
 function decodePolyline(encoded: string): { latitude: number; longitude: number }[] {
   const points: { latitude: number; longitude: number }[] = [];
   let index = 0;
   let lat = 0;
   let lng = 0;
-
   while (index < encoded.length) {
     let shift = 0;
     let result = 0;
-    let byte;
-
+    let byte: number;
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-
     const dlat = result & 1 ? ~(result >> 1) : result >> 1;
     lat += dlat;
-
     shift = 0;
     result = 0;
-
     do {
       byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-
     const dlng = result & 1 ? ~(result >> 1) : result >> 1;
     lng += dlng;
-
-    points.push({
-      latitude: lat / 1e5,
-      longitude: lng / 1e5,
-    });
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
   }
-
   return points;
 }
 
 export default function RoutePreviewScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
+  const { t, i18n } = useTranslation();
   const {
     pickup,
     dropoff,
@@ -77,58 +88,95 @@ export default function RoutePreviewScreen() {
     setFareEstimates,
     paymentMethod,
     setPaymentMethod,
+    couponCode,
+    couponDiscount,
+    setCoupon,
   } = useBookingStore();
-  const isDark = resolvedTheme === 'dark';
+  const { width, height } = useWindowDimensions();
+  const s = width / BASE_W;
+
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   const mapRef = useRef<MapView>(null);
-  const hasFitted = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; distanceValue: number; durationValue: number } | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [sheetCollapsed, setSheetCollapsed] = useState(false);
+  const [isRequestingRide, setIsRequestingRide] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
+  const [routeInfo, setRouteInfo] = useState<{
+    distance: string;
+    duration: string;
+    distanceValue: number;
+    durationValue: number;
+  } | null>(null);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [couponModalVisible, setCouponModalVisible] = useState(false);
+  const [errorModal, setErrorModal] = useState<{ title: string; msg: string } | null>(null);
 
-  const getPaymentLabel = (method: PaymentMethod) => {
-    switch (method) {
-      case 'cash': return t('booking.payment.cash', { defaultValue: 'Cash' });
-      case 'wallet': return t('booking.payment.wallet', { defaultValue: 'Wallet' });
-      case 'card': return t('booking.payment.card', { defaultValue: 'Card / Apple Pay' });
-    }
+  // Bottom sheet sizing — measured from actual content layout so there's no extra empty space.
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const SHEET_COLLAPSED_HEIGHT = 110 * s; // shows handle + title strip + a peek
+  const sheetTranslateY = useSharedValue(0);
+  const COLLAPSE_DELTA = Math.max(0, sheetHeight - SHEET_COLLAPSED_HEIGHT);
+
+  const onSheetLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h && Math.abs(h - sheetHeight) > 1) setSheetHeight(h);
   };
 
-  const getPaymentIcon = (method: PaymentMethod): keyof typeof Ionicons.glyphMap => {
-    switch (method) {
-      case 'cash': return 'cash-outline';
-      case 'wallet': return 'wallet-outline';
-      case 'card': return 'logo-apple';
-    }
-  };
+  const collapseSheet = () =>
+    (sheetTranslateY.value = withSpring(COLLAPSE_DELTA, { damping: 18, stiffness: 160 }));
+  const expandSheet = () =>
+    (sheetTranslateY.value = withSpring(0, { damping: 18, stiffness: 160 }));
 
-  // Set initial route line immediately
+  const panGesture = Gesture.Pan()
+    .onChange((e) => {
+      const next = sheetTranslateY.value + e.changeY;
+      sheetTranslateY.value = Math.max(0, Math.min(COLLAPSE_DELTA, next));
+    })
+    .onEnd((e) => {
+      const halfway = COLLAPSE_DELTA / 2;
+      // If user flicked down or moved past halfway, collapse; otherwise expand
+      if (e.velocityY > 600 || sheetTranslateY.value > halfway) {
+        sheetTranslateY.value = withSpring(COLLAPSE_DELTA, { damping: 18, stiffness: 160 });
+      } else {
+        sheetTranslateY.value = withSpring(0, { damping: 18, stiffness: 160 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
+
+  // Initial route line + load services
   useEffect(() => {
     if (pickup && dropoff) {
-      // Set straight line immediately so something shows
       setRouteCoordinates([
         { latitude: pickup.latitude, longitude: pickup.longitude },
         { latitude: dropoff.latitude, longitude: dropoff.longitude },
       ]);
-
-      // Then load the actual route and services
       loadRouteAndServices();
     }
   }, [pickup, dropoff]);
 
   const fitMap = () => {
     if (!pickup || !dropoff || !mapRef.current) return;
-    const coords = routeCoordinates.length > 0
-      ? routeCoordinates
-      : [
-          { latitude: pickup.latitude, longitude: pickup.longitude },
-          { latitude: dropoff.latitude, longitude: dropoff.longitude },
-        ];
-
+    const coords =
+      routeCoordinates.length > 0
+        ? routeCoordinates
+        : [
+            { latitude: pickup.latitude, longitude: pickup.longitude },
+            { latitude: dropoff.latitude, longitude: dropoff.longitude },
+          ];
     mapRef.current.fitToCoordinates(coords, {
-      edgePadding: { top: 120, right: 60, bottom: 60, left: 60 },
+      edgePadding: {
+        top: 120,
+        right: 60,
+        bottom: (sheetHeight || 460 * s) + 40,
+        left: 60,
+      },
       animated: true,
     });
   };
@@ -142,24 +190,20 @@ export default function RoutePreviewScreen() {
   const loadRouteAndServices = async () => {
     setIsLoading(true);
     try {
-      // Get route from Google Directions API
       await fetchRoute();
-
-      // Load services from API
       const servicesResponse = await orderApi.getServices();
-      const loadedServices: Service[] = (servicesResponse.data || []).map((s: any) => ({
-        id: s.id.toString(),
-        name: s.name,
-        description: s.description || '',
-        baseFare: parseFloat(s.baseFare) || 0,
-        perKilometer: parseFloat(s.perKilometer) || 0,
-        perMinute: parseFloat(s.perMinute) || 0,
-        minimumFare: parseFloat(s.minimumFare) || 0,
-        personCapacity: s.personCapacity || 4,
+      const loadedServices: Service[] = (servicesResponse.data || []).map((sr: any) => ({
+        id: sr.id.toString(),
+        name: sr.name,
+        description: sr.description || '',
+        baseFare: parseFloat(sr.baseFare) || 0,
+        perKilometer: parseFloat(sr.perKilometer) || 0,
+        perMinute: parseFloat(sr.perMinute) || 0,
+        minimumFare: parseFloat(sr.minimumFare) || 0,
+        personCapacity: sr.personCapacity || 4,
       }));
       setServices(loadedServices);
 
-      // Calculate fares for each service from backend
       if (pickup && dropoff && loadedServices.length > 0) {
         const farePromises = loadedServices.map(async (service) => {
           try {
@@ -171,7 +215,6 @@ export default function RoutePreviewScreen() {
               dropoffLongitude: dropoff.longitude,
             });
             const data = fareResponse.data;
-            // Backend returns: estimatedFare, breakdown.baseFare, breakdown.distanceCost, breakdown.timeCost
             return {
               serviceId: service.id,
               baseFare: parseFloat(data.breakdown?.baseFare) || 0,
@@ -182,23 +225,18 @@ export default function RoutePreviewScreen() {
               distance: parseFloat(data.distance) || 0,
               duration: parseFloat(data.estimatedDuration) || 0,
               eta: parseInt(data.estimatedDuration) || 5,
-            };
-          } catch (err) {
-            console.error('Error calculating fare for service:', service.id, err);
+            } as FareEstimate;
+          } catch {
             return null;
           }
         });
-
         const fares = (await Promise.all(farePromises)).filter(Boolean) as FareEstimate[];
         setFareEstimates(fares);
       }
 
-      // Auto-select first service
       if (!selectedService && loadedServices.length > 0) {
         setSelectedService(loadedServices[0]);
       }
-    } catch (error) {
-      console.error('Error loading route and services:', error);
     } finally {
       setIsLoading(false);
     }
@@ -206,31 +244,25 @@ export default function RoutePreviewScreen() {
 
   const fetchRoute = async () => {
     if (!pickup || !dropoff) return;
-
-    // Always set a straight line first as fallback
     const straightLine = [
       { latitude: pickup.latitude, longitude: pickup.longitude },
       { latitude: dropoff.latitude, longitude: dropoff.longitude },
     ];
     setRouteCoordinates(straightLine);
-
-    // Calculate straight-line distance and estimated time as fallback
     const distanceKm = calculateDistance(
-      pickup.latitude, pickup.longitude,
-      dropoff.latitude, dropoff.longitude
+      pickup.latitude,
+      pickup.longitude,
+      dropoff.latitude,
+      dropoff.longitude
     );
-    const estimatedMinutes = Math.round(distanceKm * 2); // Rough estimate: 2 min per km
-
+    const estimatedMinutes = Math.round(distanceKm * 2);
     setRouteInfo({
       distance: `${distanceKm.toFixed(1)} km`,
       duration: `${estimatedMinutes} min`,
       distanceValue: distanceKm * 1000,
       durationValue: estimatedMinutes * 60,
     });
-
     try {
-      // Use backend proxy for directions API
-      console.log('Fetching route via backend proxy...');
       const response = await orderApi.getDirections({
         originLat: pickup.latitude,
         originLng: pickup.longitude,
@@ -238,60 +270,51 @@ export default function RoutePreviewScreen() {
         destLng: dropoff.longitude,
       });
       const data = response.data;
-
-      console.log('Directions API response:', data.status);
-
       if (data.status === 'OK' && data.polyline) {
-        // Decode polyline for actual route
         const points = decodePolyline(data.polyline);
-        if (points.length > 0) {
-          setRouteCoordinates(points);
-          console.log('Route decoded with', points.length, 'points');
-        }
-
-        // Set actual route info from backend response
+        if (points.length > 0) setRouteCoordinates(points);
         setRouteInfo({
           distance: data.distance.text,
           duration: data.duration.text,
           distanceValue: data.distance.value,
           durationValue: data.duration.value,
         });
-      } else {
-        console.log('Directions API error:', data.status, data.error);
       }
-    } catch (error) {
-      console.error('Error fetching route:', error);
-      // Keep the straight line fallback that was already set
+    } catch {}
+  };
+
+  const getFareForService = (serviceId: string) =>
+    fareEstimates.find((f) => f.serviceId === serviceId);
+
+  const getPaymentLabel = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash':
+        return t('booking.payment.cash', { defaultValue: 'Cash' });
+      case 'wallet':
+        return t('booking.payment.wallet', { defaultValue: 'Wallet' });
+      case 'card':
+        return t('booking.payment.card', { defaultValue: 'Card / Apple Pay' });
     }
   };
-
-  const getFareForService = (serviceId: string) => {
-    return fareEstimates.find((f) => f.serviceId === serviceId);
+  const getPaymentIcon = (method: PaymentMethod): keyof typeof Ionicons.glyphMap => {
+    switch (method) {
+      case 'cash':
+        return 'cash-outline';
+      case 'wallet':
+        return 'wallet-outline';
+      case 'card':
+        return 'card-outline';
+    }
   };
-
-  const [isRequestingRide, setIsRequestingRide] = useState(false);
 
   const handleRequestRide = async () => {
-    console.log('[RoutePreview] handleRequestRide called:', {
-      hasPickup: !!pickup,
-      hasDropoff: !!dropoff,
-      hasSelectedService: !!selectedService,
-      paymentMethod,
-    });
-
-    if (!pickup || !dropoff || !selectedService) {
-      console.log('[RoutePreview] Cannot request ride - missing data');
-      return;
-    }
-
+    if (!pickup || !dropoff || !selectedService) return;
     const fare = getFareForService(selectedService.id);
     const amount = fare?.totalFare || selectedService.minimumFare || 15;
 
-    // For card payments, show payment screen first
     if (paymentMethod === 'card') {
       setIsRequestingRide(true);
       try {
-        // Create pre-payment session
         const response = await api.post('/skipcash/prepay', {
           amount,
           serviceId: parseInt(selectedService.id, 10),
@@ -302,9 +325,7 @@ export default function RoutePreviewScreen() {
           dropoffLatitude: dropoff.latitude,
           dropoffLongitude: dropoff.longitude,
         });
-
         if (response.data.success && response.data.payUrl) {
-          // Navigate to payment screen with WebView
           router.push({
             pathname: '/(main)/payment',
             params: {
@@ -315,33 +336,45 @@ export default function RoutePreviewScreen() {
             },
           });
         } else {
-          Alert.alert(
-            t('payment.error.title', { defaultValue: 'Payment Error' }),
-            response.data.error || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
-          );
+          setErrorModal({
+            title: t('payment.error.title', { defaultValue: 'Payment Error' }),
+            msg:
+              response.data.error ||
+              t('payment.error.message', {
+                defaultValue: 'Failed to create payment. Please try again.',
+              }),
+          });
         }
       } catch (error: any) {
-        console.error('[RoutePreview] Error creating pre-payment:', error);
-        Alert.alert(
-          t('payment.error.title', { defaultValue: 'Payment Error' }),
-          error.response?.data?.message || t('payment.error.message', { defaultValue: 'Failed to create payment. Please try again.' })
-        );
+        setErrorModal({
+          title: t('payment.error.title', { defaultValue: 'Payment Error' }),
+          msg:
+            error.response?.data?.message ||
+            t('payment.error.message', {
+              defaultValue: 'Failed to create payment. Please try again.',
+            }),
+        });
       } finally {
         setIsRequestingRide(false);
       }
     } else {
-      // For cash/wallet, proceed directly to finding driver
-      console.log('[RoutePreview] Navigating to finding-driver');
       router.push('/(main)/finding-driver');
     }
   };
 
   if (!pickup || !dropoff) {
     return (
-      <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? 'bg-background-dark' : 'bg-background'}`}>
-        <Text className="text-muted-foreground">{t('errors.generic')}</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-primary">{t('common.back')}</Text>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <Text style={{ color: '#6B7380' }}>{t('errors.generic')}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={{ color: '#101969' }}>{t('common.back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -350,321 +383,495 @@ export default function RoutePreviewScreen() {
   const selectedFare = selectedService ? getFareForService(selectedService.id) : null;
 
   return (
-    <View className="flex-1">
-      {/* Map with Route */}
-      <View className="flex-1">
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={{ flex: 1 }}
-          initialRegion={{
-            latitude: (pickup.latitude + dropoff.latitude) / 2,
-            longitude: (pickup.longitude + dropoff.longitude) / 2,
-            latitudeDelta: Math.abs(pickup.latitude - dropoff.latitude) * 1.5 + 0.01,
-            longitudeDelta: Math.abs(pickup.longitude - dropoff.longitude) * 1.5 + 0.01,
-          }}
-          onMapReady={fitMap}
-          showsUserLocation
-          showsMyLocationButton={false}
-        >
-          {/* Pickup Marker */}
-          <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}>
-            <View className="items-center">
-              <View className="w-8 h-8 rounded-full bg-primary items-center justify-center border-2 border-white shadow-lg">
-                <Ionicons name="location" size={18} color="white" />
-              </View>
-            </View>
-          </Marker>
-
-          {/* Dropoff Marker */}
-          <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}>
-            <View className="items-center">
-              <View className="w-8 h-8 rounded-full bg-destructive items-center justify-center border-2 border-white shadow-lg">
-                <Ionicons name="flag" size={18} color="white" />
-              </View>
-            </View>
-          </Marker>
-
-          {/* Route Line */}
-          {routeCoordinates.length > 0 && (
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor="#4CAF50"
-              strokeWidth={4}
-            />
-          )}
-        </MapView>
-
-        {/* Back button */}
-        <SafeAreaView className="absolute top-0 left-0 z-10" edges={['top']}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className={`m-2 w-9 h-9 rounded-full items-center justify-center shadow-md ${
-              isDark ? 'bg-background-dark border border-border-dark' : 'bg-white border border-border'
-            }`}
-          >
-            <Ionicons name="chevron-back" size={20} color={isDark ? '#FAFAFA' : '#212121'} />
-          </TouchableOpacity>
-        </SafeAreaView>
-
-        {/* Route Info Card - compact pill, horizontally centered */}
-        {routeInfo && (
-          <SafeAreaView className="absolute top-0 left-0 right-0 items-center z-0" edges={['top']} pointerEvents="box-none">
-            <View className={`flex-row mt-2 rounded-full shadow-md px-4 py-1.5 items-center ${isDark ? 'bg-background-dark' : 'bg-white'}`}>
-              <Ionicons name="navigate" size={14} color="#4CAF50" />
-              <Text className={`ml-1 text-sm font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {routeInfo.distance}
-              </Text>
-              <View className="w-px h-4 bg-border dark:bg-border-dark mx-3" />
-              <Ionicons name="time" size={14} color="#2196F3" />
-              <Text className={`ml-1 text-sm font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {routeInfo.duration}
-              </Text>
-            </View>
-          </SafeAreaView>
-        )}
-      </View>
-
-      {/* Bottom Sheet - Services & Price */}
-      <SafeAreaView
-        edges={['bottom']}
-        className={`rounded-t-3xl shadow-lg ${isDark ? 'bg-background-dark' : 'bg-white'}`}
+    <View style={{ flex: 1, backgroundColor: '#EBF0F7' }}>
+      {/* Map */}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={{ flex: 1 }}
+        initialRegion={{
+          latitude: (pickup.latitude + dropoff.latitude) / 2,
+          longitude: (pickup.longitude + dropoff.longitude) / 2,
+          latitudeDelta: Math.abs(pickup.latitude - dropoff.latitude) * 1.5 + 0.01,
+          longitudeDelta: Math.abs(pickup.longitude - dropoff.longitude) * 1.5 + 0.01,
+        }}
+        onMapReady={fitMap}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
       >
-        <View className="px-4 pt-2 pb-2">
-          {/* Drag Handle - tap to collapse/expand */}
-          <TouchableOpacity
-            onPress={() => setSheetCollapsed(!sheetCollapsed)}
-            activeOpacity={0.7}
-            className="py-2 items-center"
+        {/* Pickup marker (blue circle pulse, matches home) */}
+        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}>
+          <View
+            style={{
+              width: 32 * s,
+              height: 32 * s,
+              borderRadius: 16 * s,
+              backgroundColor: 'rgba(3, 102, 251, 0.20)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <View className="w-12 h-1 bg-muted dark:bg-muted-dark rounded-full" />
-            <Ionicons
-              name={sheetCollapsed ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#9ca3af"
-              style={{ marginTop: 2 }}
+            <View
+              style={{
+                width: 14 * s,
+                height: 14 * s,
+                borderRadius: 7 * s,
+                backgroundColor: '#0366FB',
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+              }}
             />
-          </TouchableOpacity>
+          </View>
+        </Marker>
 
-          {/* Route Summary */}
-          <View className="flex-row items-center mb-4">
-            <View className="w-3 h-3 rounded-full bg-primary" />
-            <Text className={`ml-2 text-sm flex-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`} numberOfLines={1}>
-              {pickup.address}
+        {/* Dropoff marker (red pin) */}
+        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}>
+          <Ionicons name="location" size={32 * s} color="#ED4557" />
+        </Marker>
+
+        {routeCoordinates.length > 0 && (
+          <Polyline coordinates={routeCoordinates} strokeColor="#0366FB" strokeWidth={4} />
+        )}
+      </MapView>
+
+      {/* Floating back button */}
+      <SafeAreaView
+        edges={['top']}
+        style={{ position: 'absolute', top: 0, left: 0 }}
+        pointerEvents="box-none"
+      >
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.back()}
+          style={{
+            marginLeft: 20 * s,
+            marginTop: 8 * s,
+            width: 48 * s,
+            height: 48 * s,
+            borderRadius: 24 * s,
+            backgroundColor: '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.12,
+            shadowRadius: 16,
+            elevation: 6,
+          }}
+        >
+          <Ionicons
+            name={isRTL ? 'chevron-forward' : 'chevron-back'}
+            size={22 * s}
+            color="#111111"
+          />
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Bottom sheet — auto-sizes to content via onLayout */}
+      <Animated.View
+        onLayout={onSheetLayout}
+        style={[
+          {
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#FFFFFF',
+            borderTopLeftRadius: 28 * s,
+            borderTopRightRadius: 28 * s,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 24,
+            elevation: 12,
+          },
+          sheetStyle,
+        ]}
+      >
+        {/* Drag handle area (gesture detector) */}
+        <GestureDetector gesture={panGesture}>
+          <View
+            style={{
+              paddingTop: 12 * s,
+              paddingBottom: 6 * s,
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 40 * s,
+                height: 4 * s,
+                borderRadius: 2 * s,
+                backgroundColor: '#E5EBF2',
+              }}
+            />
+          </View>
+        </GestureDetector>
+
+        <View style={{ paddingHorizontal: 20 * s, paddingBottom: 28 * s, gap: 14 * s }}>
+          {/* Title row */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8 * s,
+            }}
+          >
+            <Text
+              style={{
+                flex: 1,
+                color: '#111111',
+                fontSize: 22 * s,
+                fontWeight: '700',
+                letterSpacing: -0.6,
+                textAlign,
+                writingDirection,
+              }}
+            >
+              {t('booking.chooseRide')}
             </Text>
-            <Ionicons name="arrow-forward" size={16} color="#757575" className="mx-2" />
-            <View className="w-3 h-3 rounded-full bg-destructive" />
-            <Text className={`ml-2 text-sm flex-1 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`} numberOfLines={1}>
-              {dropoff.address}
-            </Text>
+            {routeInfo && (
+              <Text
+                style={{
+                  color: '#6B7380',
+                  fontSize: 13 * s,
+                  fontWeight: '500',
+                }}
+              >
+                {routeInfo.distance} · {routeInfo.duration}
+              </Text>
+            )}
           </View>
 
-          {/* Collapsible content */}
-          {!sheetCollapsed && (
-            <>
-          {/* Services */}
-          {isLoading ? (
-            <View className="py-8 items-center">
-              <ActivityIndicator size="large" color="#0366FB" />
-              <Text className="text-muted-foreground mt-2">{t('common.loading')}</Text>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-              {services.map((service) => {
-                const fare = getFareForService(service.id);
-                const isSelected = selectedService?.id === service.id;
-
-                return (
-                  <TouchableOpacity
-                    key={service.id}
-                    onPress={() => setSelectedService(service)}
-                    className={`mr-3 p-4 rounded-xl border-2 min-w-[140px] ${
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : isDark
-                        ? 'border-border-dark bg-card-dark'
-                        : 'border-border bg-card'
-                    }`}
-                  >
-                    <View className="items-center">
-                      <Ionicons
-                        name="car"
-                        size={32}
-                        color={isSelected ? '#4CAF50' : (isDark ? '#FAFAFA' : '#212121')}
-                      />
-                      <Text className={`text-base font-semibold mt-2 ${isSelected ? 'text-primary' : (isDark ? 'text-foreground-dark' : 'text-foreground')}`}>
-                        {service.name}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {service.personCapacity} {t('booking.seats', { count: service.personCapacity })}
-                      </Text>
-                      <Text className={`text-xl font-bold mt-2 ${isSelected ? 'text-primary' : (isDark ? 'text-foreground-dark' : 'text-foreground')}`}>
+          {/* Service rows */}
+          <View style={{ gap: 8 * s }}>
+            {isLoading ? (
+              <View style={{ paddingVertical: 24 * s, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#101969" />
+              </View>
+            ) : (
+              <ScrollView
+                style={{ maxHeight: 250 * s }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 * s }}
+              >
+                {services.map((service) => {
+                  const fare = getFareForService(service.id);
+                  const isSelected = selectedService?.id === service.id;
+                  return (
+                    <TouchableOpacity
+                      key={service.id}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectedService(service)}
+                      style={{
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        gap: 14 * s,
+                        height: 76 * s,
+                        paddingLeft: 14 * s,
+                        paddingRight: 16 * s,
+                        paddingVertical: 10 * s,
+                        borderRadius: 16 * s,
+                        backgroundColor: isSelected ? '#F5F7FC' : '#FFFFFF',
+                        borderWidth: isSelected ? 1.6 : 1,
+                        borderColor: isSelected ? '#101969' : '#E5EBF2',
+                      }}
+                    >
+                      {/* Car illustration */}
+                      <View
+                        style={{
+                          width: 64 * s,
+                          height: 44 * s,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Ionicons name="car-sport" size={42 * s} color="#101969" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: '#111111',
+                            fontSize: 16 * s,
+                            fontWeight: '700',
+                            textAlign,
+                            writingDirection,
+                          }}
+                        >
+                          {service.name}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            marginTop: 2 * s,
+                            color: '#6B7380',
+                            fontSize: 12 * s,
+                            textAlign,
+                            writingDirection,
+                          }}
+                        >
+                          {fare?.eta || 5} {t('booking.minutes', { count: fare?.eta || 5 })} ·{' '}
+                          {service.personCapacity}{' '}
+                          {t('booking.seats', { count: service.personCapacity })}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: '#111111',
+                          fontSize: 16 * s,
+                          fontWeight: '700',
+                        }}
+                      >
                         {fare ? `${fare.currency} ${fare.totalFare.toFixed(2)}` : '...'}
                       </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
 
-          {/* Selected Service Details */}
-          {selectedFare && (
-            <View className={`p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}>
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-muted-foreground">{t('booking.baseFare')}</Text>
-                <Text className={isDark ? 'text-foreground-dark' : 'text-foreground'}>
-                  {selectedFare.currency} {selectedFare.baseFare.toFixed(2)}
+          {/* Payment + Coupon row */}
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 * s }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setPaymentSheetVisible(true)}
+              style={{
+                flex: 1,
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 8 * s,
+                height: 56 * s,
+                paddingLeft: 12 * s,
+                paddingRight: 8 * s,
+                paddingVertical: 10 * s,
+                borderRadius: 14 * s,
+                backgroundColor: '#F5F7FC',
+                borderWidth: 1,
+                borderColor: '#E5EBF2',
+              }}
+            >
+              <Ionicons name={getPaymentIcon(paymentMethod)} size={20 * s} color="#101969" />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 11 * s,
+                    fontWeight: '500',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {t('booking.payment.title', { defaultValue: 'Payment' })}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: '#111111',
+                    fontSize: 13 * s,
+                    fontWeight: '600',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {getPaymentLabel(paymentMethod)}
                 </Text>
               </View>
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-muted-foreground">{t('booking.distanceFare')}</Text>
-                <Text className={isDark ? 'text-foreground-dark' : 'text-foreground'}>
-                  {selectedFare.currency} {selectedFare.distanceFare.toFixed(2)}
-                </Text>
-              </View>
-              <View className="flex-row justify-between mb-2">
-                <Text className="text-muted-foreground">{t('booking.timeFare')}</Text>
-                <Text className={isDark ? 'text-foreground-dark' : 'text-foreground'}>
-                  {selectedFare.currency} {selectedFare.timeFare.toFixed(2)}
-                </Text>
-              </View>
-              <View className="border-t border-border dark:border-border-dark pt-2 mt-2 flex-row justify-between">
-                <Text className={`font-bold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {t('booking.total')}
-                </Text>
-                <Text className={`font-bold text-lg ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {selectedFare.currency} {selectedFare.totalFare.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-          )}
+              <Ionicons
+                name={isRTL ? 'chevron-back' : 'chevron-forward'}
+                size={16 * s}
+                color="#6B7380"
+              />
+            </TouchableOpacity>
 
-          {/* Payment Method Selector */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setCouponModalVisible(true)}
+              style={{
+                flex: 1,
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 8 * s,
+                height: 56 * s,
+                paddingLeft: 12 * s,
+                paddingRight: 8 * s,
+                paddingVertical: 10 * s,
+                borderRadius: 14 * s,
+                backgroundColor: couponCode ? '#E0F0FF' : '#F5F7FC',
+                borderWidth: couponCode ? 1.6 : 1,
+                borderColor: couponCode ? '#101969' : '#E5EBF2',
+              }}
+            >
+              <Ionicons name="pricetag-outline" size={20 * s} color="#101969" />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: '#6B7380',
+                    fontSize: 11 * s,
+                    fontWeight: '500',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {t('booking.coupon.label', 'Coupon')}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: '#111111',
+                    fontSize: 13 * s,
+                    fontWeight: '600',
+                    textAlign,
+                    writingDirection,
+                  }}
+                >
+                  {couponCode
+                    ? `${couponCode}${couponDiscount ? ` · −QAR ${couponDiscount.toFixed(2)}` : ''}`
+                    : t('booking.coupon.addCode', 'Add code')}
+                </Text>
+              </View>
+              <Ionicons
+                name={isRTL ? 'chevron-back' : 'chevron-forward'}
+                size={16 * s}
+                color="#6B7380"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Confirm button */}
           <TouchableOpacity
-            onPress={() => setShowPaymentModal(true)}
-            className={`flex-row items-center justify-between p-4 rounded-xl mb-4 ${isDark ? 'bg-muted-dark' : 'bg-muted'}`}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name={getPaymentIcon(paymentMethod)} size={24} color="#4CAF50" />
-              <Text className={`ml-3 font-medium ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                {getPaymentLabel(paymentMethod)}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#757575" />
-          </TouchableOpacity>
-            </>
-          )}
-
-          {/* Request Ride Button */}
-          <TouchableOpacity
-            onPress={handleRequestRide}
+            activeOpacity={0.9}
             disabled={!selectedService || isLoading || isRequestingRide}
-            className={`py-4 rounded-xl items-center flex-row justify-center ${selectedService && !isLoading && !isRequestingRide ? 'bg-primary' : 'bg-muted dark:bg-muted-dark'}`}
+            onPress={handleRequestRide}
+            style={{
+              height: 56 * s,
+              borderRadius: 14 * s,
+              backgroundColor: selectedService && !isLoading ? '#101969' : '#C7CDD8',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 8 * s,
+            }}
           >
             {isRequestingRide ? (
               <>
                 <ActivityIndicator color="#FFFFFF" size="small" />
-                <Text className="text-white text-lg font-semibold ml-2">
+                <Text style={{ color: '#FFFFFF', fontSize: 16 * s, fontWeight: '600' }}>
                   {t('payment.processingShort', { defaultValue: 'Processing...' })}
                 </Text>
               </>
             ) : (
-              <Text className={`text-lg font-semibold ${selectedService && !isLoading ? 'text-white' : 'text-muted-foreground'}`}>
-                {paymentMethod === 'card'
-                  ? t('booking.payAndRequest', { defaultValue: 'Pay & Request Ride' })
+              <Text style={{ color: '#FFFFFF', fontSize: 16 * s, fontWeight: '600' }}>
+                {selectedService && selectedFare
+                  ? `${t('common.confirm')} ${selectedService.name} · ${selectedFare.currency} ${selectedFare.totalFare.toFixed(2)}`
                   : t('booking.requestRide')}
               </Text>
             )}
           </TouchableOpacity>
-
-          {/* Schedule Later */}
-          <TouchableOpacity
-            onPress={() => router.push('/(main)/schedule')}
-            className="mt-3 py-3 items-center"
-          >
-            <Text className="text-primary font-medium">
-              {t('booking.scheduleLater')}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Animated.View>
 
-      {/* Payment Method Modal */}
-      <Modal
-        visible={showPaymentModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPaymentModal(false)}
+      {/* Payment method bottom sheet */}
+      <BottomSheet
+        visible={paymentSheetVisible}
+        onClose={() => setPaymentSheetVisible(false)}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/50"
-          onPress={() => setShowPaymentModal(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            className={`rounded-t-3xl ${isDark ? 'bg-background-dark' : 'bg-white'}`}
+        <View style={{ gap: 12 * s }}>
+          <Text
+            style={{
+              color: '#111111',
+              fontSize: 18 * s,
+              fontWeight: '700',
+              textAlign,
+              writingDirection,
+            }}
           >
-            <SafeAreaView edges={['bottom']}>
-              <View className="p-6">
-                <View className="w-12 h-1 bg-muted dark:bg-muted-dark rounded-full self-center mb-4" />
-                <Text className={`text-xl font-bold mb-6 ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                  {t('booking.payment.selectMethod', { defaultValue: 'Select Payment Method' })}
-                </Text>
-
-                {(['cash', 'wallet', 'card'] as PaymentMethod[]).map((method) => (
-                  <TouchableOpacity
-                    key={method}
-                    onPress={() => {
-                      setPaymentMethod(method);
-                      setShowPaymentModal(false);
+            {t('booking.payment.selectMethod', { defaultValue: 'Select Payment Method' })}
+          </Text>
+          {(['cash', 'wallet', 'card'] as PaymentMethod[]).map((method) => {
+            const isSelected = paymentMethod === method;
+            return (
+              <TouchableOpacity
+                key={method}
+                activeOpacity={0.85}
+                onPress={() => {
+                  setPaymentMethod(method);
+                  setPaymentSheetVisible(false);
+                }}
+                style={{
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  gap: 14 * s,
+                  padding: 14 * s,
+                  borderRadius: 14 * s,
+                  backgroundColor: isSelected ? '#F5F7FC' : '#FFFFFF',
+                  borderWidth: isSelected ? 1.6 : 1,
+                  borderColor: isSelected ? '#101969' : '#E5EBF2',
+                }}
+              >
+                <Ionicons name={getPaymentIcon(method)} size={22 * s} color="#101969" />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#111111',
+                      fontSize: 15 * s,
+                      fontWeight: '600',
+                      textAlign,
+                      writingDirection,
                     }}
-                    className={`flex-row items-center p-4 rounded-xl mb-3 ${
-                      paymentMethod === method
-                        ? 'bg-primary/10 border-2 border-primary'
-                        : isDark
-                        ? 'bg-muted-dark'
-                        : 'bg-muted'
-                    }`}
                   >
-                    <View className={`w-12 h-12 rounded-full items-center justify-center ${
-                      paymentMethod === method ? 'bg-primary' : isDark ? 'bg-background-dark' : 'bg-white'
-                    }`}>
-                      <Ionicons
-                        name={getPaymentIcon(method)}
-                        size={24}
-                        color={paymentMethod === method ? '#FFFFFF' : '#4CAF50'}
-                      />
-                    </View>
-                    <View className="ml-4 flex-1">
-                      <Text className={`font-semibold ${isDark ? 'text-foreground-dark' : 'text-foreground'}`}>
-                        {getPaymentLabel(method)}
-                      </Text>
-                      <Text className="text-muted-foreground text-sm">
-                        {method === 'cash' && t('booking.payment.cashDesc', { defaultValue: 'Pay with cash to driver' })}
-                        {method === 'wallet' && t('booking.payment.walletDesc', { defaultValue: 'Pay from your wallet balance' })}
-                        {method === 'card' && t('booking.payment.cardDesc', { defaultValue: 'Apple Pay or credit/debit card' })}
-                      </Text>
-                    </View>
-                    {paymentMethod === method && (
-                      <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity
-                  onPress={() => setShowPaymentModal(false)}
-                  className="mt-4 py-4 items-center"
-                >
-                  <Text className="text-muted-foreground font-medium">
-                    {t('common.cancel')}
+                    {getPaymentLabel(method)}
                   </Text>
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+                  <Text
+                    style={{
+                      color: '#6B7380',
+                      fontSize: 12 * s,
+                      marginTop: 2 * s,
+                      textAlign,
+                      writingDirection,
+                    }}
+                  >
+                    {method === 'cash' &&
+                      t('booking.payment.cashDesc', { defaultValue: 'Pay with cash to driver' })}
+                    {method === 'wallet' &&
+                      t('booking.payment.walletDesc', {
+                        defaultValue: 'Pay from your wallet balance',
+                      })}
+                    {method === 'card' &&
+                      t('booking.payment.cardDesc', {
+                        defaultValue: 'Apple Pay or credit/debit card',
+                      })}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={22 * s} color="#101969" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BottomSheet>
+
+      {/* Coupon modal */}
+      <CouponModal
+        visible={couponModalVisible}
+        onClose={() => setCouponModalVisible(false)}
+        onApply={({ code, discount }) => setCoupon(code, discount)}
+        serviceId={selectedService?.id}
+        appliedCode={couponCode}
+      />
+
+      {/* Error modal */}
+      <AlertModal
+        visible={!!errorModal}
+        variant="error"
+        title={errorModal?.title || ''}
+        message={errorModal?.msg}
+        primaryLabel={t('common.ok', 'OK')}
+        onPrimaryPress={() => setErrorModal(null)}
+        onRequestClose={() => setErrorModal(null)}
+      />
     </View>
   );
 }

@@ -7,23 +7,23 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Animated,
-  Platform,
+  useWindowDimensions,
 } from 'react-native';
+import AlertModal from '@/components/AlertModal';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useThemeStore } from '@/stores/theme-store';
 import { useBookingStore } from '@/stores/booking-store';
-import { getColors } from '@/constants/Colors';
 import { addressApi } from '@/lib/api';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 5;
+
+const BASE_W = 393;
 
 interface PlaceResult {
   placeId: string;
@@ -40,15 +40,17 @@ interface SavedPlace {
   address: string;
   latitude: number;
   longitude: number;
-  icon: string;
 }
 
 export default function SearchScreen() {
   const { t, i18n } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
   const { pickup, setPickup, setDropoff } = useBookingStore();
-  const isDark = resolvedTheme === 'dark';
-  const colors = getColors(isDark);
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+
+  const isRTL = i18n.language === 'ar';
+  const writingDirection: 'rtl' | 'ltr' = isRTL ? 'rtl' : 'ltr';
+  const textAlign: 'left' | 'right' = isRTL ? 'right' : 'left';
 
   const [activeInput, setActiveInput] = useState<'pickup' | 'destination'>('destination');
   const [pickupText, setPickupText] = useState(pickup?.address || '');
@@ -58,158 +60,117 @@ export default function SearchScreen() {
   const [recentSearches, setRecentSearches] = useState<PlaceResult[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [samePlaceModalVisible, setSamePlaceModalVisible] = useState(false);
 
   const pickupRef = useRef<TextInput>(null);
   const destinationRef = useRef<TextInput>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const language = i18n.language === 'ar' ? 'ar' : 'en';
 
-  // Load recent searches and saved places on mount
   useEffect(() => {
     loadRecentSearches();
     loadSavedPlaces();
-    // Fade in animation
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
   }, []);
 
-  // Auto-focus destination input
   useEffect(() => {
-    setTimeout(() => {
-      destinationRef.current?.focus();
-    }, 300);
+    setTimeout(() => destinationRef.current?.focus(), 300);
   }, []);
 
   const loadRecentSearches = async () => {
     try {
       const stored = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
-      if (stored) {
-        setRecentSearches(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('Error loading recent searches:', error);
-    }
+      if (stored) setRecentSearches(JSON.parse(stored));
+    } catch {}
   };
 
   const loadSavedPlaces = async () => {
     try {
       const response = await addressApi.getAddresses();
       const addresses = response.data || [];
-      const transformed: SavedPlace[] = addresses.map((addr: any) => {
-        const type = addr.type?.toLowerCase() || 'other';
-        let icon = 'location-outline';
-        if (type === 'home') icon = 'home-outline';
-        else if (type === 'work') icon = 'briefcase-outline';
-        else if (addr.title?.toLowerCase().includes('home')) icon = 'home-outline';
-        else if (addr.title?.toLowerCase().includes('work')) icon = 'briefcase-outline';
-
-        return {
-          id: addr.id?.toString() || String(Math.random()),
-          name: addr.title || addr.type || t('places.addPlace'),
-          type: type as 'home' | 'work' | 'other',
-          address: addr.address || '',
-          latitude: parseFloat(addr.latitude) || 0,
-          longitude: parseFloat(addr.longitude) || 0,
-          icon,
-        };
-      });
+      const transformed: SavedPlace[] = addresses.map((addr: any) => ({
+        id: addr.id?.toString() || String(Math.random()),
+        name: addr.title || addr.type || t('places.addPlace'),
+        type: (addr.type?.toLowerCase() || 'other') as 'home' | 'work' | 'other',
+        address: addr.address || '',
+        latitude: parseFloat(addr.latitude) || 0,
+        longitude: parseFloat(addr.longitude) || 0,
+      }));
       setSavedPlaces(transformed);
-    } catch (error) {
-      console.error('Error loading saved places:', error);
-    }
+    } catch {}
   };
 
   const saveRecentSearch = async (place: PlaceResult) => {
     try {
-      const updated = [place, ...recentSearches.filter(p => p.placeId !== place.placeId)]
-        .slice(0, MAX_RECENT_SEARCHES);
+      const updated = [place, ...recentSearches.filter((p) => p.placeId !== place.placeId)].slice(
+        0,
+        MAX_RECENT_SEARCHES
+      );
       setRecentSearches(updated);
       await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-    } catch (error) {
-      console.error('Error saving recent search:', error);
-    }
+    } catch {}
   };
 
-  const searchPlaces = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-
-    try {
-      // Location bias for Qatar (Doha center) with 50km radius
-      const locationBias = '25.2854,51.5310';
-      const radius = '50000'; // 50km radius
-
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}&language=${language}&location=${locationBias}&radius=${radius}&components=country:qa`
-      );
-      const data = await response.json();
-
-      if (data.status === 'OK') {
-        const results: PlaceResult[] = data.predictions.map((prediction: any) => ({
-          placeId: prediction.place_id,
-          mainText: prediction.structured_formatting?.main_text || prediction.description,
-          secondaryText: prediction.structured_formatting?.secondary_text || '',
-        }));
-        setSearchResults(results);
-      } else {
+  const searchPlaces = useCallback(
+    async (query: string) => {
+      if (query.length < 2) {
         setSearchResults([]);
+        return;
       }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [language]);
+      setIsSearching(true);
+      try {
+        const locationBias = '25.2854,51.5310';
+        const radius = '50000';
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+            query
+          )}&key=${GOOGLE_MAPS_API_KEY}&language=${language}&location=${locationBias}&radius=${radius}&components=country:qa`
+        );
+        const data = await response.json();
+        if (data.status === 'OK') {
+          setSearchResults(
+            data.predictions.map((p: any) => ({
+              placeId: p.place_id,
+              mainText: p.structured_formatting?.main_text || p.description,
+              secondaryText: p.structured_formatting?.secondary_text || '',
+            }))
+          );
+        } else {
+          setSearchResults([]);
+        }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [language]
+  );
 
   const handleTextChange = (text: string, type: 'pickup' | 'destination') => {
-    if (type === 'pickup') {
-      setPickupText(text);
-    } else {
-      setDestinationText(text);
-    }
+    if (type === 'pickup') setPickupText(text);
+    else setDestinationText(text);
 
-    // Debounce search
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-    searchTimeout.current = setTimeout(() => {
-      searchPlaces(text);
-    }, 300);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => searchPlaces(text), 300);
   };
 
-  const getPlaceDetails = async (placeId: string): Promise<{ lat: number; lng: number } | null> => {
+  const getPlaceDetails = async (placeId: string) => {
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${GOOGLE_MAPS_API_KEY}&fields=geometry`
       );
       const data = await response.json();
-
       if (data.status === 'OK' && data.result?.geometry?.location) {
         return data.result.geometry.location;
       }
-    } catch (error) {
-      console.error('Error getting place details:', error);
-    }
+    } catch {}
     return null;
   };
 
   const handleSelectPlace = async (place: PlaceResult, type: 'pickup' | 'destination') => {
     Keyboard.dismiss();
-
-    // Get place coordinates if not already available
-    let latitude = place.latitude;
-    let longitude = place.longitude;
-
+    let { latitude, longitude } = place;
     if (!latitude || !longitude) {
       const coords = await getPlaceDetails(place.placeId);
       if (coords) {
@@ -217,17 +178,9 @@ export default function SearchScreen() {
         longitude = coords.lng;
       }
     }
-
     if (latitude && longitude) {
-      const location = {
-        latitude,
-        longitude,
-        address: place.mainText,
-      };
-
-      // Save to recent searches
+      const location = { latitude, longitude, address: place.mainText };
       saveRecentSearch({ ...place, latitude, longitude });
-
       if (type === 'pickup') {
         setPickup(location);
         setPickupText(place.mainText);
@@ -241,30 +194,53 @@ export default function SearchScreen() {
     }
   };
 
+  // Distance in meters between two coords (haversine).
+  const distanceMeters = (
+    a: { latitude: number; longitude: number },
+    b: { latitude: number; longitude: number }
+  ) => {
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(b.latitude - a.latitude);
+    const dLng = toRad(b.longitude - a.longitude);
+    const lat1 = toRad(a.latitude);
+    const lat2 = toRad(b.latitude);
+    const x =
+      Math.sin(dLat / 2) ** 2 +
+      Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  };
+
+  // "Use current location" — just resolve GPS and apply it immediately,
+  // no confirm/drag step.
   const handleUseCurrentLocation = async () => {
+    Keyboard.dismiss();
     setIsLoadingLocation(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-
       const [address] = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
       });
-
       const addressString = [address?.street, address?.city].filter(Boolean).join(', ');
-
       const currentLocation = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
         address: addressString || t('home.currentLocation'),
       };
+
+      // Setting destination too close to pickup makes no ride sense.
+      if (activeInput === 'destination' && pickup) {
+        const d = distanceMeters(pickup, currentLocation);
+        if (d < 50) {
+          setSamePlaceModalVisible(true);
+          return;
+        }
+      }
 
       if (activeInput === 'pickup') {
         setPickup(currentLocation);
@@ -275,337 +251,404 @@ export default function SearchScreen() {
         setDropoff(currentLocation);
         router.push('/(main)/route-preview');
       }
-    } catch (error) {
-      console.error('Error getting current location:', error);
+    } catch {
     } finally {
       setIsLoadingLocation(false);
     }
   };
 
+  // "Set on map" — open the draggable confirm-location screen.
   const handleChooseOnMap = () => {
+    Keyboard.dismiss();
     router.push({
       pathname: '/(main)/confirm-location',
-      params: { type: activeInput },
+      params: {
+        type: activeInput === 'destination' ? 'dropoff' : 'pickup',
+        source: 'map',
+      },
     });
   };
 
-  const clearInput = (type: 'pickup' | 'destination') => {
-    if (type === 'pickup') {
-      setPickupText('');
-      setPickup(null);
-      pickupRef.current?.focus();
-    } else {
-      setDestinationText('');
-      destinationRef.current?.focus();
-    }
-    setSearchResults([]);
-  };
-
   const swapLocations = () => {
-    const tempPickup = pickup;
-    const tempPickupText = pickupText;
-
     if (pickup) {
       setDestinationText(pickup.address);
       setDropoff(pickup);
     }
-
-    // For now, just swap the text - in real app would swap full location objects
     setPickupText(destinationText);
-    setDestinationText(tempPickupText);
+    setDestinationText(pickupText);
+    setPickup(null);
   };
-
-  const renderSearchResult = (place: PlaceResult, type: 'pickup' | 'destination') => (
-    <TouchableOpacity
-      key={place.placeId}
-      onPress={() => handleSelectPlace(place, type)}
-      className="flex-row items-center px-4 py-3"
-      style={{ backgroundColor: colors.card }}
-      activeOpacity={0.7}
-    >
-      <View
-        className="w-10 h-10 rounded-full items-center justify-center mr-3"
-        style={{ backgroundColor: colors.muted }}
-      >
-        <Ionicons name="location-outline" size={20} color={colors.mutedForeground} />
-      </View>
-      <View className="flex-1">
-        <Text style={{ color: colors.foreground }} className="text-base font-medium" numberOfLines={1}>
-          {place.mainText}
-        </Text>
-        {place.secondaryText ? (
-          <Text style={{ color: colors.mutedForeground }} className="text-sm mt-0.5" numberOfLines={1}>
-            {place.secondaryText}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderRecentSearch = (place: PlaceResult) => (
-    <TouchableOpacity
-      key={place.placeId}
-      onPress={() => handleSelectPlace(place, activeInput)}
-      className="flex-row items-center px-4 py-3"
-      activeOpacity={0.7}
-    >
-      <View
-        className="w-10 h-10 rounded-full items-center justify-center mr-3"
-        style={{ backgroundColor: colors.muted }}
-      >
-        <Ionicons name="time-outline" size={20} color={colors.mutedForeground} />
-      </View>
-      <View className="flex-1">
-        <Text style={{ color: colors.foreground }} className="text-base" numberOfLines={1}>
-          {place.mainText}
-        </Text>
-        {place.secondaryText ? (
-          <Text style={{ color: colors.mutedForeground }} className="text-sm mt-0.5" numberOfLines={1}>
-            {place.secondaryText}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
 
   const currentSearchText = activeInput === 'pickup' ? pickupText : destinationText;
   const showResults = searchResults.length > 0 && currentSearchText.length >= 2;
-  const showRecent = !showResults && recentSearches.length > 0 && currentSearchText.length < 2;
+  const showEmptyState =
+    !showResults && !isSearching && currentSearchText.length >= 2;
+
+  const SectionHeader = ({ children }: { children: string }) => (
+    <Text
+      style={{
+        marginTop: 16 * s,
+        marginBottom: 4 * s,
+        color: '#6B7380',
+        fontSize: 11 * s,
+        fontWeight: '600',
+        letterSpacing: 1.2,
+        textAlign,
+        writingDirection,
+      }}
+    >
+      {children.toUpperCase()}
+    </Text>
+  );
+
+  const PlaceRow = ({
+    icon,
+    title,
+    subtitle,
+    onPress,
+  }: {
+    icon: string;
+    title: string;
+    subtitle?: string;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={{
+        flexDirection: isRTL ? 'row-reverse' : 'row',
+        alignItems: 'center',
+        gap: 14 * s,
+        paddingVertical: 14 * s,
+      }}
+    >
+      <Ionicons name={icon as any} size={20 * s} color="#6B7380" />
+      <View style={{ flex: 1 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: '#111111',
+            fontSize: 15 * s,
+            fontWeight: '600',
+            textAlign,
+            writingDirection,
+          }}
+        >
+          {title}
+        </Text>
+        {!!subtitle && (
+          <Text
+            numberOfLines={1}
+            style={{
+              marginTop: 2 * s,
+              color: '#6B7380',
+              fontSize: 13 * s,
+              textAlign,
+              writingDirection,
+            }}
+          >
+            {subtitle}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        {/* Header */}
-        <View
-          style={{ backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}
-          className="px-4 pb-4"
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          alignItems: 'center',
+          gap: 12 * s,
+          paddingHorizontal: 12 * s,
+          height: 56 * s,
+        }}
+      >
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.back()}
+          style={{
+            width: 40 * s,
+            height: 40 * s,
+            borderRadius: 12 * s,
+            backgroundColor: '#F5F7FC',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          {/* Back button and title */}
-          <View className="flex-row items-center py-2">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="w-10 h-10 items-center justify-center -ml-2"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="arrow-back" size={24} color={colors.foreground} />
-            </TouchableOpacity>
-            <Text style={{ color: colors.foreground }} className="flex-1 text-lg font-semibold ml-2">
-              {t('booking.planYourTrip')}
-            </Text>
-          </View>
+          <Ionicons
+            name={isRTL ? 'chevron-forward' : 'chevron-back'}
+            size={20 * s}
+            color="#111111"
+          />
+        </TouchableOpacity>
+        <Text
+          style={{
+            flex: 1,
+            color: '#111111',
+            fontSize: 18 * s,
+            fontWeight: '600',
+            textAlign,
+            writingDirection,
+          }}
+        >
+          {t('booking.planYourTrip')}
+        </Text>
+      </View>
 
-          {/* Location inputs */}
-          <View className="flex-row mt-2">
-            {/* Timeline dots */}
-            <View className="w-8 items-center justify-center mr-2">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 24 * s, paddingBottom: 24 * s }}
+      >
+        {/* Trip card */}
+        <View
+          style={{
+            marginTop: 8 * s,
+            backgroundColor: '#F5F7FC',
+            borderRadius: 18 * s,
+            borderWidth: 1,
+            borderColor: '#E5EBF2',
+            padding: 16 * s,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'stretch',
+              gap: 12 * s,
+            }}
+          >
+            {/* Timeline */}
+            <View style={{ alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 * s }}>
               <View
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: colors.primary }}
+                style={{
+                  width: 12 * s,
+                  height: 12 * s,
+                  borderRadius: 6 * s,
+                  backgroundColor: '#0366FB',
+                  borderWidth: 3,
+                  borderColor: '#FFFFFF',
+                }}
               />
+              <View style={{ flex: 1, width: 2, backgroundColor: '#E5EBF2', marginVertical: 4 * s }} />
               <View
-                className="w-0.5 h-8 my-1"
-                style={{ backgroundColor: colors.border }}
-              />
-              <View
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: colors.destructive }}
+                style={{
+                  width: 12 * s,
+                  height: 12 * s,
+                  borderRadius: 2 * s,
+                  backgroundColor: '#ED4557',
+                }}
               />
             </View>
 
-            {/* Input fields */}
-            <View className="flex-1">
-              {/* Pickup Input */}
-              <View
-                className="flex-row items-center rounded-xl px-3 mb-2"
+            {/* Inputs */}
+            <View style={{ flex: 1 }}>
+              <TextInput
+                ref={pickupRef}
+                value={pickupText}
+                onChangeText={(text) => handleTextChange(text, 'pickup')}
+                onFocus={() => setActiveInput('pickup')}
+                placeholder={t('booking.pickupLocation')}
+                placeholderTextColor="#6B7380"
                 style={{
-                  backgroundColor: colors.muted,
-                  borderWidth: activeInput === 'pickup' ? 2 : 0,
-                  borderColor: colors.primary,
+                  height: 30 * s,
+                  fontSize: 16 * s,
+                  fontWeight: '600',
+                  color: '#111111',
+                  padding: 0,
+                  textAlign,
                 }}
-              >
-                <TextInput
-                  ref={pickupRef}
-                  value={pickupText}
-                  onChangeText={(text) => handleTextChange(text, 'pickup')}
-                  onFocus={() => setActiveInput('pickup')}
-                  placeholder={t('booking.pickupLocation')}
-                  placeholderTextColor={colors.mutedForeground}
-                  style={{ color: colors.foreground, flex: 1, height: 48, fontSize: 16 }}
-                />
-                {pickupText.length > 0 && (
-                  <TouchableOpacity onPress={() => clearInput('pickup')} className="p-2">
-                    <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Destination Input */}
-              <View
-                className="flex-row items-center rounded-xl px-3"
+              />
+              <View style={{ height: 1, backgroundColor: '#E5EBF2', marginVertical: 12 * s }} />
+              <TextInput
+                ref={destinationRef}
+                value={destinationText}
+                onChangeText={(text) => handleTextChange(text, 'destination')}
+                onFocus={() => setActiveInput('destination')}
+                placeholder={t('home.whereTo')}
+                placeholderTextColor="#6B7380"
                 style={{
-                  backgroundColor: colors.muted,
-                  borderWidth: activeInput === 'destination' ? 2 : 0,
-                  borderColor: colors.primary,
+                  height: 30 * s,
+                  fontSize: 16 * s,
+                  color: '#111111',
+                  padding: 0,
+                  textAlign,
                 }}
-              >
-                <TextInput
-                  ref={destinationRef}
-                  value={destinationText}
-                  onChangeText={(text) => handleTextChange(text, 'destination')}
-                  onFocus={() => setActiveInput('destination')}
-                  placeholder={t('home.whereTo')}
-                  placeholderTextColor={colors.mutedForeground}
-                  style={{ color: colors.foreground, flex: 1, height: 48, fontSize: 16 }}
-                />
-                {destinationText.length > 0 && (
-                  <TouchableOpacity onPress={() => clearInput('destination')} className="p-2">
-                    <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              />
             </View>
 
             {/* Swap button */}
-            <TouchableOpacity
-              onPress={swapLocations}
-              className="w-10 items-center justify-center ml-2"
-            >
-              <Ionicons name="swap-vertical" size={24} color={colors.mutedForeground} />
-            </TouchableOpacity>
+            <View style={{ justifyContent: 'center' }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={swapLocations}
+                style={{
+                  width: 40 * s,
+                  height: 40 * s,
+                  borderRadius: 20 * s,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: '#E5EBF2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="swap-horizontal" size={18 * s} color="#101969" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* Content */}
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }}
+        {/* Quick action chips */}
+        <View
+          style={{
+            marginTop: 14 * s,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            gap: 10 * s,
+          }}
         >
-          {/* Quick Actions */}
-          {!showResults && (
-            <View className="py-2">
-              {/* Current Location */}
-              <TouchableOpacity
-                onPress={handleUseCurrentLocation}
-                disabled={isLoadingLocation}
-                className="flex-row items-center px-4 py-3"
-                activeOpacity={0.7}
-              >
-                <View
-                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                  style={{ backgroundColor: `${colors.primary}20` }}
-                >
-                  {isLoadingLocation ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="locate" size={20} color={colors.primary} />
-                  )}
-                </View>
-                <Text style={{ color: colors.primary }} className="text-base font-medium">
-                  {t('booking.useCurrentLocation')}
-                </Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleUseCurrentLocation}
+            disabled={isLoadingLocation}
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8 * s,
+              paddingHorizontal: 14 * s,
+              paddingVertical: 10 * s,
+              borderRadius: 999,
+              backgroundColor: '#F5F7FC',
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+            }}
+          >
+            {isLoadingLocation ? (
+              <ActivityIndicator size="small" color="#101969" />
+            ) : (
+              <Ionicons name="locate" size={16 * s} color="#101969" />
+            )}
+            <Text style={{ color: '#111111', fontSize: 13 * s, fontWeight: '600' }}>
+              {t('booking.useCurrentLocation')}
+            </Text>
+          </TouchableOpacity>
 
-              {/* Choose on Map */}
-              <TouchableOpacity
-                onPress={handleChooseOnMap}
-                className="flex-row items-center px-4 py-3"
-                activeOpacity={0.7}
-              >
-                <View
-                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                  style={{ backgroundColor: colors.muted }}
-                >
-                  <Ionicons name="map-outline" size={20} color={colors.foreground} />
-                </View>
-                <Text style={{ color: colors.foreground }} className="text-base font-medium">
-                  {t('booking.chooseOnMap')}
-                </Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleChooseOnMap}
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8 * s,
+              paddingHorizontal: 14 * s,
+              paddingVertical: 10 * s,
+              borderRadius: 999,
+              backgroundColor: '#F5F7FC',
+              borderWidth: 1,
+              borderColor: '#E5EBF2',
+            }}
+          >
+            <Ionicons name="navigate" size={16 * s} color="#101969" />
+            <Text style={{ color: '#111111', fontSize: 13 * s, fontWeight: '600' }}>
+              {t('booking.chooseOnMap')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-              {/* Divider */}
-              <View className="h-2" style={{ backgroundColor: colors.muted }} />
-            </View>
-          )}
+        {/* Search loading */}
+        {isSearching && (
+          <View style={{ paddingVertical: 24 * s, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color="#101969" />
+          </View>
+        )}
 
-          {/* Search Results */}
-          {isSearching && (
-            <View className="py-8 items-center">
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          )}
+        {/* Search results */}
+        {showResults && !isSearching && (
+          <View style={{ marginTop: 8 * s }}>
+            {searchResults.map((place) => (
+              <PlaceRow
+                key={place.placeId}
+                icon="location-outline"
+                title={place.mainText}
+                subtitle={place.secondaryText}
+                onPress={() => handleSelectPlace(place, activeInput)}
+              />
+            ))}
+          </View>
+        )}
 
-          {showResults && !isSearching && (
-            <View>
-              {searchResults.map((place) => renderSearchResult(place, activeInput))}
-            </View>
-          )}
+        {/* Empty state for search */}
+        {showEmptyState && (
+          <View style={{ paddingVertical: 32 * s, alignItems: 'center' }}>
+            <Ionicons name="search-outline" size={40 * s} color="#6B7380" />
+            <Text style={{ color: '#6B7380', fontSize: 14 * s, marginTop: 12 * s }}>
+              {t('booking.noResultsFound')}
+            </Text>
+          </View>
+        )}
 
-          {/* Recent Searches */}
-          {showRecent && (
-            <View>
-              <Text
-                style={{ color: colors.mutedForeground }}
-                className="px-4 py-2 text-sm font-medium uppercase"
-              >
-                {t('booking.recentSearches')}
-              </Text>
-              {recentSearches.map(renderRecentSearch)}
-            </View>
-          )}
+        {/* Recent + Suggested when not searching */}
+        {!showResults && !isSearching && (
+          <>
+            {recentSearches.length > 0 && (
+              <>
+                <SectionHeader>{t('booking.recentSearches')}</SectionHeader>
+                {recentSearches.map((place) => (
+                  <PlaceRow
+                    key={place.placeId}
+                    icon="time-outline"
+                    title={place.mainText}
+                    subtitle={place.secondaryText}
+                    onPress={() => handleSelectPlace(place, activeInput)}
+                  />
+                ))}
+              </>
+            )}
 
-          {/* Saved Places */}
-          {savedPlaces.length > 0 && !showResults && (
-            <View className="mt-4">
-              <Text
-                style={{ color: colors.mutedForeground }}
-                className="px-4 py-2 text-sm font-medium uppercase"
-              >
-                {t('booking.savedPlaces')}
-              </Text>
-              {savedPlaces.map((place) => (
-                <TouchableOpacity
-                  key={place.id}
-                  onPress={() => handleSelectPlace({
-                    placeId: place.id,
-                    mainText: place.name,
-                    secondaryText: place.address,
-                    latitude: place.latitude,
-                    longitude: place.longitude,
-                  }, activeInput)}
-                  className="flex-row items-center px-4 py-3"
-                  activeOpacity={0.7}
-                >
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                    style={{ backgroundColor: colors.muted }}
-                  >
-                    <Ionicons name={place.icon as any} size={20} color={colors.foreground} />
-                  </View>
-                  <View className="flex-1">
-                    <Text style={{ color: colors.foreground }} className="text-base font-medium">
-                      {place.name}
-                    </Text>
-                    <Text style={{ color: colors.mutedForeground }} className="text-sm mt-0.5" numberOfLines={1}>
-                      {place.address}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+            {savedPlaces.length > 0 && (
+              <>
+                <SectionHeader>{t('booking.suggested')}</SectionHeader>
+                {savedPlaces.map((place) => (
+                  <PlaceRow
+                    key={place.id}
+                    icon="location-outline"
+                    title={place.name}
+                    subtitle={place.address}
+                    onPress={() =>
+                      handleSelectPlace(
+                        {
+                          placeId: place.id,
+                          mainText: place.name,
+                          secondaryText: place.address,
+                          latitude: place.latitude,
+                          longitude: place.longitude,
+                        },
+                        activeInput
+                      )
+                    }
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </ScrollView>
 
-          {/* Empty State */}
-          {!showResults && !showRecent && !isSearching && currentSearchText.length >= 2 && (
-            <View className="py-8 items-center px-4">
-              <Ionicons name="search-outline" size={48} color={colors.mutedForeground} />
-              <Text style={{ color: colors.mutedForeground }} className="text-base mt-4 text-center">
-                {t('booking.noResultsFound')}
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      </Animated.View>
+      <AlertModal
+        visible={samePlaceModalVisible}
+        variant="warning"
+        title={t('booking.samePlaceTitle', 'Same as pickup')}
+        message={t(
+          'booking.samePlaceMsg',
+          "Your dropoff is the same as your pickup. Please choose a different destination."
+        )}
+        primaryLabel={t('common.ok', 'OK')}
+        onPrimaryPress={() => setSamePlaceModalVisible(false)}
+        onRequestClose={() => setSamePlaceModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }

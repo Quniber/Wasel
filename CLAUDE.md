@@ -19,14 +19,14 @@ Tech stack: TypeScript, NestJS, Expo/React Native, Next.js, Prisma, MySQL, Socke
 ```bash
 npm run dev              # Start all APIs + admin panel via Turbo
 npm run admin-api        # Admin API only (port 3000)
-npm run rider-api        # Rider API only (port 3001)
-npm run driver-api       # Driver API only (port 3002)
 
-# Socket API (must run directly, not via workspace)
-cd apps/socket-api && npm run dev
+# These are NOT in root workspaces — run directly from their directories
+cd apps/rider-api && npm run dev      # Rider API (port 3001)
+cd apps/driver-api && npm run dev     # Driver API (port 3002)
+cd apps/socket-api && npm run dev     # Socket API (port 3004)
 
-# Mobile apps
-cd apps/rider-app && npm start    # Expo dev server
+# Mobile apps (also not in root workspaces)
+cd apps/rider-app && npm start        # Expo dev server
 cd apps/driver-app && npm start
 ```
 
@@ -71,7 +71,7 @@ packages/
 └── socket/          # Socket.IO utilities: RoomManager, DriverTracker, event types
 ```
 
-**Note**: Mobile apps and socket-api are NOT in the root workspaces array (see `package.json`). Run them directly from their directories.
+**Note**: Only `admin-api`, `admin-panel`, and `packages/*` are in the root workspaces array. All other apps (rider-api, driver-api, socket-api, rider-app, driver-app) must be run directly from their directories.
 
 ### NestJS API Pattern
 Each API follows this module structure:

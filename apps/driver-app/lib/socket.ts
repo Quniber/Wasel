@@ -17,6 +17,10 @@ class DriverSocketService {
   private socket: Socket | null = null;
   private listeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   private locationInterval: ReturnType<typeof setInterval> | null = null;
+  // Intended online presence — re-emitted on every (re)connect so the server
+  // always registers the CURRENT socket id after reconnects.
+  private intendedOnline = false;
+  private lastOnlinePayload: { location?: { latitude: number; longitude: number } } = {};
 
   async connect() {
     console.log('[Socket] connect() called');
@@ -43,6 +47,12 @@ class DriverSocketService {
 
     this.socket.on('connect', () => {
       console.log('[Socket] Connected! Socket ID:', this.socket?.id);
+      // Re-register online presence after a (re)connect so the server binds it
+      // to the CURRENT socket id. Without this, dispatch emits to a dead socket.
+      if (this.intendedOnline) {
+        console.log('[Socket] Re-emitting driver:online after connect');
+        this.socket?.emit('driver:online', this.lastOnlinePayload);
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -72,6 +82,7 @@ class DriverSocketService {
   }
 
   disconnect() {
+    this.intendedOnline = false;
     this.stopLocationUpdates();
     if (this.socket) {
       this.socket.disconnect();
@@ -102,11 +113,15 @@ class DriverSocketService {
 
   // Go online - start receiving orders
   goOnline(location?: { latitude: number; longitude: number }) {
-    this.emit('driver:online', { location });
+    // Remember the intended state so we can re-emit it on reconnect.
+    this.intendedOnline = true;
+    this.lastOnlinePayload = { location };
+    this.emit('driver:online', this.lastOnlinePayload);
   }
 
   // Go offline - stop receiving orders
   goOffline() {
+    this.intendedOnline = false;
     this.emit('driver:offline');
     this.stopLocationUpdates();
   }

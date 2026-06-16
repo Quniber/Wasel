@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import PaymentWebView from '@/components/PaymentWebView';
-import { useThemeStore } from '@/stores/theme-store';
+import AlertModal from '@/components/AlertModal';
 import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
-import { getColors } from '@/constants/Colors';
+
+const BASE_W = 393;
 
 export default function PaymentScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const params = useLocalSearchParams<{
     payUrl: string;
     orderId: string;
@@ -19,31 +26,32 @@ export default function PaymentScreen() {
     isPrePay: string;
     serviceId: string;
   }>();
-  const { resolvedTheme } = useThemeStore();
-  const { activeOrder, resetBooking, pickup, dropoff, selectedService, setActiveOrder } = useBookingStore();
-  const isDark = resolvedTheme === 'dark';
-  const colors = getColors(isDark);
+  const { width } = useWindowDimensions();
+  const s = width / BASE_W;
+  const isRTL = i18n.language === 'ar';
+
+  const { activeOrder, resetBooking, pickup, dropoff, selectedService, setActiveOrder } =
+    useBookingStore();
   const isPrePay = params.isPrePay === 'true';
 
-  const [paymentStatus, setPaymentStatus] = useState<'loading' | 'processing' | 'success' | 'error'>('loading');
+  const [paymentStatus, setPaymentStatus] = useState<
+    'loading' | 'processing' | 'success' | 'error'
+  >('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [prePayOrderId, setPrePayOrderId] = useState<string | null>(null);
+  const [cancelModal, setCancelModal] = useState(false);
+  const [closeModal, setCloseModal] = useState(false);
 
   const payUrl = params.payUrl;
-  const orderId = params.orderId || activeOrder?.id?.toString();
   const amount = params.amount;
 
   useEffect(() => {
-    // Listen for payment completion via socket
-    const completedUnsub = socketService.on('order:completed', (data) => {
-      console.log('[Payment] Order completed via socket:', data);
+    const completedUnsub = socketService.on('order:completed', () => {
       setPaymentStatus('success');
     });
-
-    const paymentSuccessUnsub = socketService.on('order:payment_success', (data) => {
-      console.log('[Payment] Payment success via socket:', data);
+    const paymentSuccessUnsub = socketService.on('order:payment_success', () => {
       setPaymentStatus('success');
     });
-
     return () => {
       completedUnsub?.();
       paymentSuccessUnsub?.();
@@ -51,11 +59,9 @@ export default function PaymentScreen() {
   }, []);
 
   useEffect(() => {
-    // Auto-redirect after success
     if (paymentStatus === 'success') {
-      const timer = setTimeout(async () => {
+      const timer = setTimeout(() => {
         if (isPrePay) {
-          // For pre-payment, set up the active order with the order created by server
           if (prePayOrderId && pickup && dropoff && selectedService) {
             setActiveOrder({
               id: prePayOrderId,
@@ -68,10 +74,8 @@ export default function PaymentScreen() {
               createdAt: new Date().toISOString(),
             });
           }
-          // Navigate to finding-driver to wait for driver assignment
           router.replace('/(main)/finding-driver');
         } else {
-          // For post-ride payment, navigate to ride complete
           router.replace('/(main)/ride-complete');
         }
       }, 1500);
@@ -79,194 +83,255 @@ export default function PaymentScreen() {
     }
   }, [paymentStatus, isPrePay, prePayOrderId, pickup, dropoff, selectedService]);
 
-  const [prePayOrderId, setPrePayOrderId] = useState<string | null>(null);
-
   const handlePaymentSuccess = (data?: { orderId?: string; paymentId?: string }) => {
-    console.log('[Payment] WebView reported success:', data);
     setPaymentStatus('processing');
-
-    // For pre-payment, store the orderId from the return URL
     if (isPrePay && data?.orderId) {
       setPrePayOrderId(data.orderId);
     }
-
-    // Wait for socket confirmation or timeout
     setTimeout(() => {
-      if (paymentStatus !== 'success') {
-        // If no socket confirmation, assume success and navigate
-        setPaymentStatus('success');
-      }
+      setPaymentStatus((prev) => (prev !== 'success' ? 'success' : prev));
     }, 3000);
   };
 
-  const handlePaymentCancel = () => {
-    console.log('[Payment] Payment cancelled by user');
-    Alert.alert(
-      t('payment.cancelled.title', { defaultValue: 'Payment Cancelled' }),
-      t('payment.cancelled.message', { defaultValue: 'Would you like to try again or cancel the ride?' }),
-      [
-        {
-          text: t('payment.tryAgain', { defaultValue: 'Try Again' }),
-          onPress: () => {
-            setPaymentStatus('loading');
-          },
-        },
-        {
-          text: t('common.cancel'),
-          style: 'destructive',
-          onPress: () => {
-            // Go back to home - order remains in WaitingForPostPay
-            resetBooking();
-            router.replace('/(main)');
-          },
-        },
-      ]
-    );
-  };
+  const handlePaymentCancel = () => setCancelModal(true);
 
   const handlePaymentError = (error: string) => {
-    console.error('[Payment] Payment error:', error);
     setErrorMessage(error);
     setPaymentStatus('error');
   };
 
-  const handleClose = () => {
-    Alert.alert(
-      t('payment.close.title', { defaultValue: 'Close Payment' }),
-      t('payment.close.message', { defaultValue: 'Are you sure you want to close? Your payment may not be completed.' }),
-      [
-        {
-          text: t('common.cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('common.close'),
-          style: 'destructive',
-          onPress: () => {
-            // Go back - order remains in current state
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(main)');
-            }
-          },
-        },
-      ]
-    );
-  };
+  const handleClose = () => setCloseModal(true);
 
-  // No payment URL provided
+  // Centered status view (loading/processing/success/error)
+  const StatusView = ({
+    icon,
+    iconColor,
+    iconBg,
+    title,
+    message,
+    actions,
+    activity,
+  }: {
+    icon?: keyof typeof Ionicons.glyphMap;
+    iconColor?: string;
+    iconBg?: string;
+    title: string;
+    message?: string;
+    actions?: React.ReactNode;
+    activity?: boolean;
+  }) => (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24 * s,
+        backgroundColor: '#FFFFFF',
+      }}
+      edges={['top', 'bottom']}
+    >
+      {activity ? (
+        <ActivityIndicator size="large" color="#101969" />
+      ) : icon ? (
+        <View
+          style={{
+            width: 88 * s,
+            height: 88 * s,
+            borderRadius: 44 * s,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: iconBg || '#F5F7FC',
+          }}
+        >
+          <Ionicons name={icon} size={48 * s} color={iconColor || '#101969'} />
+        </View>
+      ) : null}
+
+      <Text
+        style={{
+          marginTop: 18 * s,
+          color: '#111111',
+          fontSize: 20 * s,
+          fontWeight: '700',
+          textAlign: 'center',
+        }}
+      >
+        {title}
+      </Text>
+
+      {!!amount && (title === t('payment.success.title', 'Payment Successful!') || false) && (
+        <Text style={{ color: '#101969', fontSize: 18 * s, fontWeight: '700', marginTop: 8 * s }}>
+          {amount} QAR
+        </Text>
+      )}
+
+      {!!message && (
+        <Text
+          style={{
+            color: '#6B7380',
+            fontSize: 14 * s,
+            textAlign: 'center',
+            marginTop: 8 * s,
+            paddingHorizontal: 16 * s,
+          }}
+        >
+          {message}
+        </Text>
+      )}
+
+      {actions && <View style={{ marginTop: 24 * s, width: '100%' }}>{actions}</View>}
+    </SafeAreaView>
+  );
+
   if (!payUrl) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center p-6" style={{ backgroundColor: colors.background }}>
-        <Ionicons name="alert-circle-outline" size={64} color={colors.destructive} />
-        <Text style={{ color: colors.foreground }} className="text-lg font-semibold mt-4 text-center">
-          {t('payment.error.noUrl', { defaultValue: 'Payment Error' })}
-        </Text>
-        <Text style={{ color: colors.mutedForeground }} className="text-center mt-2">
-          {t('payment.error.noUrlMessage', { defaultValue: 'No payment URL provided. Please try again.' })}
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mt-6 px-6 py-3 rounded-xl bg-primary"
-        >
-          <Text className="text-white font-semibold">{t('common.goBack')}</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <StatusView
+        icon="alert-circle-outline"
+        iconColor="#ED4557"
+        iconBg="#FFEBED"
+        title={t('payment.error.noUrl', 'Payment Error')}
+        message={t('payment.error.noUrlMessage', 'No payment URL provided. Please try again.')}
+        actions={
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => router.back()}
+            style={{
+              height: 56 * s,
+              borderRadius: 14 * s,
+              backgroundColor: '#101969',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 16 * s, fontWeight: '600' }}>
+              {t('common.goBack', 'Go back')}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
     );
   }
 
-  // Processing state (after WebView success, waiting for confirmation)
   if (paymentStatus === 'processing') {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center p-6" style={{ backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.foreground }} className="text-lg font-semibold mt-4 text-center">
-          {t('payment.processing.title', { defaultValue: 'Processing Payment' })}
-        </Text>
-        <Text style={{ color: colors.mutedForeground }} className="text-center mt-2">
-          {t('payment.processing.message', { defaultValue: 'Please wait while we confirm your payment...' })}
-        </Text>
-      </SafeAreaView>
+      <StatusView
+        activity
+        title={t('payment.processing.title', 'Processing Payment')}
+        message={t('payment.processing.message', 'Please wait while we confirm your payment...')}
+      />
     );
   }
 
-  // Success state
   if (paymentStatus === 'success') {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center p-6" style={{ backgroundColor: colors.background }}>
-        <View className="w-20 h-20 rounded-full bg-primary/20 items-center justify-center">
-          <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
-        </View>
-        <Text style={{ color: colors.foreground }} className="text-xl font-semibold mt-4 text-center">
-          {t('payment.success.title', { defaultValue: 'Payment Successful!' })}
-        </Text>
-        {amount && (
-          <Text style={{ color: colors.mutedForeground }} className="text-lg mt-2">
-            {amount} QAR
-          </Text>
-        )}
-        <Text style={{ color: colors.mutedForeground }} className="text-center mt-2">
-          {t('payment.success.message', { defaultValue: 'Redirecting...' })}
-        </Text>
-      </SafeAreaView>
+      <StatusView
+        icon="checkmark-circle"
+        iconColor="#33BF73"
+        iconBg="#DBF5E3"
+        title={t('payment.success.title', 'Payment Successful!')}
+        message={t('payment.success.message', 'Redirecting...')}
+      />
     );
   }
 
-  // Error state
   if (paymentStatus === 'error') {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center p-6" style={{ backgroundColor: colors.background }}>
-        <Ionicons name="close-circle-outline" size={64} color={colors.destructive} />
-        <Text style={{ color: colors.foreground }} className="text-lg font-semibold mt-4 text-center">
-          {t('payment.error.title', { defaultValue: 'Payment Failed' })}
-        </Text>
-        <Text style={{ color: colors.mutedForeground }} className="text-center mt-2">
-          {errorMessage || t('payment.error.message', { defaultValue: 'Something went wrong. Please try again.' })}
-        </Text>
-        <View className="flex-row gap-3 mt-6">
-          <TouchableOpacity
-            onPress={() => setPaymentStatus('loading')}
-            className="px-6 py-3 rounded-xl bg-primary"
-          >
-            <Text className="text-white font-semibold">{t('common.retry')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="px-6 py-3 rounded-xl"
-            style={{ backgroundColor: colors.muted }}
-          >
-            <Text style={{ color: colors.foreground }} className="font-semibold">{t('common.cancel')}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <StatusView
+        icon="close-circle-outline"
+        iconColor="#ED4557"
+        iconBg="#FFEBED"
+        title={t('payment.error.title', 'Payment Failed')}
+        message={errorMessage || t('payment.error.message', 'Something went wrong. Please try again.')}
+        actions={
+          <View style={{ flexDirection: 'row', gap: 12 * s }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setPaymentStatus('loading')}
+              style={{
+                flex: 1,
+                height: 56 * s,
+                borderRadius: 14 * s,
+                backgroundColor: '#101969',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 16 * s, fontWeight: '600' }}>
+                {t('common.retry', 'Retry')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.back()}
+              style={{
+                flex: 1,
+                height: 56 * s,
+                borderRadius: 14 * s,
+                backgroundColor: '#F5F7FC',
+                borderWidth: 1,
+                borderColor: '#E5EBF2',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#111111', fontSize: 16 * s, fontWeight: '600' }}>
+                {t('common.cancel', 'Cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
     );
   }
 
-  // Main WebView payment view
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
-      {/* Header */}
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <SafeAreaView edges={['top']}>
-        <View className="flex-row items-center justify-between px-4 py-3 border-b" style={{ borderColor: colors.border }}>
-          <TouchableOpacity onPress={handleClose} className="p-2">
-            <Ionicons name="close" size={24} color={colors.foreground} />
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16 * s,
+            paddingVertical: 12 * s,
+            borderBottomWidth: 1,
+            borderBottomColor: '#E5EBF2',
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleClose}
+            style={{
+              width: 40 * s,
+              height: 40 * s,
+              borderRadius: 12 * s,
+              backgroundColor: '#F5F7FC',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="close" size={20 * s} color="#111111" />
           </TouchableOpacity>
-          <View className="items-center">
-            <Text style={{ color: colors.foreground }} className="text-lg font-semibold">
-              {t('payment.title', { defaultValue: 'Complete Payment' })}
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ color: '#111111', fontSize: 16 * s, fontWeight: '700' }}>
+              {t('payment.title', 'Complete Payment')}
             </Text>
-            {amount && (
-              <Text style={{ color: colors.mutedForeground }} className="text-sm">
+            {!!amount && (
+              <Text
+                style={{
+                  color: '#6B7380',
+                  fontSize: 13 * s,
+                  fontWeight: '500',
+                  marginTop: 2 * s,
+                }}
+              >
                 {amount} QAR
               </Text>
             )}
           </View>
-          <View className="w-10" />
+          <View style={{ width: 40 * s }} />
         </View>
       </SafeAreaView>
 
-      {/* Payment WebView */}
       <PaymentWebView
         payUrl={payUrl}
         onSuccess={handlePaymentSuccess}
@@ -274,15 +339,64 @@ export default function PaymentScreen() {
         onError={handlePaymentError}
       />
 
-      {/* Secure payment badge */}
       <SafeAreaView edges={['bottom']}>
-        <View className="flex-row items-center justify-center py-3 px-4" style={{ borderTopWidth: 1, borderColor: colors.border }}>
-          <Ionicons name="lock-closed" size={16} color={colors.mutedForeground} />
-          <Text style={{ color: colors.mutedForeground }} className="text-xs ml-2">
-            {t('payment.securePayment', { defaultValue: 'Secure payment powered by SkipCash' })}
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6 * s,
+            paddingVertical: 12 * s,
+            paddingHorizontal: 16 * s,
+            borderTopWidth: 1,
+            borderTopColor: '#E5EBF2',
+          }}
+        >
+          <Ionicons name="lock-closed" size={14 * s} color="#6B7380" />
+          <Text style={{ color: '#6B7380', fontSize: 12 * s, fontWeight: '500' }}>
+            {t('payment.securePayment', 'Secure payment powered by SkipCash')}
           </Text>
         </View>
       </SafeAreaView>
+
+      <AlertModal
+        visible={cancelModal}
+        variant="warning"
+        title={t('payment.cancelled.title', 'Payment Cancelled')}
+        message={t('payment.cancelled.message', 'Would you like to try again or cancel the ride?')}
+        primaryLabel={t('payment.tryAgain', 'Try Again')}
+        secondaryLabel={t('common.cancel', 'Cancel')}
+        onPrimaryPress={() => {
+          setCancelModal(false);
+          setPaymentStatus('loading');
+        }}
+        onSecondaryPress={() => {
+          setCancelModal(false);
+          resetBooking();
+          router.replace('/(main)');
+        }}
+        onRequestClose={() => setCancelModal(false)}
+      />
+
+      <AlertModal
+        visible={closeModal}
+        variant="warning"
+        title={t('payment.close.title', 'Close Payment')}
+        message={t(
+          'payment.close.message',
+          'Are you sure you want to close? Your payment may not be completed.'
+        )}
+        primaryLabel={t('common.close', 'Close')}
+        secondaryLabel={t('common.cancel', 'Cancel')}
+        primaryColor="#ED4557"
+        onPrimaryPress={() => {
+          setCloseModal(false);
+          if (router.canGoBack()) router.back();
+          else router.replace('/(main)');
+        }}
+        onSecondaryPress={() => setCloseModal(false)}
+        onRequestClose={() => setCloseModal(false)}
+      />
     </View>
   );
 }

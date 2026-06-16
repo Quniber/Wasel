@@ -39,8 +39,8 @@ export default function SupportScreen() {
     {
       icon: 'logo-whatsapp' as const,
       label: t('support.whatsapp'),
-      subtitle: '+974 5555 6666',
-      onPress: () => Linking.openURL('https://wa.me/97455556666'),
+      subtitle: '+974 7065 6846',
+      onPress: () => Linking.openURL('https://wa.me/97470656846'),
     },
   ];
 

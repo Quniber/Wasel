@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenHeader from '@/components/ScreenHeader';
+import AlertModal from '@/components/AlertModal';
 
 const BASE_W = 393;
 
@@ -56,6 +57,23 @@ export default function SupportScreen() {
   ];
 
   const [expanded, setExpanded] = useState<number | null>(0);
+  const [contactInfo, setContactInfo] = useState<{ title: string; value: string } | null>(null);
+
+  /**
+   * Try to open a tel:/mailto: URL. If the device can't handle it (iOS
+   * simulator with no Mail app, etc.) show the value in a modal so the
+   * user can read or copy it manually.
+   */
+  const openOrShow = async (url: string, title: string, value: string) => {
+    try {
+      const can = await Linking.canOpenURL(url);
+      if (can) {
+        await Linking.openURL(url);
+        return;
+      }
+    } catch {}
+    setContactInfo({ title, value });
+  };
 
   const Card = ({
     icon,
@@ -146,21 +164,27 @@ export default function SupportScreen() {
             icon="call-outline"
             title={t('support.callUs', 'Call us')}
             sub="+974 4040 9999"
-            onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}
+            onPress={() =>
+              openOrShow(
+                `tel:${SUPPORT_PHONE}`,
+                t('support.callUs', 'Call us'),
+                '+974 4040 9999'
+              )
+            }
           />
           <Card
             icon="mail-outline"
             title={t('support.email', 'Email')}
             sub={SUPPORT_EMAIL}
-            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            onPress={() =>
+              openOrShow(`mailto:${SUPPORT_EMAIL}`, t('support.email', 'Email'), SUPPORT_EMAIL)
+            }
           />
           <Card
-            icon="chatbubbles-outline"
-            title={t('support.liveChat', 'Live chat')}
-            sub={t('support.liveChatSub', 'Get help in seconds')}
-            onPress={() => {
-              // TODO: open live chat
-            }}
+            icon="logo-whatsapp"
+            title={t('support.whatsapp', 'WhatsApp')}
+            sub="+974 7065 6846"
+            onPress={() => Linking.openURL('https://wa.me/97470656846')}
           />
         </View>
 
@@ -236,6 +260,16 @@ export default function SupportScreen() {
           })}
         </View>
       </ScrollView>
+
+      <AlertModal
+        visible={!!contactInfo}
+        variant="info"
+        title={contactInfo?.title || ''}
+        message={contactInfo?.value}
+        primaryLabel={t('common.ok', 'OK')}
+        onPrimaryPress={() => setContactInfo(null)}
+        onRequestClose={() => setContactInfo(null)}
+      />
     </SafeAreaView>
   );
 }

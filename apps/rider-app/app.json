@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#101969"
     },
     "ios": {
       "supportsTablet": false,
@@ -25,7 +25,7 @@
         "NSLocationAlwaysUsageDescription": "We need your location to track your ride in progress.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "40"
+      "buildNumber": "41"
     },
     "android": {
       "adaptiveIcon": {
@@ -44,7 +44,7 @@
           "apiKey": "AIzaSyCcjyEPNrx4eRMYof-Z_4aEBjUdRQN8VlE"
         }
       },
-      "versionCode": 4
+      "versionCode": 7
     },
     "web": {
       "bundler": "metro",
@@ -58,7 +58,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
+          "backgroundColor": "#101969",
           "image": "./assets/splash.png",
           "imageWidth": 280,
           "resizeMode": "contain"
