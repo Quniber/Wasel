@@ -104,6 +104,11 @@ export default function FindingDriverScreen() {
   const [searchRadius, setSearchRadius] = useState(500);
 
   const cleanupRef = useRef<(() => void) | null>(null);
+  // Guards against firing router.replace more than once. Even with a single
+  // socket, the order:status handler awaits the order details before navigating,
+  // so a follow-up status event could re-enter and trigger a second navigation
+  // (which slides a duplicate screen in/out). One navigation per screen.
+  const navigatedRef = useRef(false);
   const isCancellingRef = useRef(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [confirmCancelVisible, setConfirmCancelVisible] = useState(false);
@@ -145,6 +150,16 @@ export default function FindingDriverScreen() {
       };
     }, [])
   );
+
+  // Navigate at most once for the lifetime of this screen. Tears down the socket
+  // subscription first so no further status events can re-enter.
+  const navigateOnce = (path: '/(main)/ride-active' | '/(main)/ride-complete' | '/(main)') => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    router.replace(path);
+  };
 
   const startPulseAnimation = () => {
     pulseAnim.setValue(0);
@@ -204,9 +219,7 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(driverData, pickup?.latitude || 0, pickup?.longitude || 0),
               createdAt: fullOrder.createdAt || new Date().toISOString(),
             });
-            cleanupRef.current?.();
-            cleanupRef.current = null;
-            router.replace('/(main)/ride-active');
+            navigateOnce('/(main)/ride-active');
           } catch {
             setActiveOrder({
               id: data.orderId?.toString() || orderId.toString(),
@@ -218,16 +231,12 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(data.driver, pickup?.latitude || 0, pickup?.longitude || 0),
               createdAt: new Date().toISOString(),
             });
-            cleanupRef.current?.();
-            cleanupRef.current = null;
-            router.replace('/(main)/ride-active');
+            navigateOnce('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
         } else if (data.status === 'Finished' || data.status === 'finished') {
-          cleanupRef.current?.();
-          cleanupRef.current = null;
-          router.replace('/(main)/ride-complete');
+          navigateOnce('/(main)/ride-complete');
         }
       });
 
@@ -289,9 +298,7 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(driverData, cp.latitude, cp.longitude),
               createdAt: order.createdAt || new Date().toISOString(),
             });
-            cleanupRef.current?.();
-            cleanupRef.current = null;
-            router.replace('/(main)/ride-active');
+            navigateOnce('/(main)/ride-active');
           } catch {
             setActiveOrder({
               id: data.orderId?.toString() || order.id.toString(),
@@ -303,16 +310,12 @@ export default function FindingDriverScreen() {
               driver: buildDriverObject(data.driver, cp.latitude, cp.longitude),
               createdAt: order.createdAt || new Date().toISOString(),
             });
-            cleanupRef.current?.();
-            cleanupRef.current = null;
-            router.replace('/(main)/ride-active');
+            navigateOnce('/(main)/ride-active');
           }
         } else if (data.status === 'no_drivers' || data.status === 'NotFound') {
           setStatus('not_found');
         } else if (data.status === 'Finished' || data.status === 'finished') {
-          cleanupRef.current?.();
-          cleanupRef.current = null;
-          router.replace('/(main)/ride-complete');
+          navigateOnce('/(main)/ride-complete');
         }
       });
 

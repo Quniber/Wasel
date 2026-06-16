@@ -10,8 +10,41 @@ import { useBookingStore } from '@/stores/booking-store';
 import { socketService } from '@/lib/socket';
 import { orderApi } from '@/lib/api';
 import { getColors } from '@/constants/Colors';
+import BrandAlert from '@/components/BrandAlert';
 
 type RideStatus = 'driver_on_way' | 'driver_arrived' | 'trip_started';
+
+// Decode a Google "encoded polyline" string into map coordinates so the route
+// follows the actual roads instead of a straight line.
+function decodePolyline(encoded: string): { latitude: number; longitude: number }[] {
+  const points: { latitude: number; longitude: number }[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return points;
+}
 
 export default function RideActiveScreen() {
   const { t } = useTranslation();
@@ -21,10 +54,23 @@ export default function RideActiveScreen() {
   const colors = getColors(isDark);
 
   const mapRef = useRef<MapView>(null);
+  const navigatedRef = useRef(false); // guard: navigate to ride-complete only once
   const [status, setStatus] = useState<RideStatus>('driver_on_way');
   const [eta, setEta] = useState(5);
   const [isLoading, setIsLoading] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
+  // Custom map markers must render their view once, then stop tracking changes —
+  // otherwise react-native-maps redraws them on every re-render (driver location
+  // pings), which makes the markers flash/flicker, especially when the driver and
+  // rider overlap at the same coordinate.
+  const [tracksMarkerChanges, setTracksMarkerChanges] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setTracksMarkerChanges(false), 1500);
+    return () => clearTimeout(t);
+  }, []);
+  // Road-following route geometry for the active ride (Google Directions).
+  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Fetch order details from server if driver info is missing
   useEffect(() => {
@@ -128,14 +174,20 @@ export default function RideActiveScreen() {
       } else if (status === 'trip_completed' || status === 'completed' || status === 'finished') {
         // Update local status before navigating to prevent stale state
         updateOrderStatus('Finished');
-        router.replace('/(main)/ride-complete');
+        if (!navigatedRef.current) {
+          navigatedRef.current = true;
+          router.replace('/(main)/ride-complete');
+        }
       }
     });
 
     // Listen for ride completed event (separate from order:status)
     const completedUnsub = socketService.on('order:completed', (data) => {
       console.log('[RideActive] Order completed:', data);
-      router.replace('/(main)/ride-complete');
+      if (!navigatedRef.current) {
+        navigatedRef.current = true;
+        router.replace('/(main)/ride-complete');
+      }
     });
 
     // Listen for payment required event (when payment fails and needs retry)
@@ -211,6 +263,40 @@ export default function RideActiveScreen() {
     fitMapToRoute();
   }, [status, activeOrder?.driver?.latitude, activeOrder?.driver?.longitude]);
 
+  // Fetch the road-following route for the current phase: driver -> pickup while
+  // on the way, pickup -> dropoff once the trip has started. Re-fetched on status
+  // change only (not on every location ping) to avoid hammering the Directions API.
+  useEffect(() => {
+    if (!activeOrder) return;
+    const origin =
+      status === 'trip_started'
+        ? activeOrder.pickup
+        : activeOrder.driver || activeOrder.pickup;
+    const dest = status === 'trip_started' ? activeOrder.dropoff : activeOrder.pickup;
+    if (!origin || !dest) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await orderApi.getDirections({
+          originLat: origin.latitude,
+          originLng: origin.longitude,
+          destLat: dest.latitude,
+          destLng: dest.longitude,
+        });
+        const data = res.data;
+        if (!cancelled && data?.status === 'OK' && data.polyline) {
+          const pts = decodePolyline(data.polyline);
+          if (pts.length > 0) setRouteCoordinates(pts);
+        }
+      } catch {
+        // fall back to straight line if directions fail
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, activeOrder?.id]);
+
   const fitMapToRoute = () => {
     if (!activeOrder || !mapRef.current) return;
 
@@ -280,9 +366,10 @@ export default function RideActiveScreen() {
               // Reset local state
               resetBooking();
               router.replace('/(main)');
-            } catch (error) {
+            } catch (error: any) {
               console.error('[RideActive] Error cancelling order:', error);
-              Alert.alert(t('common.error'), t('errors.generic'));
+              const msg = error?.response?.data?.message || error?.message || t('errors.generic');
+              setErrorMsg(Array.isArray(msg) ? msg.join('\n') : String(msg));
             }
           },
         },
@@ -354,6 +441,9 @@ export default function RideActiveScreen() {
         <Marker
           coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
           title={`${driver.firstName} ${driver.lastName}`}
+          tracksViewChanges={tracksMarkerChanges}
+          anchor={{ x: 0.5, y: 0.5 }}
+          zIndex={2}
         >
           <View className="w-10 h-10 rounded-full bg-primary items-center justify-center border-3 border-white">
             <Ionicons name="car" size={20} color="#FFFFFF" />
@@ -362,23 +452,38 @@ export default function RideActiveScreen() {
 
         {/* Pickup Marker */}
         {status !== 'trip_started' && (
-          <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}>
+          <Marker
+            coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
+            tracksViewChanges={tracksMarkerChanges}
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={1}
+          >
             <View className="w-6 h-6 rounded-full bg-primary border-2 border-white" />
           </Marker>
         )}
 
         {/* Dropoff Marker */}
-        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}>
+        <Marker
+          coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}
+          tracksViewChanges={tracksMarkerChanges}
+          anchor={{ x: 0.5, y: 0.5 }}
+          zIndex={1}
+        >
           <View className="w-6 h-6 rounded-full bg-destructive border-2 border-white" />
         </Marker>
 
-        {/* Route Line */}
+        {/* Route Line — follows the road when directions are available,
+            otherwise falls back to a direct line. */}
         <Polyline
-          coordinates={[
-            { latitude: driver.latitude, longitude: driver.longitude },
-            { latitude: destination.latitude, longitude: destination.longitude },
-          ]}
-          strokeColor="#4CAF50"
+          coordinates={
+            routeCoordinates.length > 1
+              ? routeCoordinates
+              : [
+                  { latitude: driver.latitude, longitude: driver.longitude },
+                  { latitude: destination.latitude, longitude: destination.longitude },
+                ]
+          }
+          strokeColor="#0366FB"
           strokeWidth={4}
         />
       </MapView>
@@ -501,6 +606,14 @@ export default function RideActiveScreen() {
           )}
         </View>
       </SafeAreaView>
+
+      <BrandAlert
+        visible={!!errorMsg}
+        title={t('common.error')}
+        message={errorMsg || ''}
+        buttonText={t('common.ok')}
+        onClose={() => setErrorMsg(null)}
+      />
     </View>
   );
 }
