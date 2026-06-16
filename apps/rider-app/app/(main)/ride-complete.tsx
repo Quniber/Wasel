@@ -102,7 +102,9 @@ export default function RideCompleteScreen() {
     return null;
   }
 
-  const { pickup, dropoff, fare, service } = activeOrder;
+  const { pickup, dropoff, service } = activeOrder;
+  // fare may be undefined or a string depending on how the order was set — coerce safely.
+  const fare = Number((activeOrder as any).fare ?? (activeOrder as any).costBest ?? 0);
 
   const fareBreakdown = [
     { label: t('ride.completed.tripFare'), amount: fare - 1.5 },
